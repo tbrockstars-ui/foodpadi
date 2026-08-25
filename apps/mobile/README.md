@@ -9,7 +9,7 @@ Now/Cook Today/Plan Ahead/Scan are stubs — logic lands in Phases 2-6.
 
 1. From the repo root: `npm install`.
 2. Start the API first (`npm run api:dev`) — the app points at
-   `http://localhost:3000` by default (see `app.json` → `expo.extra.apiBaseUrl`).
+   `http://localhost:4310` by default (see `app.json` → `expo.extra.apiBaseUrl`).
    For a physical device, change this to your machine's LAN IP.
 3. `npm run mobile:start` (or `npm run start --workspace=@foodpadi/mobile`),
    then open in Expo Go or a simulator.
