@@ -35,14 +35,21 @@ Why:
 - TypeScript end-to-end (client ↔ server ↔ DB via Prisma) removes an entire class of shape-mismatch bugs between mobile and API.
 - Node has first-class SDKs for Anthropic Claude, Stripe/RevenueCat, and push notification providers, keeping the integration surface small.
 
-### 2.3 Database — PostgreSQL, managed via Supabase (Postgres + Auth + Storage), accessed only through the backend
+### 2.3 Database — PostgreSQL on Neon, accessed only through the backend
+
+**User decision:** Neon (serverless Postgres) is the database provider.
 
 **Recommended over:** self-hosted Postgres + custom auth; a NoSQL primary store.
 
-Why:
+Why Postgres generally:
 - The data model (§24) is inherently relational with many FKs (users → households → meal_plans → meal_plan_items → recipes → ingredients) — Postgres is the correct fit, not a document store.
-- Supabase gives managed Postgres, row-level security primitives, and object storage (for scan photos) out of the box, which materially de-risks the "encryption at rest," "RLS where appropriate," and "secure secrets management" requirements in §25 without building that infrastructure from scratch.
-- **Important boundary:** the mobile app talks to the NestJS API, never directly to Supabase with a client-side anon key beyond what's needed for auth session bootstrapping. Business rules, entitlement checks, and writes to sensitive tables happen server-side. RLS is a defence-in-depth layer, not the primary authorization mechanism — this satisfies §25's "never trust the client."
+- Neon gives managed, autoscaling Postgres with branching (a real database branch per PR/preview environment is genuinely useful for this project's migration-heavy early phases) and native Postgres row-level security, satisfying the "RLS where appropriate" and "encryption at rest" requirements in §25 without self-hosting.
+
+Consequences of Neon vs. an all-in-one BaaS (e.g. Supabase):
+- Neon provides Postgres only — no bundled Auth or Storage service. That's consistent with this architecture anyway: the NestJS API is the sole auth authority (its own JWT issuance, §2.7 below), not a third-party auth service, so nothing is lost there.
+- **Object storage** (scan photos, receipts — Phase 6) needs a separate provider, since Neon doesn't provide one. Recommend Cloudflare R2 or AWS S3, decided when Phase 6 starts; not load-bearing now.
+- **Important boundary unchanged:** the mobile app talks only to the NestJS API, never directly to the database. Business rules, entitlement checks, and writes to sensitive tables happen server-side. Postgres RLS is applied as defence-in-depth, not the primary authorization mechanism — this satisfies §25's "never trust the client."
+- Prisma is the ORM/migration tool against Neon's connection string (`DATABASE_URL`); Neon's pooled connection string should be used for the API's runtime pool given serverless Postgres connection limits.
 
 ### 2.4 AI — Anthropic Claude (Messages API), called only from the backend
 
@@ -89,9 +96,9 @@ graph TD
         Maps[Places/location provider]
     end
 
-    subgraph Data["Postgres (via Supabase) + Storage"]
-        DB[(Relational schema §24)]
-        Obj[(Scan photos / receipts)]
+    subgraph Data["Neon Postgres + Object Storage (Phase 6+)"]
+        DB[(Relational schema §24, via Prisma)]
+        Obj[(Scan photos / receipts — provider TBD)]
     end
 
     UI -->|HTTPS, authenticated| Backend

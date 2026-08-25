@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "FoodPadi",
+    "slug": "foodpadi",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "uk.foodpadi.app"
+    },
+    "android": {
+      "package": "uk.foodpadi.app"
+    },
+    "extra": {
+      "apiBaseUrl": "http://localhost:3000"
+    }
+  }
+}

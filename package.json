@@ -1,0 +1,17 @@
+{
+  "name": "foodpadi",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "api:dev": "npm run start:dev --workspace=@foodpadi/api",
+    "api:build": "npm run build --workspace=@foodpadi/api",
+    "api:test": "npm run test --workspace=@foodpadi/api",
+    "mobile:start": "npm run start --workspace=@foodpadi/mobile",
+    "shared:build": "npm run build --workspace=@foodpadi/shared",
+    "shared:test": "npm run test --workspace=@foodpadi/shared"
+  }
+}

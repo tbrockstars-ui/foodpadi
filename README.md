@@ -6,7 +6,18 @@ An AI-powered personal food companion for UK consumers, built around three prima
 
 ## Status
 
-Pre-implementation. Phase 0 (product discovery, architecture, and planning documentation) is complete. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for the phased build plan and current position.
+Phase 0 (documentation) and the first pass of Phase 1 (Foundation) are in place: auth, disclaimer acknowledgement, food/lifestyle goal selection, preferences/avoided ingredients, data export/deletion, and a Home screen shell. See [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for what's next.
+
+## Repository Layout
+
+```
+apps/api/       NestJS + Prisma backend (Postgres via Neon) — see apps/api/README.md
+apps/mobile/    Expo/React Native/TypeScript app — see apps/mobile/README.md
+packages/shared/ Shared TypeScript types/DTOs used by both
+docs/           Product, architecture, safety, privacy, and process documentation
+```
+
+Copy `.env.example` to `.env` at the repo root before running the API (Neon connection strings + JWT secrets).
 
 ## Documentation
 

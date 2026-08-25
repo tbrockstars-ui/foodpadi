@@ -71,4 +71,4 @@ audit_logs (id, actor_user_id NULLABLE, action, target_table, target_id, metadat
 - `avoided_ingredients.note` and any free-text field a user can fill are treated as **potentially special-category data** per [PRIVACY_DATA_MODEL.md](PRIVACY_DATA_MODEL.md) — encrypted at rest, excluded from default analytics exports.
 - Pricing fields are stored in integer pence to avoid floating-point currency bugs; `currency` defaults to GBP per §29 (UK-first), schema leaves room for multi-currency later.
 - `pantry_items.confirmed_by_user` defaults false and nothing reads a pantry item as "available" for recommendation until confirmed — enforces §14's "never silently assume."
-- Row-Level Security policies (Postgres/Supabase) are applied per-table keyed on `user_id`/`household_id` membership as defence-in-depth; the API layer remains the primary authorization boundary (§25).
+- Row-Level Security policies (native Postgres, hosted on Neon) are applied per-table keyed on `user_id`/`household_id` membership as defence-in-depth; the API layer remains the primary authorization boundary (§25).
