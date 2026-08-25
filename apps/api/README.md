@@ -25,6 +25,8 @@ ingredients, disclaimer acknowledgement, and data export/deletion. See
 | POST | `/auth/login` | Get access + refresh tokens |
 | POST | `/auth/refresh` | Rotate refresh token |
 | POST | `/auth/logout` | Revoke a refresh token |
+| POST | `/auth/password-reset/request` | Request a reset token (always 204, even for unknown emails — no enumeration) |
+| POST | `/auth/password-reset/confirm` | Set a new password with a valid token; revokes all existing sessions |
 | GET | `/users/me` | Current profile |
 | POST | `/users/me/disclaimer-acknowledge` | Record disclaimer acknowledgement (§12) |
 | POST | `/users/me/complete-onboarding` | Mark onboarding complete (requires disclaimer first) |
@@ -45,5 +47,10 @@ far; expands each phase per [docs/TEST_STRATEGY.md](../../docs/TEST_STRATEGY.md)
 
 - Apple/Google sign-in is not yet wired (email/password only in this pass) —
   tracked for the rest of Phase 1.
+- Password reset emails are **not actually sent** — no email provider is
+  configured yet, so `MailerService` (`src/common/mailer.service.ts`) just
+  logs the reset token to the server console for local testing. Replace with
+  a real provider (e.g. Resend/SES/SendGrid) before production; a user who
+  can't receive the email can't recover their account.
 - No LLM, recipe, planning, pantry, or subscription logic lives here yet —
   that arrives in Phases 2-7 per [docs/IMPLEMENTATION_PLAN.md](../../docs/IMPLEMENTATION_PLAN.md).

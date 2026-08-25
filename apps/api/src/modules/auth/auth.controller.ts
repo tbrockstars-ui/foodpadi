@@ -3,6 +3,8 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
+import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
+import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -29,5 +31,17 @@ export class AuthController {
   @HttpCode(HttpStatus.NO_CONTENT)
   async logout(@Body() dto: RefreshDto) {
     await this.authService.logout(dto.refreshToken);
+  }
+
+  @Post('password-reset/request')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    await this.authService.requestPasswordReset(dto.email);
+  }
+
+  @Post('password-reset/confirm')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async confirmPasswordReset(@Body() dto: ConfirmPasswordResetDto) {
+    await this.authService.confirmPasswordReset(dto.token, dto.newPassword);
   }
 }

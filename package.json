@@ -13,7 +13,7 @@
     "mobile:start": "npm run start --workspace=@foodpadi/mobile",
     "shared:build": "npm run build --workspace=@foodpadi/shared",
     "shared:test": "npm run test --workspace=@foodpadi/shared",
-    "web:dev": "npm run dev --workspace=@foodpadi/web",
+    "web:dev": "npm run dev --workspace=@foodpadi/web -- -p 3100",
     "web:build": "npm run build --workspace=@foodpadi/web"
   },
   "overrides": {

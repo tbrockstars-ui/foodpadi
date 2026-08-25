@@ -4,7 +4,12 @@ import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { colors } from '../theme/colors';
 
-export function AuthScreen() {
+interface Props {
+  onForgotPassword: () => void;
+  successMessage?: string;
+}
+
+export function AuthScreen({ onForgotPassword, successMessage }: Props) {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -32,6 +37,8 @@ export function AuthScreen() {
     <View style={styles.container}>
       <Text style={styles.title}>FoodPadi</Text>
       <Text style={styles.subtitle}>Your food companion that plans with you, not for you.</Text>
+
+      {successMessage ? <Text style={styles.success}>{successMessage}</Text> : null}
 
       <TextInput
         style={styles.input}
@@ -68,6 +75,12 @@ export function AuthScreen() {
         )}
       </TouchableOpacity>
 
+      {mode === 'login' ? (
+        <TouchableOpacity onPress={onForgotPassword}>
+          <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
+        </TouchableOpacity>
+      ) : null}
+
       <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
         <Text style={styles.switchModeText}>
           {mode === 'login' ? "New here? Create an account" : 'Already have an account? Log in'}
@@ -100,6 +113,8 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   primaryButtonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
+  forgotPasswordText: { color: colors.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
   switchModeText: { color: colors.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
   error: { color: colors.danger, marginBottom: 12, fontSize: 14 },
+  success: { color: colors.primary, marginBottom: 16, fontSize: 14, textAlign: 'center' },
 });

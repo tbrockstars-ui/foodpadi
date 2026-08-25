@@ -1,0 +1,29 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mobile",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "mobile:start"],
+      "port": 8081
+    },
+    {
+      "name": "mobile-web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--workspace=@foodpadi/mobile", "--", "--web"],
+      "port": 8081
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "api:dev"],
+      "port": 4310
+    },
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "web:dev"],
+      "port": 3100
+    }
+  ]
+}

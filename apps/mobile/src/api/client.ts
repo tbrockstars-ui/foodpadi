@@ -1,9 +1,16 @@
 import Constants from 'expo-constants';
-import type { AuthResponse, LoginRequest, RegisterRequest, UserSummary } from '@foodpadi/shared';
+import type {
+  AuthResponse,
+  ConfirmPasswordResetRequest,
+  LoginRequest,
+  RegisterRequest,
+  RequestPasswordResetRequest,
+  UserSummary,
+} from '@foodpadi/shared';
 import { tokenStore } from './tokenStore';
 
 const API_BASE_URL: string =
-  (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ?? 'http://localhost:3000';
+  (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ?? 'http://localhost:4310';
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -53,6 +60,10 @@ export const api = {
     request<UserSummary>('/users/me/complete-onboarding', { method: 'POST', auth: true }),
   setGoal: (goalType: string) =>
     request('/users/me/goal', { method: 'PUT', body: { goalType }, auth: true }),
+  requestPasswordReset: (payload: RequestPasswordResetRequest) =>
+    request<void>('/auth/password-reset/request', { method: 'POST', body: payload }),
+  confirmPasswordReset: (payload: ConfirmPasswordResetRequest) =>
+    request<void>('/auth/password-reset/confirm', { method: 'POST', body: payload }),
 };
 
 export { ApiError };

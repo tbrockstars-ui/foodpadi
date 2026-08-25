@@ -4,16 +4,19 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parseDurationMs } from '../../common/duration.util';
+import { MailerService } from '../../common/mailer.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
 const BCRYPT_ROUNDS = 12;
+const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
+    private readonly mailer: MailerService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -86,6 +89,57 @@ export class AuthService {
       where: { tokenHash, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+  }
+
+  /**
+   * Always resolves the same way regardless of whether the email matches an
+   * account — a different response for unknown emails would let an attacker
+   * enumerate registered users.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (!user) {
+      return;
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    await this.prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: this.hashToken(rawToken),
+        expiresAt: new Date(Date.now() + PASSWORD_RESET_TTL_MS),
+      },
+    });
+
+    await this.mailer.sendPasswordResetEmail(email, rawToken);
+  }
+
+  async confirmPasswordReset(rawToken: string, newPassword: string): Promise<void> {
+    const tokenHash = this.hashToken(rawToken);
+    const stored = await this.prisma.passwordResetToken.findUnique({ where: { tokenHash } });
+
+    if (!stored || stored.usedAt || stored.expiresAt < new Date()) {
+      throw new UnauthorizedException('This reset link is invalid or has expired.');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: stored.userId },
+        data: { passwordHash },
+      }),
+      this.prisma.passwordResetToken.update({
+        where: { id: stored.id },
+        data: { usedAt: new Date() },
+      }),
+      // A password reset is a security event — force every existing session
+      // to re-authenticate rather than leaving old refresh tokens valid.
+      this.prisma.refreshToken.updateMany({
+        where: { userId: stored.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
+    ]);
   }
 
   private async issueTokens(

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
-import { AuthScreen } from '../screens/AuthScreen';
+import { AuthFlow } from './AuthFlow';
 import { DisclaimerScreen } from '../screens/DisclaimerScreen';
 import { GoalScreen } from '../screens/GoalScreen';
 import { HomeScreen } from '../screens/HomeScreen';
@@ -27,7 +27,7 @@ export function RootNavigator() {
   }
 
   if (!user) {
-    return <AuthScreen />;
+    return <AuthFlow />;
   }
 
   if (!user.disclaimerAcknowledgedAt) {
