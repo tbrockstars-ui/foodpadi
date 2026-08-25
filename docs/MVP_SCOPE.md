@@ -2,6 +2,8 @@
 
 Per spec §32, with priorities per §45 (P0 = launch blocker, P1 = MVP, P2 = post-MVP, P3 = future).
 
+**Platform scope (user decision):** the mobile app (iOS/Android, Expo) is the only user-facing surface. The web application (`apps/web`) is limited to a public landing page (directs visitors to install the app) and a staff-only admin/support page — never a customer-facing web version of Eat Now/Cook Today/Plan Ahead/etc. See [TECHNICAL_ARCHITECTURE.md §2.7](TECHNICAL_ARCHITECTURE.md#27-web-surface--landing-page--admin-support-page-only).
+
 ## In Scope (MVP)
 
 | # | Feature | Priority | Notes |

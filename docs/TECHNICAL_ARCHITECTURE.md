@@ -66,9 +66,24 @@ Why:
 
 A scheduler (backend cron / queue) decides *when* and *why* to notify (§18, §37 — every notification must justify itself); Expo only handles delivery.
 
-### 2.7 Infra / deployment
+### 2.7 Web surface — landing page + admin support page only
+
+**User decision:** there is no customer-facing web app. The only web surfaces are (1) a public marketing landing page that directs visitors to install the mobile app, and (2) an internal, staff-only admin/support page. No user-facing feature (Eat Now, Cook Today, Plan Ahead, etc.) is ever built for web — the mobile app is the only place end users transact with the product.
+
+Recommendation: a single `apps/web` Next.js (TypeScript) app with two independent surfaces sharing one deploy:
+- `/` (and marketing routes) — static/SSG landing page: value proposition, App Store/Play Store links, links to the disclaimer (§12) and privacy notice. No auth, no user data, minimal JS.
+- `/admin/*` — staff-only, authenticated separately from end-user auth (its own login, not the mobile app's JWT flow), calling dedicated admin endpoints on the NestJS API. Used for the admin/analytics capability in §38 (aggregate usage, safety events, feedback triage, subscription lookups) and for handling user support requests (e.g. account/data-deletion requests that need manual assistance).
+
+Why Next.js for this rather than a static site generator plus a separate admin tool:
+- One deploy, one TypeScript codebase, reuses `@foodpadi/shared` types for anything the admin page renders from API responses.
+- The admin page needs real interactivity (tables, filters, forms) — a plain static site would need a second tool bolted on anyway; Next.js covers both surfaces without over-engineering either.
+
+Non-negotiable boundary carried over from §25/§38: the admin page never exposes more than it needs to — aggregate views by default, per-user drill-down is a permissioned, audit-logged action, and admin auth is entirely separate from end-user auth (a compromised admin account must not be reachable via the same credential surface as a consumer account).
+
+### 2.8 Infra / deployment
 
 - Backend: containerized NestJS service, deployed to a managed container platform (e.g. Fly.io / Render / AWS ECS — final choice deferred to Phase 8, not load-bearing now).
+- Web (landing + admin): deployed separately from the API (e.g. Vercel), since it has a different release cadence and no reason to share infrastructure with the stateful backend.
 - CI: lint + typecheck + test gate on every PR (§42).
 - Observability: structured logging + error monitoring (Sentry) + basic AI cost/usage metering from day one, since §38/§31 require AI cost per active user as a tracked metric.
 
@@ -78,6 +93,11 @@ A scheduler (backend cron / queue) decides *when* and *why* to notify (§18, §3
 graph TD
     subgraph Client["Mobile App (React Native / Expo)"]
         UI[Home / Eat Now / Cook Today / Plan Ahead / Scan UI]
+    end
+
+    subgraph Web["apps/web (Next.js) — no user-facing features"]
+        Landing[Landing page: app store links, disclaimer, privacy]
+        Admin[/admin — staff-only support & analytics/]
     end
 
     subgraph Backend["NestJS API (TypeScript)"]
@@ -102,6 +122,7 @@ graph TD
     end
 
     UI -->|HTTPS, authenticated| Backend
+    Admin -->|HTTPS, staff auth, separate from end-user auth| Backend
     L5 <--> Claude
     L6 --> Push
     L6 --> RevCat
@@ -116,3 +137,5 @@ graph TD
 2. Every deterministic calculation (budget totals, ingredient consolidation, quantities, subscription entitlement) is computed server-side and is unit-tested; the LLM may *describe* a result but never *produce* the number of record.
 3. The allergy/medical safety boundary (§11) is enforced as a Layer 3 rule (a response filter + fixed disclaimer injection), not as an LLM instruction alone — LLM instructions are a second layer of defence, not the only one.
 4. Pricing, feature flags, and entitlement thresholds live in server-side config, not client code or hard-coded constants.
+5. No end-user-facing product feature is ever implemented on the web. `apps/web` is limited to the public landing page and the staff-only admin/support page; the mobile app is the sole client for Eat Now, Cook Today, Plan Ahead, Scan, Shop, and every other user-facing capability.
+6. Admin authentication is entirely separate from end-user authentication (different credential store/flow) — no shared session mechanism between a consumer account and staff access.

@@ -8,7 +8,7 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 ## Phase 1 — Foundation
 
-- Repo scaffold: `/apps/mobile` (Expo/TypeScript), `/apps/api` (NestJS/TypeScript), `/packages/shared` (shared types/DTOs).
+- Repo scaffold: `/apps/mobile` (Expo/TypeScript, the only user-facing client), `/apps/api` (NestJS/TypeScript), `/apps/web` (Next.js — landing page + staff-only admin/support page, no user-facing features), `/packages/shared` (shared types/DTOs).
 - Postgres (Neon) schema + Prisma migrations for identity/household/preferences/goals tables ([DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) sections 1-2).
 - Auth (email + Apple/Google), session handling.
 - Onboarding flow: disclaimer acknowledgement, goal selection, optional preferences.

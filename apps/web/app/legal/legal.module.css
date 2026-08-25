@@ -1,0 +1,11 @@
+.main {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.body {
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--text);
+}

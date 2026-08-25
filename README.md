@@ -12,8 +12,9 @@ Phase 0 (documentation) and the first pass of Phase 1 (Foundation) are in place:
 
 ```
 apps/api/       NestJS + Prisma backend (Postgres via Neon) — see apps/api/README.md
-apps/mobile/    Expo/React Native/TypeScript app — see apps/mobile/README.md
-packages/shared/ Shared TypeScript types/DTOs used by both
+apps/mobile/    Expo/React Native/TypeScript app — the only user-facing surface — see apps/mobile/README.md
+apps/web/       Next.js landing page + staff-only admin/support page (no user-facing features) — see apps/web/README.md
+packages/shared/ Shared TypeScript types/DTOs used across all three
 docs/           Product, architecture, safety, privacy, and process documentation
 ```
 
