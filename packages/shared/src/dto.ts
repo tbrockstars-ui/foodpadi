@@ -111,6 +111,10 @@ export interface RecipeView {
 
 export type SaveRecipeRequest = RecipeView;
 
+export interface ImportRecipeRequest {
+  url: string;
+}
+
 export interface SearchEatNowRequest {
   query: string;
   maxPricePence?: number;

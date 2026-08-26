@@ -9,6 +9,7 @@ import type {
   GenerateRecipesRequest,
   GeneratePlanRequest,
   GuestSessionResponse,
+  ImportRecipeRequest,
   LoginRequest,
   MealPlanView,
   RecipeView,
@@ -138,6 +139,8 @@ export const api = {
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
     request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
+  importRecipe: (payload: ImportRecipeRequest) =>
+    request<RecipeView>('/recipe-import', { method: 'POST', body: payload, auth: true }),
   searchEatNow: (payload: SearchEatNowRequest, token: string) =>
     request<never>('/eat-now/search', { method: 'POST', body: payload, token }),
   generatePlan: (payload: GeneratePlanRequest) =>

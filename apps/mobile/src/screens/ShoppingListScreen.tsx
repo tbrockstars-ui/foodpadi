@@ -6,6 +6,7 @@ import { api } from '../api/client';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { AISLE_ORDER, categorizeIngredient } from '../constants/aisleCategories';
 import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
@@ -51,6 +52,10 @@ export function ShoppingListScreen({ route, navigation }: Props) {
   }
 
   const remaining = list.items.filter((i) => !i.checked).length;
+  const groups = AISLE_ORDER.map((aisle) => ({
+    aisle,
+    items: list.items.filter((item) => categorizeIngredient(item.ingredientName) === aisle),
+  })).filter((group) => group.items.length > 0);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
@@ -65,28 +70,33 @@ export function ShoppingListScreen({ route, navigation }: Props) {
       {list.items.length === 0 ? (
         <EmptyState title="Nothing here yet" body="Add an item below to get started." />
       ) : (
-        <Card style={styles.card}>
-          {list.items.map((item) => (
-            <View key={item.id} style={styles.row}>
-              <TouchableOpacity
-                style={styles.checkRow}
-                onPress={() => toggle(item.id, !item.checked)}
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: item.checked }}
-              >
-                <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
-                  {item.checked ? <Text style={styles.checkmark}>✓</Text> : null}
+        groups.map((group) => (
+          <View key={group.aisle} style={styles.group}>
+            <Text style={styles.groupHeading}>{group.aisle}</Text>
+            <Card style={styles.card}>
+              {group.items.map((item) => (
+                <View key={item.id} style={styles.row}>
+                  <TouchableOpacity
+                    style={styles.checkRow}
+                    onPress={() => toggle(item.id, !item.checked)}
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: item.checked }}
+                  >
+                    <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
+                      {item.checked ? <Text style={styles.checkmark}>✓</Text> : null}
+                    </View>
+                    <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>
+                      {[item.quantity, item.ingredientName].filter(Boolean).join(' ')}
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => removeItem(item.id)} accessibilityLabel="Remove item">
+                    <Text style={styles.removeIcon}>✕</Text>
+                  </TouchableOpacity>
                 </View>
-                <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>
-                  {[item.quantity, item.ingredientName].filter(Boolean).join(' ')}
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => removeItem(item.id)} accessibilityLabel="Remove item">
-                <Text style={styles.removeIcon}>✕</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-        </Card>
+              ))}
+            </Card>
+          </View>
+        ))
       )}
 
       <View style={styles.addRow}>
@@ -116,6 +126,8 @@ const styles = StyleSheet.create({
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   card: { marginBottom: spacing.lg },
+  group: { marginBottom: spacing.sm },
+  groupHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

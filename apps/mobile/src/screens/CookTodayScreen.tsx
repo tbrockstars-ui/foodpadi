@@ -279,6 +279,12 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
         disabled={ingredients.length === 0}
         style={styles.actionSpacing}
       />
+
+      {user ? (
+        <TouchableOpacity onPress={() => navigation.navigate('ImportRecipe')} style={styles.importLink}>
+          <Text style={styles.importLinkText}>Or import a recipe from a link →</Text>
+        </TouchableOpacity>
+      ) : null}
     </ScrollView>
   );
 }
@@ -313,6 +319,8 @@ const styles = StyleSheet.create({
   addButtonText: { color: colors.text, fontWeight: '600' },
   errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
+  importLink: { marginTop: spacing.lg, alignItems: 'center' },
+  importLinkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   resultCard: { marginBottom: spacing.md },
   resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
