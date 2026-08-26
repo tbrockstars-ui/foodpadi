@@ -19,7 +19,7 @@ const TOOL_SHORTCUTS = [
   { key: 'eat-now', label: 'Eat Now', live: true },
   { key: 'cook-today', label: 'Cook Today', live: true },
   { key: 'plan-ahead', label: 'Plan Ahead', live: true },
-  { key: 'scan', label: 'Scan', live: false },
+  { key: 'scan', label: 'Scan', live: true },
 ] as const;
 
 export function HomeScreen({ navigation, onRequestLogin }: Props) {
@@ -54,6 +54,12 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
     if (key === 'plan-ahead') {
       if (isGuest) onRequestLogin();
       else navigation.navigate('PlanAhead');
+    }
+    // Scan builds your personal pantry, which only exists for a real account
+    // (same precedent as Plan Ahead) — a guest tapping it goes to signup.
+    if (key === 'scan') {
+      if (isGuest) onRequestLogin();
+      else navigation.navigate('Scan');
     }
   };
 

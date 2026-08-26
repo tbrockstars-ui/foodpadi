@@ -23,6 +23,14 @@ export interface PlanGenerationInput {
   avoidedIngredients?: string[];
 }
 
+export interface RawScannedItem {
+  name: unknown;
+  quantity?: unknown;
+  unit?: unknown;
+}
+
+export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
+
 const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intolerance, or medical condition, and never state or imply a recipe is medically appropriate. You may only describe what ingredients a recipe contains. Do not repeat the same ingredient twice within one recipe's ingredients list. Every recipe must have at least 2 steps and a positive cookTimeMinutes and servings.`;
 
 // MVP fallback: with no ANTHROPIC_API_KEY configured, serve these instead of
@@ -170,6 +178,16 @@ Rules you must follow:
 - If a weekly budget is given, treat it as a soft steering hint toward simpler, less expensive ingredients — you have no real pricing data, so never state or imply an exact cost.
 - ${SAFETY_RULES}`;
 
+const SCAN_SYSTEM_PROMPT = `You are the food-recognition component inside FoodPadi, a UK food companion app. You are shown a photo of food — a fridge, cupboard, shopping bag, or receipt — and must identify what food and drink items are visible.
+
+Rules you must follow:
+- Return ONLY valid JSON, no prose before or after it, matching exactly this shape:
+  {"items": [{"name": string, "quantity": string | null, "unit": string | null}]}
+- Only include food or drink items you can actually see or read. Do not guess at items that aren't visible.
+- Use generic names (e.g. "baked beans", "semi-skimmed milk"), not specific brand names, unless the brand name is the clearest way to describe a distinctive product.
+- Do not estimate expiry dates, freshness, or safety — you are identifying what is present, nothing more.
+- If you cannot identify any food items in the photo, return {"items": []}.`;
+
 @Injectable()
 export class ClaudeService {
   private readonly logger = new Logger(ClaudeService.name);
@@ -223,6 +241,49 @@ export class ClaudeService {
       .join(' ');
 
     return this.callForRecipes(PLAN_AHEAD_SYSTEM_PROMPT, userMessage, 400 + input.days * 500);
+  }
+
+  // No curated fallback here, unlike the two methods above — a specific
+  // user's photo can't be honestly faked with generic placeholder content
+  // the way a generic recipe suggestion can. Gates on ANTHROPIC_API_KEY via
+  // getClient() and throws a plain 503 if it's unset.
+  async analyzeFoodPhoto(imageBase64: string, mediaType: ScanImageMediaType): Promise<RawScannedItem[]> {
+    const client = this.getClient();
+    const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: 1024,
+      system: SCAN_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: 'What food or drink items can you identify in this photo?' },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === 'text');
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new ServiceUnavailableException('The scanner returned an empty response.');
+    }
+
+    let parsed: { items?: unknown };
+    try {
+      parsed = JSON.parse(textBlock.text);
+    } catch {
+      this.logger.error(`Failed to parse scan output as JSON: ${textBlock.text.slice(0, 500)}`);
+      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
+    }
+
+    if (!Array.isArray(parsed.items)) {
+      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
+    }
+
+    return parsed.items as RawScannedItem[];
   }
 
   private async callForRecipes(

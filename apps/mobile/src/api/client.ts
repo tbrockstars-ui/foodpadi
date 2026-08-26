@@ -1,5 +1,7 @@
 import Constants from 'expo-constants';
 import type {
+  AddPantryItemsRequest,
+  AddPantryItemsResponse,
   AddShoppingListItemRequest,
   AuthResponse,
   AvoidedIngredientItem,
@@ -17,6 +19,8 @@ import type {
   RegisterRequest,
   RequestPasswordResetRequest,
   SaveRecipeRequest,
+  ScanPhotoRequest,
+  ScannedItemView,
   SearchEatNowRequest,
   SetFoodGoalsRequest,
   ShoppingListView,
@@ -163,6 +167,10 @@ export const api = {
     request(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: payload, auth: true }),
   removeShoppingListItem: (listId: string, itemId: string) =>
     request<void>(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE', auth: true }),
+  scanPhoto: (payload: ScanPhotoRequest) =>
+    request<ScannedItemView[]>('/scan/photo', { method: 'POST', body: payload, auth: true }),
+  addPantryItems: (payload: AddPantryItemsRequest) =>
+    request<AddPantryItemsResponse>('/pantry/items', { method: 'POST', body: payload, auth: true }),
 };
 
 export { ApiError };

@@ -36,6 +36,7 @@ model User {
   foodEvents               FoodEvent[]
   mealPlans                MealPlan[]
   shoppingLists            ShoppingList[]
+  pantryItems              PantryItem[]
 
   @@map("users")
 }
@@ -297,4 +298,23 @@ model AiMemory {
   deletedAt  DateTime? @map("deleted_at")
 
   @@map("ai_memory")
+}
+
+// Scan (Phase 6): a photo of food is analysed (Layer 5, vision) into
+// candidate items, but nothing here is written until the user explicitly
+// confirms the reviewed list — this table only ever holds confirmed rows,
+// never raw scan output. `source` distinguishes how an item was added.
+model PantryItem {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String
+  quantity   String?
+  unit       String?
+  source     String    @default("manual") // "manual" | "scan_photo"
+  createdAt  DateTime  @default(now()) @map("created_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  @@index([userId])
+  @@map("pantry_items")
 }

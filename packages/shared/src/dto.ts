@@ -115,6 +115,33 @@ export interface ImportRecipeRequest {
   url: string;
 }
 
+export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+export interface ScanPhotoRequest {
+  imageBase64: string;
+  mediaType: ScanImageMediaType;
+}
+
+export interface ScannedItemView {
+  name: string;
+  quantity: string | null;
+  unit: string | null;
+}
+
+export interface PantryItemInput {
+  name: string;
+  quantity?: string;
+  unit?: string;
+}
+
+export interface AddPantryItemsRequest {
+  items: PantryItemInput[];
+}
+
+export interface AddPantryItemsResponse {
+  added: number;
+}
+
 export interface SearchEatNowRequest {
   query: string;
   maxPricePence?: number;

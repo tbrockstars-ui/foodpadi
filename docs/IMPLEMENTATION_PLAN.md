@@ -81,12 +81,14 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 **Exit criteria:** acceptance criteria 12-13, 15-16 pass.
 
-## Phase 6 — Scan
+## Phase 6 — Scan (photo scanning ✅, barcode not started)
 
-- Barcode scanning (fast win — deterministic lookup, no AI vision needed).
-- Receipt scanning and photo-based pantry/fridge detection (AI vision), **always** behind an explicit user-confirm-before-write step.
+- Photo-based pantry detection (AI vision — `ClaudeService.analyzeFoodPhoto`, `ScanModule`), always behind an explicit user-confirm-before-write step: `POST /scan/photo` only ever returns candidate items (Layer 3-validated via `scan-validation.ts`'s `sanitizeScannedItems`), nothing is written to `pantry_items` until the user reviews the list on `ScanScreen` and calls `POST /pantry/items` with the (possibly edited/trimmed) confirmed set. New `PantryItem` model (migration `20260826172848_add_pantry_items`, applied to the real Neon DB). Account-only, no guest access (same precedent as Plan Ahead — it builds a persisted, personal pantry). Deliberately has **no curated fallback** unlike Cook Today/Plan Ahead/Eat Now: a specific user's own photo can't be honestly faked with generic placeholder content, so with no `ANTHROPIC_API_KEY` this is a plain 503, not a demo-able stand-in. ✅ built and verified live: registered a real account, navigated Home → Scan, selected a real image file through the browser's actual file picker (`expo-image-picker`'s web implementation), confirmed the request reached `/scan/photo` and the app displayed the graceful "not configured yet" message — the same honest gate Cook Today had before its fallback was added.
+- Not verified live: the review screen (checkbox per detected item, deselect before confirming) and the actual `/pantry/items` write from the UI, since both require real vision output and no `ANTHROPIC_API_KEY` exists in this environment. The `/pantry/items` endpoint itself *was* verified directly (bypassing the UI): posted items, got a real `pantry_items` row back, confirmed cascade-delete on account deletion. Flagging this gap honestly rather than claiming full UI verification.
+- Barcode scanning (deterministic lookup, no AI vision needed) — not started; no product/barcode data source chosen yet, same open question as Eat Now's data source.
+- Web equivalent — not built, per explicit MVP-focus direction this pass (camera/photo capture is a mobile-native capability first; web would only support file upload, no camera).
 
-**Exit criteria:** no AI guess is ever persisted without confirmation (verified by a specific test, not just code review).
+**Exit criteria:** no AI guess is ever persisted without confirmation — verified structurally (the DTO to `/pantry/items` takes the reviewed list itself, not a scan-result id, so there is no code path from "analysed" to "persisted" that skips the client's confirm step) and the persistence endpoint was verified directly; the full analyse → review → confirm loop through real vision output remains unverified pending an `ANTHROPIC_API_KEY`.
 
 ## Phase 7 — Premium
 

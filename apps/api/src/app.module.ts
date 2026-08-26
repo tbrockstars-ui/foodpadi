@@ -10,6 +10,7 @@ import { CookTodayModule } from './modules/cook-today/cook-today.module';
 import { PlanAheadModule } from './modules/plan-ahead/plan-ahead.module';
 import { EatNowModule } from './modules/eat-now/eat-now.module';
 import { RecipeImportModule } from './modules/recipe-import/recipe-import.module';
+import { ScanModule } from './modules/scan/scan.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -25,6 +26,7 @@ import { AppController } from './app.controller';
     PlanAheadModule,
     EatNowModule,
     RecipeImportModule,
+    ScanModule,
   ],
   controllers: [AppController],
 })
