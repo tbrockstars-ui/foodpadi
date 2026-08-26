@@ -6,6 +6,21 @@ import { SearchEatNowDto } from './dto/search-eat-now.dto';
 
 const MAX_RESULTS = 5;
 
+// "Something different" (the unified Home decision flow's wildcard chip) has
+// no matching catalog tag by design — it means "surprise me", not a keyword.
+// Recognising it here (rather than returning an empty, dead-end result) is a
+// contained tweak to this existing matcher, not a new engine.
+const SURPRISE_ME_TRIGGERS = ['different', 'surprise', 'anything', 'variety'];
+
+function shuffled<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 // Rough pence ceilings per tier — a soft heuristic (like Plan Ahead's budget
 // hint), not a real price. Kept alongside the catalog until we have real
 // pricing to sort by.
@@ -41,16 +56,22 @@ export class EatNowService {
     const queryTokens = dto.query.toLowerCase().split(/\s+/).filter(Boolean);
     const cuisineFilter = dto.cuisine?.trim().toLowerCase();
 
-    const results = EAT_NOW_CATALOG.filter((idea) => {
+    const wantsSurprise = queryTokens.some((token) => SURPRISE_ME_TRIGGERS.includes(token));
+
+    const filtered = EAT_NOW_CATALOG.filter((idea) => {
       if (cuisineFilter && !idea.cuisine.toLowerCase().includes(cuisineFilter)) return false;
       if (dto.maxPricePence && BUDGET_TIER_CEILING_PENCE[idea.budgetTier] > dto.maxPricePence) return false;
       return true;
-    })
-      .map((idea) => ({ idea, score: scoreIdea(idea, queryTokens) }))
-      .filter((entry) => entry.score > 0)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_RESULTS)
-      .map((entry) => entry.idea);
+    });
+
+    const results = wantsSurprise
+      ? shuffled(filtered).slice(0, MAX_RESULTS)
+      : filtered
+          .map((idea) => ({ idea, score: scoreIdea(idea, queryTokens) }))
+          .filter((entry) => entry.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, MAX_RESULTS)
+          .map((entry) => entry.idea);
 
     await this.analytics.track('eat_now_searched', actorToAnalyticsFields(actor), {
       resultCount: results.length,

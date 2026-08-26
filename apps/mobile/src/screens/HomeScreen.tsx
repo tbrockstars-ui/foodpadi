@@ -1,29 +1,66 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { chipLabel, routeFoodDecision, SITUATION_CHIPS, SituationChip, whyLabel } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
+import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { Chip } from '../components/Chip';
 import { Tag } from '../components/Tag';
 import { colors, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogin: () => void };
 
-const PRIMARY_ACTIONS = [
-  { key: 'eat-now', label: 'Eat now', subtitle: 'Find something to eat', live: true },
-  { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', live: true },
-  { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', live: true },
-  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false },
+// Secondary shortcuts for returning users who already know which tool they
+// want — the unified chip flow above is the primary, first-time experience
+// (docs/IMPLEMENTATION_PLAN.md's "What should I eat?" Home rework).
+const TOOL_SHORTCUTS = [
+  { key: 'eat-now', label: 'Eat Now', live: true },
+  { key: 'cook-today', label: 'Cook Today', live: true },
+  { key: 'plan-ahead', label: 'Plan Ahead', live: true },
+  { key: 'scan', label: 'Scan', live: false },
 ] as const;
 
 export function HomeScreen({ navigation, onRequestLogin }: Props) {
   const { user } = useAuth();
   const isGuest = !user;
+  const [selected, setSelected] = useState<SituationChip[]>([]);
+
+  const toggleChip = (chip: SituationChip) => {
+    setSelected((current) =>
+      current.includes(chip) ? current.filter((c) => c !== chip) : [...current, chip],
+    );
+  };
+
+  const askFoodPadi = () => {
+    const target = routeFoodDecision(selected);
+    if (target.engine === 'cook-today') {
+      navigation.navigate('CookToday');
+    } else {
+      navigation.navigate('EatNow', {
+        initialQuery: target.query,
+        initialMaxPricePence: target.maxPricePence,
+        whyLabel: whyLabel(selected),
+      });
+    }
+  };
+
+  const openTool = (key: (typeof TOOL_SHORTCUTS)[number]['key']) => {
+    if (key === 'eat-now') navigation.navigate('EatNow');
+    if (key === 'cook-today') navigation.navigate('CookToday');
+    // Plan Ahead is account-first (docs/FOODPADI_ONBOARDING_SPEC.md) — a
+    // guest tapping it goes to signup, not a 401 screen.
+    if (key === 'plan-ahead') {
+      if (isGuest) onRequestLogin();
+      else navigation.navigate('PlanAhead');
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.heading}>What do you need today?</Text>
+        <Text style={styles.brand}>FoodPadi</Text>
         <Text
           style={styles.headerLink}
           onPress={() => (isGuest ? onRequestLogin() : navigation.navigate('Profile'))}
@@ -33,32 +70,43 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
         </Text>
       </View>
 
-      <View style={styles.grid}>
-        {PRIMARY_ACTIONS.map((action) => (
-          <Card
-            key={action.key}
-            style={[styles.actionCard, !action.live && styles.actionCardDisabled]}
-            onPress={
-              action.live
-                ? () => {
-                    if (action.key === 'eat-now') navigation.navigate('EatNow');
-                    if (action.key === 'cook-today') navigation.navigate('CookToday');
-                    // Plan Ahead is account-first (docs/FOODPADI_ONBOARDING_SPEC.md)
-                    // — a guest tapping it goes to signup, not a 401 screen.
-                    if (action.key === 'plan-ahead') {
-                      if (isGuest) onRequestLogin();
-                      else navigation.navigate('PlanAhead');
-                    }
-                  }
-                : undefined
-            }
-          >
-            <Text style={[styles.actionLabel, !action.live && styles.actionLabelDisabled]}>
-              {action.label}
-            </Text>
-            <Text style={styles.actionSubtitle}>{action.subtitle}</Text>
-            {!action.live ? <Tag label="Soon" tone="neutral" /> : null}
-          </Card>
+      <Text style={styles.heading}>What should I eat?</Text>
+      <Text style={styles.subtitle}>Tell FoodPadi what you need and we'll help you decide.</Text>
+
+      <View style={styles.chipWrap}>
+        {SITUATION_CHIPS.map((chip) => (
+          <Chip
+            key={chip}
+            label={chipLabel(chip)}
+            selected={selected.includes(chip)}
+            onPress={() => toggleChip(chip)}
+          />
+        ))}
+      </View>
+
+      <Button
+        label="Ask FoodPadi"
+        onPress={askFoodPadi}
+        disabled={selected.length === 0}
+        style={styles.askButton}
+      />
+
+      <Text style={styles.toolsHeading}>Or choose a tool</Text>
+      <View style={styles.toolsRow}>
+        {TOOL_SHORTCUTS.map((tool, index) => (
+          <React.Fragment key={tool.key}>
+            {index > 0 ? <Text style={styles.toolsDivider}>·</Text> : null}
+            <TouchableOpacity
+              onPress={tool.live ? () => openTool(tool.key) : undefined}
+              disabled={!tool.live}
+              accessibilityRole="button"
+            >
+              <View style={styles.toolShortcut}>
+                <Text style={[styles.toolLabel, !tool.live && styles.toolLabelDisabled]}>{tool.label}</Text>
+                {!tool.live ? <Tag label="Soon" tone="neutral" /> : null}
+              </View>
+            </TouchableOpacity>
+          </React.Fragment>
         ))}
       </View>
 
@@ -88,16 +136,32 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    marginBottom: spacing.lg,
+  },
+  brand: { ...typography.label, color: colors.textMuted, letterSpacing: 1 },
+  headerLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  heading: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
+  askButton: { marginBottom: spacing.xl },
+  toolsHeading: {
+    ...typography.label,
+    color: colors.textFaint,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  toolsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.xl,
   },
-  heading: { ...typography.display, color: colors.text, flex: 1, paddingRight: spacing.md },
-  headerLink: { color: colors.primary, fontSize: 14, fontWeight: '600', paddingTop: 6 },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, marginBottom: spacing.xl },
-  actionCard: { width: '47%' },
-  actionCardDisabled: { opacity: 0.55 },
-  actionLabel: { fontSize: 16, fontWeight: '700', color: colors.primary },
-  actionLabelDisabled: { color: colors.text },
-  actionSubtitle: { fontSize: 13, color: colors.textMuted, marginTop: 4, marginBottom: spacing.md },
+  toolsDivider: { color: colors.textFaint },
+  toolShortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+  toolLabel: { fontSize: 14, fontWeight: '600', color: colors.primary },
+  toolLabelDisabled: { color: colors.textFaint },
   companionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm },
   companionBody: { ...typography.body, color: colors.text },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DISCLAIMER_TEXT, FoodIdeaView } from '@foodpadi/shared';
@@ -23,36 +23,30 @@ const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
   high: '£££',
 };
 
-export function EatNowScreen({ navigation }: Props) {
+// Deep-linked from the unified "What should I eat?" Home flow limits to 3
+// recommendations (its whole premise is a short list, not a browse); typing
+// a search directly on this screen keeps the wider limit.
+const UNIFIED_FLOW_RESULT_LIMIT = 3;
+
+export function EatNowScreen({ navigation, route }: Props) {
   const { user } = useAuth();
   const guestSession = useGuestSession();
   const needsGuestDisclaimer = !user && !guestSession.disclaimerAcknowledged;
+  const params = route.params;
 
   const [step, setStep] = useState<Step>(needsGuestDisclaimer ? 'disclaimer' : 'search');
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(params?.initialQuery ?? '');
   const [results, setResults] = useState<FoodIdeaView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
 
-  const acknowledgeDisclaimer = async () => {
-    setAcknowledging(true);
-    try {
-      await guestSession.acknowledgeDisclaimer();
-      setStep('search');
-    } finally {
-      setAcknowledging(false);
-    }
-  };
-
-  const search = async () => {
-    const trimmed = query.trim();
-    if (!trimmed) return;
+  const runSearch = async (searchQuery: string, maxPricePence?: number, limit = 5) => {
     setError(null);
     setStep('loading');
     try {
       const token = user ? await tokenStore.getAccessToken() : await guestSession.ensureSession();
-      const found = await api.searchEatNow({ query: trimmed }, token ?? '');
-      setResults(found);
+      const found = await api.searchEatNow({ query: searchQuery, maxPricePence }, token ?? '');
+      setResults(found.slice(0, limit));
       setStep('results');
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
@@ -62,6 +56,37 @@ export function EatNowScreen({ navigation }: Props) {
       }
       setStep('search');
     }
+  };
+
+  // Deep-linked from the unified Home decision flow with a pre-built query —
+  // run it immediately rather than making the user retype what they already
+  // told Home. Skipped while the guest disclaimer still needs acknowledging;
+  // acknowledgeDisclaimer below re-triggers this once it's out of the way.
+  useEffect(() => {
+    if (params?.initialQuery && step === 'search') {
+      runSearch(params.initialQuery, params.initialMaxPricePence, UNIFIED_FLOW_RESULT_LIMIT);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const acknowledgeDisclaimer = async () => {
+    setAcknowledging(true);
+    try {
+      await guestSession.acknowledgeDisclaimer();
+      if (params?.initialQuery) {
+        await runSearch(params.initialQuery, params.initialMaxPricePence, UNIFIED_FLOW_RESULT_LIMIT);
+      } else {
+        setStep('search');
+      }
+    } finally {
+      setAcknowledging(false);
+    }
+  };
+
+  const search = async () => {
+    const trimmed = query.trim();
+    if (!trimmed) return;
+    await runSearch(trimmed);
   };
 
   if (step === 'disclaimer') {
@@ -83,17 +108,26 @@ export function EatNowScreen({ navigation }: Props) {
   if (step === 'results') {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={() => setStep('search')} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Try another search</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
+          <Text style={styles.backLinkText}>‹ {params?.whyLabel ? 'Home' : 'Try another search'}</Text>
         </TouchableOpacity>
         <Text style={styles.title}>A few ideas</Text>
+        {params?.whyLabel ? (
+          <Text style={styles.whyText}>Because you're after: {params.whyLabel}</Text>
+        ) : null}
         <Text style={styles.disclaimerNote}>
           Example suggestions from a small curated list — not real-time restaurant listings, prices,
           or availability.
         </Text>
 
         {results.length === 0 ? (
-          <Text style={styles.emptyText}>Nothing matched that. Try different words, like a cuisine or "quick".</Text>
+          <View>
+            <Text style={styles.emptyText}>
+              I couldn't find a good match with all those preferences. Try removing one, or search for
+              something else.
+            </Text>
+            <Button label="Try again" variant="secondary" onPress={() => setStep('search')} style={styles.actionSpacing} />
+          </View>
         ) : (
           results.map((idea) => (
             <Card key={idea.id} style={styles.resultCard}>
@@ -143,8 +177,9 @@ const styles = StyleSheet.create({
   backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+  whyText: { ...typography.body, color: colors.primary, marginBottom: spacing.sm, fontWeight: '600' },
   disclaimerNote: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
-  emptyText: { ...typography.body, color: colors.textMuted },
+  emptyText: { ...typography.body, color: colors.textMuted, marginBottom: spacing.md },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.border,

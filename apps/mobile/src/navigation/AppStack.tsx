@@ -12,7 +12,7 @@ import { ImportRecipeScreen } from '../screens/ImportRecipeScreen';
 
 export type AppStackParamList = {
   Home: undefined;
-  EatNow: undefined;
+  EatNow: { initialQuery?: string; initialMaxPricePence?: number; whyLabel?: string } | undefined;
   CookToday: undefined;
   PlanAhead: undefined;
   ShoppingList: { listId: string };
