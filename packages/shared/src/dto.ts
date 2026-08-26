@@ -117,15 +117,30 @@ export interface ImportRecipeRequest {
 
 export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
+export type DemoScenarioKey = 'fridge' | 'cupboard' | 'mixed' | 'shopping';
+
 export interface ScanPhotoRequest {
-  imageBase64: string;
-  mediaType: ScanImageMediaType;
+  // Either a real photo (imageBase64 + mediaType) or an explicit demo
+  // scenario — never both required, the service treats demoScenario as
+  // taking priority when present.
+  imageBase64?: string;
+  mediaType?: ScanImageMediaType;
+  demoScenario?: DemoScenarioKey;
 }
 
 export interface ScannedItemView {
   name: string;
   quantity: string | null;
   unit: string | null;
+}
+
+export interface ScanPhotoResponse {
+  items: ScannedItemView[];
+  // True when this result came from the deterministic demo analyzer (either
+  // an explicit "Try a sample kitchen" pick, or SCAN_DEMO_MODE serving a
+  // real uploaded photo) rather than real vision analysis — lets the UI
+  // show a subtle "Demo mode" indicator without exposing any server config.
+  demo: boolean;
 }
 
 export interface PantryItemInput {

@@ -14,7 +14,7 @@ import { ScanScreen } from '../screens/ScanScreen';
 export type AppStackParamList = {
   Home: undefined;
   EatNow: { initialQuery?: string; initialMaxPricePence?: number; whyLabel?: string } | undefined;
-  CookToday: undefined;
+  CookToday: { initialIngredients?: string[] } | undefined;
   PlanAhead: undefined;
   ShoppingList: { listId: string };
   Profile: undefined;

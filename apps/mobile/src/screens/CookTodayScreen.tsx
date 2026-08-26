@@ -40,13 +40,15 @@ const TIME_OPTIONS = [
 
 type Step = 'disclaimer' | 'input' | 'loading' | 'results' | 'detail';
 
-export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
+export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   const { user } = useAuth();
   const guestSession = useGuestSession();
   const needsGuestDisclaimer = !user && !guestSession.disclaimerAcknowledged;
 
   const [step, setStep] = useState<Step>(needsGuestDisclaimer ? 'disclaimer' : 'input');
-  const [ingredients, setIngredients] = useState<string[]>([]);
+  // Deep-linked from Scan's "Cook with what's in your pantry" — pre-fills
+  // what was just confirmed rather than making the user re-type it.
+  const [ingredients, setIngredients] = useState<string[]>(route.params?.initialIngredients ?? []);
   const [customIngredient, setCustomIngredient] = useState('');
   const [timeConstraint, setTimeConstraint] = useState<number | undefined>(undefined);
   const [recipes, setRecipes] = useState<RecipeView[]>([]);

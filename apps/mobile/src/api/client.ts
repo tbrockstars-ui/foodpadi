@@ -20,7 +20,7 @@ import type {
   RequestPasswordResetRequest,
   SaveRecipeRequest,
   ScanPhotoRequest,
-  ScannedItemView,
+  ScanPhotoResponse,
   SearchEatNowRequest,
   SetFoodGoalsRequest,
   ShoppingListView,
@@ -168,7 +168,7 @@ export const api = {
   removeShoppingListItem: (listId: string, itemId: string) =>
     request<void>(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE', auth: true }),
   scanPhoto: (payload: ScanPhotoRequest) =>
-    request<ScannedItemView[]>('/scan/photo', { method: 'POST', body: payload, auth: true }),
+    request<ScanPhotoResponse>('/scan/photo', { method: 'POST', body: payload, auth: true }),
   addPantryItems: (payload: AddPantryItemsRequest) =>
     request<AddPantryItemsResponse>('/pantry/items', { method: 'POST', body: payload, auth: true }),
 };
