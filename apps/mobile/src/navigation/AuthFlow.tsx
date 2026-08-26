@@ -11,7 +11,7 @@ type View = 'auth' | 'forgot' | 'reset';
  * meaningful "back stack" beyond "return to login", so a full navigation
  * stack would be more machinery than the flow needs.
  */
-export function AuthFlow() {
+export function AuthFlow({ onContinueAsGuest }: { onContinueAsGuest: () => Promise<void> }) {
   const [view, setView] = useState<View>('auth');
   const [successMessage, setSuccessMessage] = useState<string | undefined>(undefined);
 
@@ -39,5 +39,11 @@ export function AuthFlow() {
     );
   }
 
-  return <AuthScreen onForgotPassword={() => setView('forgot')} successMessage={successMessage} />;
+  return (
+    <AuthScreen
+      onForgotPassword={() => setView('forgot')}
+      onContinueAsGuest={onContinueAsGuest}
+      successMessage={successMessage}
+    />
+  );
 }

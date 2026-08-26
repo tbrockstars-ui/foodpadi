@@ -1,7 +1,8 @@
-# FoodPadi API (Phase 1 — Foundation)
+# FoodPadi API (Phase 1 Foundation + Phase 2 Cook Today, first pass)
 
-NestJS + Prisma backend. Owns auth, profile, food goals, preferences, avoided
-ingredients, disclaimer acknowledgement, and data export/deletion. See
+NestJS + Prisma backend. Owns auth (incl. guest sessions), profile, food
+goals, preferences, avoided ingredients, disclaimer acknowledgement, data
+export/deletion, analytics events, and Cook Today recipe generation. See
 [/docs](../../docs) for the full architecture and safety/privacy rationale.
 
 ## Setup
@@ -35,8 +36,14 @@ ingredients, disclaimer acknowledgement, and data export/deletion. See
 | GET/PUT | `/users/me/goal` | Food/lifestyle goal (§10 — non-medical set only) |
 | GET/POST/DELETE | `/users/me/preferences[/:id]` | Food preferences |
 | GET/POST/DELETE | `/users/me/avoided-ingredients[/:id]` | "Foods I choose to avoid" — never framed as medical |
+| POST | `/auth/guest-session` | Issue a short-lived guest session token (no account) |
+| POST | `/auth/guest-session/disclaimer-acknowledge` | Reissue the guest token with disclaimer acknowledgement recorded |
+| POST | `/cook-today/generate` | Generate 2-3 recipes from ingredients; accepts a user access token **or** a guest token |
+| POST | `/cook-today/recipes` | Save a generated recipe — requires a real account |
+| GET | `/cook-today/recipes` | List the current user's saved recipes |
+| DELETE | `/cook-today/recipes/:id` | Soft-delete a saved recipe |
 
-All `/users/me/*` routes require `Authorization: Bearer <accessToken>`.
+All `/users/me/*` routes require `Authorization: Bearer <accessToken>`. `/cook-today/generate` accepts either an access token or a guest token (see [FOODPADI_AUTHENTICATION_SPEC.md](../../docs/FOODPADI_AUTHENTICATION_SPEC.md)); the rest of `/cook-today/*` requires a real account.
 
 ## Tests
 
@@ -52,5 +59,9 @@ far; expands each phase per [docs/TEST_STRATEGY.md](../../docs/TEST_STRATEGY.md)
   logs the reset token to the server console for local testing. Replace with
   a real provider (e.g. Resend/SES/SendGrid) before production; a user who
   can't receive the email can't recover their account.
-- No LLM, recipe, planning, pantry, or subscription logic lives here yet —
-  that arrives in Phases 2-7 per [docs/IMPLEMENTATION_PLAN.md](../../docs/IMPLEMENTATION_PLAN.md).
+- Cook Today's recipe generation (`ClaudeService`, `src/modules/ai/`) needs
+  `ANTHROPIC_API_KEY` set — without it, `/cook-today/generate` returns a
+  clear `503` rather than crashing, and the mobile UI shows a friendly
+  "not ready yet" message.
+- Planning, pantry, and subscription logic don't exist yet — that arrives in
+  Phases 3+ per [docs/IMPLEMENTATION_PLAN.md](../../docs/IMPLEMENTATION_PLAN.md).

@@ -51,6 +51,33 @@ export interface ConfirmPasswordResetRequest {
   newPassword: string;
 }
 
+export interface GenerateRecipesRequest {
+  ingredients: string[];
+  timeConstraintMinutes?: number;
+  servings?: number;
+}
+
+export interface RecipeIngredientView {
+  name: string;
+  quantity: string | null;
+  unit: string | null;
+}
+
+export interface RecipeView {
+  title: string;
+  cookTimeMinutes: number;
+  servings: number;
+  cuisine: string | null;
+  ingredients: RecipeIngredientView[];
+  steps: string[];
+}
+
+export type SaveRecipeRequest = RecipeView;
+
+export interface GuestSessionResponse {
+  guestToken: string;
+}
+
 export const DISCLAIMER_TEXT = `AI Food Companion provides food discovery, ingredient information, meal planning, recipes, shopping assistance and general food-related recommendations.
 
 The service is not an allergy monitoring, allergy-management, medical, diagnostic or emergency service.

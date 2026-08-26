@@ -1,0 +1,33 @@
+import React from 'react';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { HomeScreen } from '../screens/HomeScreen';
+import { CookTodayScreen } from '../screens/CookTodayScreen';
+
+export type AppStackParamList = {
+  Home: undefined;
+  CookToday: undefined;
+};
+
+const Stack = createNativeStackNavigator<AppStackParamList>();
+
+/**
+ * The real navigation stack for post-onboarding/guest screens — RootNavigator
+ * previously noted this would arrive once a first real feature landed (Cook
+ * Today, Phase 2). Available to both signed-in users and guests; each screen
+ * decides for itself what a guest can/can't do.
+ */
+export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Home">
+          {(props) => <HomeScreen {...props} onRequestLogin={onRequestLogin} />}
+        </Stack.Screen>
+        <Stack.Screen name="CookToday">
+          {(props) => <CookTodayScreen {...props} onRequestLogin={onRequestLogin} />}
+        </Stack.Screen>
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}

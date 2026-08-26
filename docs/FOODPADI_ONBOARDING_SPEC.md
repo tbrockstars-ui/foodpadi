@@ -144,16 +144,16 @@ What is your food & lifestyle goal?
 
 ## Backlog & Phasing
 
-**P0 (launch blocker for the onboarding change itself):**
-- Add "Skip for now" to `GoalScreen`; skipping calls `completeOnboarding` without a prior `setGoal` call. (Small, mobile-only change plus confirming the API doesn't require a goal to exist before `completeOnboarding` — it doesn't today.)
-- Add a guest-session concept to the API (see [FOODPADI_AUTHENTICATION_SPEC.md](FOODPADI_AUTHENTICATION_SPEC.md)) — required before any guest-mode UI work is meaningful.
-- Contextual signup-prompt component (mobile), reusable across trigger points.
+**P0 (launch blocker for the onboarding change itself):** ✅ all built
+- ✅ "Skip for now" added to `GoalScreen`; skipping calls `completeOnboarding` without a prior `setGoal` call.
+- ✅ Guest-session concept added to the API (`GuestSessionService`, `GuestSessionController`, `GuestOrAuthGuard` — see [FOODPADI_AUTHENTICATION_SPEC.md](FOODPADI_AUTHENTICATION_SPEC.md)).
+- ✅ Contextual signup-prompt component (`SignupPromptModal`, mobile), used from Cook Today's Save action.
 
-**P1 (MVP, sequenced with Phase 2-4 feature work — cannot fully land before Eat Now/Cook Today exist):**
-- Guest-capable `HomeScreen` variant + `RootNavigator` branch for "no user, has/creates guest session."
-- Wire the signup trigger into the real Eat Now "Save" and Cook Today "Save"/"Start Cook Mode" actions once those features exist (Phase 2/4).
-- Disclaimer-for-guest-sessions logging (extends the existing disclaimer-acknowledgement pattern to a guest-session ID rather than a `user_id`).
-- Plan Ahead's short post-signup preference step (planning scope + optional goal).
+**P1 (MVP, sequenced with Phase 2-4 feature work):**
+- ✅ Guest-capable `HomeScreen` variant + `RootNavigator` branch for "no user, has/creates guest session" — built and verified live (guest → Cook Today → disclaimer → results → save → signup prompt, end to end).
+- ✅ Signup trigger wired into Cook Today's "Save" action (Eat Now doesn't exist yet — Phase 4 — so its trigger isn't wired yet).
+- ✅ Disclaimer-for-guest-sessions logging — implemented as a claim on the guest token itself (reissued with `disclaimerAcknowledged: true`), not a separate table; see [FOODPADI_AUTHENTICATION_SPEC.md](FOODPADI_AUTHENTICATION_SPEC.md)'s Database Changes note on why.
+- ⬜ Plan Ahead's short post-signup preference step (planning scope + optional goal) — blocked on Plan Ahead itself (Phase 3, not yet built).
 
 **P2 (post-MVP):**
 - "After N free guest interactions" as an A/B-tested alternative signup trigger (see [FOODPADI_ONBOARDING_ANALYTICS.md](FOODPADI_ONBOARDING_ANALYTICS.md)) — not a default, only if data supports it.

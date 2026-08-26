@@ -32,6 +32,8 @@ model User {
   refreshTokens            RefreshToken[]
   passwordResetTokens      PasswordResetToken[]
   aiMemory                 AiMemory[]
+  recipes                  Recipe[]
+  foodEvents               FoodEvent[]
 
   @@map("users")
 }
@@ -141,6 +143,60 @@ model AvoidedIngredient {
   deletedAt      DateTime? @map("deleted_at")
 
   @@map("avoided_ingredients")
+}
+
+// Analytics events, derived from real domain actions rather than a parallel
+// tracking SDK (docs/ANALYTICS_PLAN.md). Either userId or guestSessionId is
+// set, never neither — guest activity (Eat Now/Cook Today) is tracked
+// separately from account activity until/unless the guest converts.
+model FoodEvent {
+  id             String    @id @default(uuid())
+  userId         String?   @map("user_id")
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSessionId String?   @map("guest_session_id")
+  eventType      String    @map("event_type")
+  metadata       Json?
+  occurredAt     DateTime  @default(now()) @map("occurred_at")
+
+  @@index([userId])
+  @@index([guestSessionId])
+  @@index([eventType])
+  @@map("food_events")
+}
+
+// AI-generated (or, later, curated) recipes. No master ingredient catalog
+// (spec §13 Principle 6 — "do not build another generic recipe database");
+// ingredients are free-text per recipe, validated for internal consistency
+// (Layer 3) rather than matched against a reference table. Only persisted
+// when a signed-in user saves a result — guest-mode results are ephemeral.
+model Recipe {
+  id              String    @id @default(uuid())
+  title           String
+  cookTimeMinutes Int       @map("cook_time_minutes")
+  servings        Int
+  cuisine         String?
+  steps           Json
+  source          String    @default("ai_generated") // "ai_generated" | "curated"
+  createdByUserId String?   @map("created_by_user_id")
+  createdBy       User?     @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+
+  ingredients     RecipeIngredient[]
+
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id       String @id @default(uuid())
+  recipeId String @map("recipe_id")
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  name     String
+  quantity String?
+  unit     String?
+
+  @@map("recipe_ingredients")
 }
 
 // Long-term AI memory only — curated, user-visible facts (spec §36).

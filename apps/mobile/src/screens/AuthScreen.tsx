@@ -6,18 +6,36 @@ import { colors } from '../theme/colors';
 
 interface Props {
   onForgotPassword: () => void;
+  onContinueAsGuest: () => Promise<void>;
   successMessage?: string;
 }
 
-export function AuthScreen({ onForgotPassword, successMessage }: Props) {
+export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage }: Props) {
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+
+  const continueAsGuest = async () => {
+    setGuestLoading(true);
+    try {
+      await onContinueAsGuest();
+    } catch {
+      setError('Could not start a guest session. Please try again.');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
+
+  const emailLooksValid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const passwordLongEnough = password.length >= 8;
+  const canSubmit = emailLooksValid && passwordLongEnough;
 
   const submit = async () => {
+    if (!canSubmit) return;
     setError(null);
     setSubmitting(true);
     try {
@@ -59,13 +77,16 @@ export function AuthScreen({ onForgotPassword, successMessage }: Props) {
         onChangeText={setPassword}
         accessibilityLabel="Password"
       />
+      {password.length > 0 && !passwordLongEnough ? (
+        <Text style={styles.hint}>At least 8 characters</Text>
+      ) : null}
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <TouchableOpacity
-        style={styles.primaryButton}
+        style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
         onPress={submit}
-        disabled={submitting}
+        disabled={submitting || !canSubmit}
         accessibilityRole="button"
       >
         {submitting ? (
@@ -85,6 +106,20 @@ export function AuthScreen({ onForgotPassword, successMessage }: Props) {
         <Text style={styles.switchModeText}>
           {mode === 'login' ? "New here? Create an account" : 'Already have an account? Log in'}
         </Text>
+      </TouchableOpacity>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
+      <TouchableOpacity onPress={continueAsGuest} disabled={guestLoading} accessibilityRole="button">
+        {guestLoading ? (
+          <ActivityIndicator color={colors.textMuted} />
+        ) : (
+          <Text style={styles.guestText}>Just want a quick idea? Continue without an account</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
@@ -112,9 +147,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  primaryButtonDisabled: { opacity: 0.4 },
   primaryButtonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
+  hint: { color: colors.textMuted, fontSize: 13, marginTop: -6, marginBottom: 12 },
   forgotPasswordText: { color: colors.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
   switchModeText: { color: colors.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
   error: { color: colors.danger, marginBottom: 12, fontSize: 14 },
   success: { color: colors.primary, marginBottom: 16, fontSize: 14, textAlign: 'center' },
+  divider: { flexDirection: 'row', alignItems: 'center', marginTop: 28, marginBottom: 20, gap: 12 },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
+  dividerText: { color: colors.textMuted, fontSize: 13 },
+  guestText: { color: colors.textMuted, textAlign: 'center', fontSize: 14, textDecorationLine: 'underline' },
 });

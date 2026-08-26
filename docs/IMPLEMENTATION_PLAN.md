@@ -13,20 +13,22 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 - Auth (email/password — built; Apple/Google + guest session — see below), session handling.
 - Onboarding flow: disclaimer acknowledgement, **skippable** goal selection, optional preferences.
 - Privacy controls skeleton: view/export/delete profile.
-- Analytics event pipeline wired to `food_events` from day one (§38 requires this from the start, not bolted on later).
+- Analytics event pipeline wired to `food_events` from day one (§38 requires this from the start, not bolted on later). ✅ built (`AnalyticsService`, called inline from feature services — Cook Today is the first caller).
 
-**Exit criteria:** a user can sign up, see the disclaimer, pick or skip a goal, and land on Home. Acceptance criteria 1-3, 17 from §40 pass.
+**Exit criteria:** a user can sign up, see the disclaimer, pick or skip a goal, and land on Home. Acceptance criteria 1-3, 17 from §40 pass. ✅ met, verified live against the real Neon DB.
 
 **Superseded/refined by dedicated research:** the onboarding model above (mandatory goal, login-before-everything) was revisited in a full competitor/Reddit/privacy research pass — see [FOODPADI_LOGIN_ONBOARDING_RESEARCH.md](FOODPADI_LOGIN_ONBOARDING_RESEARCH.md) and its companion specs ([FOODPADI_ONBOARDING_SPEC.md](FOODPADI_ONBOARDING_SPEC.md), [FOODPADI_AUTHENTICATION_SPEC.md](FOODPADI_AUTHENTICATION_SPEC.md), [FOODPADI_PERSONALISATION_SPEC.md](FOODPADI_PERSONALISATION_SPEC.md), [FOODPADI_ONBOARDING_ANALYTICS.md](FOODPADI_ONBOARDING_ANALYTICS.md)). Net changes: the goal question becomes skippable; a guest-session concept is added so Eat Now/Cook Today can be used before an account exists (Plan Ahead remains account-first). Those docs' own P0-P3 backlogs are the authoritative sequencing for this area going forward.
 
-## Phase 2 — Cook Today
+## Phase 2 — Cook Today (first pass ✅, in progress)
 
-- Ingredient input UI (chips + free add), recipe generation via Layer 4/5 against `recipes`/`ingredients` tables.
-- Time-constraint adaptation logic (Layer 3 re-ranks/adapts existing candidates, doesn't regenerate from scratch).
-- Cook Mode (steps, timers, substitutions, pause/resume).
-- Meal feedback capture → `meal_feedback`, feeds `ai_memory`.
+- Ingredient input UI (chips + free add) ✅ built (`CookTodayScreen`).
+- Recipe generation: Layer 5 (`ClaudeService`, Anthropic SDK) → Layer 3 validation/sanitization (`CookTodayService.sanitize` — drops recipes with non-positive time/servings, fewer than 2 steps, or duplicate ingredients; enforces the requested time limit) → Layer 6 persistence on save (`Recipe`/`RecipeIngredient`). ✅ built and verified end-to-end against the real API, including the graceful "not configured yet" path when `ANTHROPIC_API_KEY` is unset.
+- Guest-accessible per [FOODPADI_ONBOARDING_SPEC.md](FOODPADI_ONBOARDING_SPEC.md): guest session (`GuestSessionService`, `GuestOrAuthGuard`), guest-capable Home, contextual signup prompt on Save. ✅ built — this closes the P0/P1 guest-mode items from that spec's backlog.
+- Time-constraint adaptation logic (Layer 3 re-ranks/adapts existing candidates, doesn't regenerate from scratch) — not yet built; current implementation regenerates on any input change. Tracked as a follow-up, not a launch blocker.
+- Cook Mode (steps, timers, substitutions, pause/resume) — not yet built; the detail view currently shows static ingredients/steps only.
+- Meal feedback capture → `meal_feedback`, feeds `ai_memory` — not yet built (depends on the `ai_memory` controller from [FOODPADI_PERSONALISATION_SPEC.md](FOODPADI_PERSONALISATION_SPEC.md), also not yet built).
 
-**Exit criteria:** acceptance criteria 6-7 pass; AI eval suite green for recipe sanity checks.
+**Exit criteria:** acceptance criteria 6-7 pass (met for the core "generate → view → save" path); AI eval suite green for recipe sanity checks (Layer 3 validation exists and was verified manually against the graceful-failure path; a standing automated eval suite per [TEST_STRATEGY.md](TEST_STRATEGY.md) is not yet built — needs a live `ANTHROPIC_API_KEY` to exercise real model output, not just the 503 path).
 
 ## Phase 3 — Plan Ahead
 

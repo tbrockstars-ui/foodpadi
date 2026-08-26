@@ -2,9 +2,13 @@ import Constants from 'expo-constants';
 import type {
   AuthResponse,
   ConfirmPasswordResetRequest,
+  GenerateRecipesRequest,
+  GuestSessionResponse,
   LoginRequest,
+  RecipeView,
   RegisterRequest,
   RequestPasswordResetRequest,
+  SaveRecipeRequest,
   UpsertFoodPreferenceRequest,
   UserSummary,
 } from '@foodpadi/shared';
@@ -19,13 +23,35 @@ class ApiError extends Error {
   }
 }
 
+// NestJS error bodies are JSON ({ message: string | string[], error, statusCode }),
+// not plain text — surfacing the raw body (as this used to) shows the user
+// a literal JSON blob instead of a sentence. class-validator in particular
+// returns an array of per-field messages.
+function extractErrorMessage(rawBody: string): string | null {
+  if (!rawBody) return null;
+  try {
+    const parsed = JSON.parse(rawBody) as { message?: string | string[] };
+    if (Array.isArray(parsed.message)) {
+      return parsed.message.join('. ');
+    }
+    if (typeof parsed.message === 'string') {
+      return parsed.message;
+    }
+    return null;
+  } catch {
+    return rawBody;
+  }
+}
+
 async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; auth?: boolean } = {},
+  options: { method?: string; body?: unknown; auth?: boolean; token?: string } = {},
 ): Promise<T> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
 
-  if (options.auth) {
+  if (options.token) {
+    headers.Authorization = `Bearer ${options.token}`;
+  } else if (options.auth) {
     const accessToken = await tokenStore.getAccessToken();
     if (accessToken) {
       headers.Authorization = `Bearer ${accessToken}`;
@@ -39,8 +65,8 @@ async function request<T>(
   });
 
   if (!response.ok) {
-    const message = await response.text();
-    throw new ApiError(response.status, message || response.statusText);
+    const rawBody = await response.text();
+    throw new ApiError(response.status, extractErrorMessage(rawBody) ?? response.statusText);
   }
 
   if (response.status === 204) {
@@ -67,6 +93,17 @@ export const api = {
     request<void>('/auth/password-reset/request', { method: 'POST', body: payload }),
   confirmPasswordReset: (payload: ConfirmPasswordResetRequest) =>
     request<void>('/auth/password-reset/confirm', { method: 'POST', body: payload }),
+  createGuestSession: () =>
+    request<GuestSessionResponse>('/auth/guest-session', { method: 'POST' }),
+  acknowledgeGuestDisclaimer: (guestToken: string) =>
+    request<GuestSessionResponse>('/auth/guest-session/disclaimer-acknowledge', {
+      method: 'POST',
+      body: { guestToken },
+    }),
+  generateCookTodayRecipes: (payload: GenerateRecipesRequest, token: string) =>
+    request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
+  saveRecipe: (payload: SaveRecipeRequest) =>
+    request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
 };
 
 export { ApiError };
