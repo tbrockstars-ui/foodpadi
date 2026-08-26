@@ -23,6 +23,10 @@ const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
   high: '£££',
 };
 
+function formatPence(pence: number): string {
+  return pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`;
+}
+
 // Deep-linked from the unified "What should I eat?" Home flow limits to 3
 // recommendations (its whole premise is a short list, not a browse); typing
 // a search directly on this screen keeps the wider limit.
@@ -40,11 +44,11 @@ export function EatNowScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
 
-  const runSearch = async (searchQuery: string, maxPricePence?: number, limit = 5) => {
+  const runSearch = async (searchQuery: string, maxPricePence?: number, limit = 5, explicitToken?: string) => {
     setError(null);
     setStep('loading');
     try {
-      const token = user ? await tokenStore.getAccessToken() : await guestSession.ensureSession();
+      const token = explicitToken ?? (user ? await tokenStore.getAccessToken() : await guestSession.ensureSession());
       const found = await api.searchEatNow({ query: searchQuery, maxPricePence }, token ?? '');
       setResults(found.slice(0, limit));
       setStep('results');
@@ -72,9 +76,9 @@ export function EatNowScreen({ navigation, route }: Props) {
   const acknowledgeDisclaimer = async () => {
     setAcknowledging(true);
     try {
-      await guestSession.acknowledgeDisclaimer();
+      const token = await guestSession.acknowledgeDisclaimer();
       if (params?.initialQuery) {
-        await runSearch(params.initialQuery, params.initialMaxPricePence, UNIFIED_FLOW_RESULT_LIMIT);
+        await runSearch(params.initialQuery, params.initialMaxPricePence, UNIFIED_FLOW_RESULT_LIMIT, token);
       } else {
         setStep('search');
       }
@@ -116,8 +120,8 @@ export function EatNowScreen({ navigation, route }: Props) {
           <Text style={styles.whyText}>Because you're after: {params.whyLabel}</Text>
         ) : null}
         <Text style={styles.disclaimerNote}>
-          Example suggestions from a small curated list — not real-time restaurant listings, prices,
-          or availability.
+          Example suggestions from a small curated list — cuisine and price band are real; distance,
+          delivery time and exact price are illustrative estimates, not live data from any restaurant.
         </Text>
 
         {results.length === 0 ? (
@@ -133,6 +137,10 @@ export function EatNowScreen({ navigation, route }: Props) {
             <Card key={idea.id} style={styles.resultCard}>
               <Text style={styles.resultTitle}>{idea.title}</Text>
               <Text style={styles.resultBody}>{idea.description}</Text>
+              <Text style={styles.estimateText}>
+                ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
+                {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
+              </Text>
               <View style={styles.tagRow}>
                 <Tag label={idea.cuisine} />
                 <Tag label={BUDGET_LABEL[idea.budgetTier]} />
@@ -195,6 +203,7 @@ const styles = StyleSheet.create({
   resultCard: { marginBottom: spacing.md },
   resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
   resultBody: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
+  estimateText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   disclaimerBox: {
     flex: 1,

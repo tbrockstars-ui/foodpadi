@@ -8,7 +8,13 @@ interface GuestSessionContextValue {
   disclaimerAcknowledged: boolean;
   /** Returns a valid guest token, creating one via the API if none exists yet. */
   ensureSession: () => Promise<string>;
-  acknowledgeDisclaimer: () => Promise<void>;
+  /** Returns the freshly-acknowledged token — callers that need to act on it
+   * immediately (e.g. auto-running a search right after) must use this
+   * return value rather than calling ensureSession() again, since that would
+   * read from a closure captured before this update and — if the caller's
+   * component hasn't re-rendered yet — create and return a second, still-
+   * unacknowledged guest session instead of reusing this one. */
+  acknowledgeDisclaimer: () => Promise<string>;
   clearSession: () => Promise<void>;
 }
 
@@ -46,6 +52,7 @@ export function GuestSessionProvider({ children }: { children: React.ReactNode }
     await tokenStore.setGuestDisclaimerAcknowledged();
     setGuestToken(updatedToken);
     setDisclaimerAcknowledged(true);
+    return updatedToken;
   }, [ensureSession]);
 
   // Called once a guest converts to a real account — guest state is

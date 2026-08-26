@@ -6,10 +6,12 @@ import * as SecureStore from 'expo-secure-store';
 // docs/SECURITY_MODEL.md calls out as needing "secure session handling".
 //
 // expo-secure-store has no web implementation (it throws), so web falls
-// back to localStorage. That fallback is NOT secure storage — it exists only
-// because web is a dev/preview convenience for this product (see
-// docs/TECHNICAL_ARCHITECTURE.md §2.7: the mobile app is the only real
-// user-facing target), never the production platform this matters for.
+// back to localStorage. That fallback is NOT secure storage — it's only used
+// when this mobile codebase itself is compiled to run in a browser (`expo
+// start --web`), which stays a dev/preview convenience for testing the
+// mobile app, not a real deployment target. It is unrelated to apps/web's
+// separate customer-facing Next.js app (docs/TECHNICAL_ARCHITECTURE.md
+// §2.7), which uses proper per-user httpOnly session cookies instead.
 const ACCESS_TOKEN_KEY = 'foodpadi.accessToken';
 const REFRESH_TOKEN_KEY = 'foodpadi.refreshToken';
 const GUEST_TOKEN_KEY = 'foodpadi.guestToken';

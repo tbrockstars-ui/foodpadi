@@ -1,10 +1,39 @@
+/* Mirrors apps/mobile/src/theme/colors.ts exactly, as CSS custom properties,
+   so web and mobile stay one visual identity instead of drifting apart. */
 :root {
   --background: #fbfaf7;
   --surface: #ffffff;
-  --text: #1f2421;
+  --surface-sunken: #f4f2ec;
+  --text: #181c19;
   --text-muted: #6b7268;
+  --text-faint: #9a9e94;
   --primary: #2f6b4f;
-  --border: #e4e1d8;
+  --primary-dark: #204a37;
+  --primary-soft: #eaf3ee;
+  --primary-text: #ffffff;
+  --secondary: #c2760c;
+  --secondary-soft: #fbf0de;
+  --success: #3b7a3b;
+  --success-soft: #eaf3ea;
+  --warning: #b7791f;
+  --warning-soft: #fbf1e2;
+  --border: #e7e4db;
+  --border-strong: #d4d0c4;
+  --danger: #b3261e;
+  --danger-soft: #fbebea;
+
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-xxl: 32px;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
 }
 
 * {

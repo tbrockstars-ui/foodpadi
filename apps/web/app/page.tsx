@@ -1,5 +1,8 @@
 import Link from 'next/link';
+import { isAuthenticated } from '../lib/serverApi';
+import { Card } from '../components/Card';
 import styles from './page.module.css';
+import homeStyles from './home.module.css';
 
 // Placeholder store links — swap for real App Store/Play Store URLs once listed.
 const APP_STORE_URL = '#';
@@ -38,7 +41,52 @@ const PRINCIPLES = [
   },
 ] as const;
 
+// v1 web slice ships Plan Ahead only — see docs/TECHNICAL_ARCHITECTURE.md
+// §2.7. The rest mirror mobile's HomeScreen "Soon" treatment until they land.
+const HUB_ACTIONS = [
+  { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', href: '/plan', live: true },
+  { key: 'eat-now', label: 'Eat now', subtitle: 'Find something to eat', href: '/eat-now', live: true },
+  { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', live: false },
+  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false },
+] as const;
+
+function HomeHub() {
+  return (
+    <main className={homeStyles.container}>
+      <div className={homeStyles.header}>
+        <h1 className={homeStyles.heading}>What do you need today?</h1>
+        <form action="/api/auth/logout" method="POST">
+          <button type="submit" className={homeStyles.logoutLink}>
+            Log out
+          </button>
+        </form>
+      </div>
+
+      <div className={homeStyles.grid}>
+        {HUB_ACTIONS.map((action) =>
+          action.live ? (
+            <Card key={action.key} href={action.href} className={homeStyles.actionCard}>
+              <p className={homeStyles.actionLabel}>{action.label}</p>
+              <p className={homeStyles.actionSubtitle}>{action.subtitle}</p>
+            </Card>
+          ) : (
+            <div key={action.key} className={homeStyles.actionCardDisabled}>
+              <p className={homeStyles.actionLabelDisabled}>{action.label}</p>
+              <p className={homeStyles.actionSubtitle}>{action.subtitle}</p>
+              <span className={homeStyles.soonTag}>Soon</span>
+            </div>
+          ),
+        )}
+      </div>
+    </main>
+  );
+}
+
 export default function LandingPage() {
+  if (isAuthenticated()) {
+    return <HomeHub />;
+  }
+
   return (
     <>
       <section className={styles.hero}>
@@ -60,6 +108,9 @@ export default function LandingPage() {
                 Get it on Google Play
               </a>
             </div>
+            <Link className={styles.loginLink} href="/login">
+              Already have an account? Log in
+            </Link>
           </div>
 
           <div className={styles.heroVisual} aria-hidden="true">

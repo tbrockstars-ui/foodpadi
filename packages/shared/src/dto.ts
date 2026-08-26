@@ -128,6 +128,13 @@ export interface FoodIdeaView {
   cuisine: string;
   budgetTier: 'low' | 'medium' | 'high';
   tags: string[];
+  // Illustrative estimates only — not real location, live pricing, or a real
+  // delivery ETA (no location capability or retailer integration exists yet).
+  distanceMiles: number;
+  deliveryMinutesMin: number;
+  deliveryMinutesMax: number;
+  pricePenceMin: number;
+  pricePenceMax: number;
 }
 
 export interface GuestSessionResponse {

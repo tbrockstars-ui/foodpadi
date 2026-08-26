@@ -66,19 +66,20 @@ Why:
 
 A scheduler (backend cron / queue) decides *when* and *why* to notify (§18, §37 — every notification must justify itself); Expo only handles delivery.
 
-### 2.7 Web surface — landing page + admin support page only
+### 2.7 Web surface — mobile-flagship, full-parity customer web app + admin support page
 
-**User decision:** there is no customer-facing web app. The only web surfaces are (1) a public marketing landing page that directs visitors to install the mobile app, and (2) an internal, staff-only admin/support page. No user-facing feature (Eat Now, Cook Today, Plan Ahead, etc.) is ever built for web — the mobile app is the only place end users transact with the product.
+**Superseded decision (2026-08-26):** this section previously recorded a "User decision" that there would be no customer-facing web app at all — landing page + admin only, mobile the sole place users transact. That's reversed. The trigger was hands-on research into how Samsung Food actually splits mobile vs. web: `samsungfood.com` is a marketing-only landing page, but `app.samsungfood.com` is a genuinely separate, fully-authenticated web client sharing mobile's core nav (Explore/Saved/Planner/Lists) — gated by a login modal, never by a "download the app" redirect. Mobile stays the flagship (it's marketed first, gets features first), but web is a real client, not a teaser.
 
-Recommendation: a single `apps/web` Next.js (TypeScript) app with two independent surfaces sharing one deploy:
-- `/` (and marketing routes) — static/SSG landing page: value proposition, App Store/Play Store links, links to the disclaimer (§12) and privacy notice. No auth, no user data, minimal JS.
-- `/admin/*` — staff-only, authenticated separately from end-user auth (its own login, not the mobile app's JWT flow), calling dedicated admin endpoints on the NestJS API. Used for the admin/analytics capability in §38 (aggregate usage, safety events, feedback triage, subscription lookups) and for handling user support requests (e.g. account/data-deletion requests that need manual assistance).
+`apps/web` now has three surfaces sharing one deploy:
+- `/` (and marketing routes) — static/SSG landing page for logged-out visitors: value proposition, App Store/Play Store links, a "Log in" link, disclaimer/privacy links.
+- **Customer app** (`/login`, `/register`, `/plan`, `/shopping-list/[id]`, growing incrementally) — full-parity web ports of the equivalent mobile screens, reusing the same NestJS API and `@foodpadi/shared` types. Session is a per-user httpOnly cookie pair (`fp_access`/`fp_refresh`) issued by Next.js Route Handlers that call the API's existing `/auth/*` endpoints — tokens never reach browser JS, unlike mobile's own web-build fallback (see `apps/mobile/src/api/tokenStore.ts`). A generic authenticated proxy (`app/api/proxy/[...path]/route.ts`) forwards client-side calls to the API with the session's access token attached, and `middleware.ts` silently calls `/auth/refresh` when the access cookie has expired but the refresh cookie is still valid — closing a gap that existed even on mobile (nothing anywhere called `/auth/refresh` before this). Current scope: auth, Home hub, Plan Ahead, Shopping List. Deferred: Eat Now, Cook Today, Import Recipe, Goals/Preferences editing, Profile — same account/guest boundary as mobile (Plan Ahead and Shopping List require a real account, matching `HomeScreen`'s own guest-gating).
+- `/admin/*` — unchanged: staff-only, authenticated separately from end-user auth, for the admin/analytics capability in §38.
 
-Why Next.js for this rather than a static site generator plus a separate admin tool:
-- One deploy, one TypeScript codebase, reuses `@foodpadi/shared` types for anything the admin page renders from API responses.
-- The admin page needs real interactivity (tables, filters, forms) — a plain static site would need a second tool bolted on anyway; Next.js covers both surfaces without over-engineering either.
+Why Next.js for all three rather than splitting the customer app into its own deploy:
+- One deploy, one TypeScript codebase, reuses `@foodpadi/shared` types across landing/customer/admin surfaces.
+- Server Components fetch the NestJS API directly (no client-side waterfall) for initial page loads; only interactive mutations go through the proxy.
 
-Non-negotiable boundary carried over from §25/§38: the admin page never exposes more than it needs to — aggregate views by default, per-user drill-down is a permissioned, audit-logged action, and admin auth is entirely separate from end-user auth (a compromised admin account must not be reachable via the same credential surface as a consumer account).
+Non-negotiable boundary carried over from §25/§38, unchanged by this reversal: admin auth stays entirely separate from end-user auth — a compromised admin account must not be reachable via the same credential surface as a consumer account. The customer web app's session mechanism (httpOnly cookies via Route Handlers) is a different, per-user mechanism from admin's single-shared-secret cookie; they must never be unified.
 
 ### 2.8 Infra / deployment
 

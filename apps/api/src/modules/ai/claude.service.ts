@@ -25,6 +25,128 @@ export interface PlanGenerationInput {
 
 const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intolerance, or medical condition, and never state or imply a recipe is medically appropriate. You may only describe what ingredients a recipe contains. Do not repeat the same ingredient twice within one recipe's ingredients list. Every recipe must have at least 2 steps and a positive cookTimeMinutes and servings.`;
 
+// MVP fallback: with no ANTHROPIC_API_KEY configured, serve these instead of
+// a 503 so Cook Today / Plan Ahead can be built and demoed end-to-end on a
+// curated dataset. Passes the same Layer 3 validation (recipe-validation.ts)
+// as a real model response. Swap to live AI by setting ANTHROPIC_API_KEY —
+// no code change needed, getClient() below picks it up automatically.
+const CURATED_RECIPES: RawRecipeCandidate[] = [
+  {
+    title: 'One-Pot Chicken & Rice',
+    cookTimeMinutes: 35,
+    servings: 4,
+    cuisine: 'British',
+    ingredients: [
+      { name: 'chicken thighs', quantity: '4', unit: null },
+      { name: 'rice', quantity: '300', unit: 'g' },
+      { name: 'onion', quantity: '1', unit: null },
+      { name: 'garlic', quantity: '2 cloves', unit: null },
+      { name: 'chicken stock', quantity: '600', unit: 'ml' },
+      { name: 'carrot', quantity: '2', unit: null },
+    ],
+    steps: [
+      'Brown the chicken thighs in a large pot, then set aside.',
+      'Soften the onion, garlic and carrot in the same pot.',
+      'Stir in the rice, pour over the stock, and nestle the chicken back in.',
+      'Cover and simmer for 20 minutes until the rice is tender and chicken is cooked through.',
+    ],
+  },
+  {
+    title: 'Tomato & Basil Pasta',
+    cookTimeMinutes: 20,
+    servings: 2,
+    cuisine: 'Italian',
+    ingredients: [
+      { name: 'pasta', quantity: '200', unit: 'g' },
+      { name: 'tinned tomatoes', quantity: '400', unit: 'g' },
+      { name: 'garlic', quantity: '2 cloves', unit: null },
+      { name: 'basil', quantity: 'a handful', unit: null },
+      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
+      { name: 'parmesan', quantity: '30', unit: 'g' },
+    ],
+    steps: [
+      'Cook the pasta in salted boiling water until al dente.',
+      'Fry the garlic gently in olive oil, then add the tinned tomatoes and simmer for 10 minutes.',
+      'Toss the drained pasta through the sauce, top with torn basil and grated parmesan.',
+    ],
+  },
+  {
+    title: 'Chickpea & Spinach Curry',
+    cookTimeMinutes: 30,
+    servings: 3,
+    cuisine: 'Indian',
+    ingredients: [
+      { name: 'chickpeas', quantity: '2 tins', unit: null },
+      { name: 'spinach', quantity: '150', unit: 'g' },
+      { name: 'onion', quantity: '1', unit: null },
+      { name: 'curry powder', quantity: '2', unit: 'tbsp' },
+      { name: 'coconut milk', quantity: '400', unit: 'ml' },
+      { name: 'ginger', quantity: '1 thumb', unit: null },
+    ],
+    steps: [
+      'Soften the onion and ginger, then stir in the curry powder for a minute.',
+      'Add the chickpeas and coconut milk, simmer for 15 minutes.',
+      'Stir through the spinach until wilted, then serve with rice or flatbread.',
+    ],
+  },
+  {
+    title: 'Sheet-Pan Salmon & Veg',
+    cookTimeMinutes: 25,
+    servings: 2,
+    cuisine: 'Mediterranean',
+    ingredients: [
+      { name: 'salmon fillets', quantity: '2', unit: null },
+      { name: 'courgette', quantity: '1', unit: null },
+      { name: 'cherry tomatoes', quantity: '200', unit: 'g' },
+      { name: 'lemon', quantity: '1', unit: null },
+      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
+    ],
+    steps: [
+      'Toss the courgette and cherry tomatoes with olive oil on a baking tray.',
+      'Roast for 10 minutes, then add the salmon fillets and lemon slices on top.',
+      'Roast for a further 12-15 minutes until the salmon is cooked through.',
+    ],
+  },
+  {
+    title: 'Beef & Black Bean Tacos',
+    cookTimeMinutes: 25,
+    servings: 4,
+    cuisine: 'Mexican',
+    ingredients: [
+      { name: 'beef mince', quantity: '400', unit: 'g' },
+      { name: 'black beans', quantity: '1 tin', unit: null },
+      { name: 'taco seasoning', quantity: '1 packet', unit: null },
+      { name: 'tortillas', quantity: '8', unit: null },
+      { name: 'lettuce', quantity: 'a handful', unit: null },
+      { name: 'cheese', quantity: '80', unit: 'g' },
+    ],
+    steps: [
+      'Brown the beef mince in a pan, draining any excess fat.',
+      'Stir in the taco seasoning and black beans, simmer for 5 minutes.',
+      'Warm the tortillas and fill with the beef mixture, lettuce and cheese.',
+    ],
+  },
+  {
+    title: 'Miso Noodle Soup',
+    cookTimeMinutes: 20,
+    servings: 2,
+    cuisine: 'Japanese',
+    ingredients: [
+      { name: 'noodles', quantity: '150', unit: 'g' },
+      { name: 'miso paste', quantity: '2', unit: 'tbsp' },
+      { name: 'spring onion', quantity: '2', unit: null },
+      { name: 'mushroom', quantity: '100', unit: 'g' },
+      { name: 'egg', quantity: '2', unit: null },
+      { name: 'vegetable stock', quantity: '600', unit: 'ml' },
+    ],
+    steps: [
+      'Bring the stock to a simmer and whisk in the miso paste.',
+      'Add the mushrooms and cook for 5 minutes, then cook the noodles in the broth.',
+      'Serve topped with a soft-boiled egg and sliced spring onion.',
+    ],
+  },
+];
+
 const COOK_TODAY_SYSTEM_PROMPT = `You are the recipe-generation component inside FoodPadi, a UK food companion app. You are called only for the "Cook Today" feature: a user has told you what ingredients they have, and optionally a time limit and serving count.
 
 Rules you must follow:
@@ -65,7 +187,16 @@ export class ClaudeService {
     return this.client;
   }
 
+  private curatedFallback(count: number): RawRecipeCandidate[] {
+    this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
+    return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
+  }
+
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return this.curatedFallback(3);
+    }
+
     const userMessage = [
       `Ingredients I have: ${input.ingredients.join(', ')}.`,
       input.timeConstraintMinutes ? `I have at most ${input.timeConstraintMinutes} minutes to cook.` : null,
@@ -78,6 +209,10 @@ export class ClaudeService {
   }
 
   async generatePlanMeals(input: PlanGenerationInput): Promise<RawRecipeCandidate[]> {
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return this.curatedFallback(input.days);
+    }
+
     const userMessage = [
       `Plan dinner for ${input.days} day${input.days === 1 ? '' : 's'}.`,
       input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,

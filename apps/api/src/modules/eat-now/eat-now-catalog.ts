@@ -43,4 +43,16 @@ export const EAT_NOW_CATALOG: FoodIdea[] = [
   { id: 'dumplings', title: 'Dumplings', description: 'Steamed or fried dumplings — a quick, satisfying snack or light meal.', cuisine: 'Chinese', budgetTier: 'medium', tags: ['takeaway', 'quick', 'comfort'] },
   { id: 'katsu-curry', title: 'Chicken katsu curry', description: 'Crispy breaded chicken with a mild Japanese curry sauce and rice.', cuisine: 'Japanese', budgetTier: 'medium', tags: ['curry', 'chicken', 'comfort'] },
   { id: 'full-english', title: 'Full English breakfast', description: 'Eggs, bacon, sausage, beans, and toast — a hearty British classic.', cuisine: 'British', budgetTier: 'medium', tags: ['breakfast', 'comfort', 'filling'] },
+
+  // Added to close a real gap: these three cuisines are offered as favourite-
+  // cuisine options during onboarding (PreferencesScreen's CUISINES list) but
+  // previously had zero matching entries here — someone picking "Nigerian &
+  // West African" as a favourite got nothing relevant back, ever.
+  { id: 'jollof-rice', title: 'Jollof rice with chicken', description: 'Smoky, spiced tomato rice with chicken — a West African favourite.', cuisine: 'Nigerian & West African', budgetTier: 'medium', tags: ['spicy', 'rice', 'chicken', 'comfort'] },
+  { id: 'egusi-soup', title: 'Egusi soup with pounded yam', description: 'Rich ground melon-seed stew with leafy greens, served with pounded yam.', cuisine: 'Nigerian & West African', budgetTier: 'medium', tags: ['spicy', 'filling', 'comfort'] },
+  { id: 'suya-skewers', title: 'Suya skewers', description: 'Grilled, thinly-sliced beef coated in a spiced peanut suya mix — a popular West African street food.', cuisine: 'Nigerian & West African', budgetTier: 'low', tags: ['spicy', 'quick', 'skewers', 'peanut'] },
+  { id: 'souvlaki-wrap', title: 'Souvlaki wrap', description: 'Grilled meat skewers wrapped in warm pitta with tzatziki and salad.', cuisine: 'Mediterranean', budgetTier: 'low', tags: ['quick', 'wrap', 'grilled'] },
+  { id: 'greek-salad', title: 'Greek salad with feta', description: 'Tomatoes, cucumber, olives and feta with olive oil — light and fresh.', cuisine: 'Mediterranean', budgetTier: 'medium', tags: ['vegetarian', 'light', 'fresh', 'salad'] },
+  { id: 'croque-monsieur', title: 'Croque monsieur', description: 'Grilled ham and cheese sandwich with a rich béchamel top.', cuisine: 'French', budgetTier: 'low', tags: ['cheese', 'quick', 'comfort'] },
+  { id: 'ratatouille', title: 'Ratatouille with crusty bread', description: 'Stewed Mediterranean vegetables in a classic French style — warm and comforting.', cuisine: 'French', budgetTier: 'medium', tags: ['vegetarian', 'light', 'comfort', 'home'] },
 ];
