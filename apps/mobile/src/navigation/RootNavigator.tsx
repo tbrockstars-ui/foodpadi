@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { AuthFlow } from './AuthFlow';
 import { DisclaimerScreen } from '../screens/DisclaimerScreen';
-import { GoalScreen } from '../screens/GoalScreen';
+import { OnboardingFlow } from './OnboardingFlow';
 import { HomeScreen } from '../screens/HomeScreen';
 import { colors } from '../theme/colors';
 
@@ -35,7 +35,7 @@ export function RootNavigator() {
   }
 
   if (!user.onboardingCompletedAt) {
-    return <GoalScreen onSelected={refreshUser} />;
+    return <OnboardingFlow onComplete={refreshUser} />;
   }
 
   return <HomeScreen />;

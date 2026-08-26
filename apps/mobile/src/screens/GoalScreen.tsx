@@ -18,17 +18,19 @@ const GOAL_LABELS: Record<FoodGoal, string> = {
   none: 'No particular goal',
 };
 
-export function GoalScreen({ onSelected }: { onSelected: () => void }) {
+export function GoalScreen({ onNext }: { onNext: () => void }) {
   const [selected, setSelected] = useState<FoodGoal | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // Goal is optional (docs/FOODPADI_ONBOARDING_SPEC.md) — this screen no
+  // longer completes onboarding itself; Preferences (the next, also-skippable
+  // step) does that once the short sequence is done.
   const confirm = async () => {
     if (!selected) return;
     setSubmitting(true);
     try {
       await api.setGoal(selected);
-      await api.completeOnboarding();
-      onSelected();
+      onNext();
     } finally {
       setSubmitting(false);
     }
@@ -52,14 +54,24 @@ export function GoalScreen({ onSelected }: { onSelected: () => void }) {
           </TouchableOpacity>
         ))}
       </View>
-      <TouchableOpacity
-        style={[styles.button, !selected && styles.buttonDisabled]}
-        onPress={confirm}
-        disabled={!selected || submitting}
-        accessibilityRole="button"
-      >
-        <Text style={styles.buttonText}>Continue</Text>
-      </TouchableOpacity>
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonPrimary, !selected && styles.buttonDisabled]}
+          onPress={confirm}
+          disabled={!selected || submitting}
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonText}>Continue</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.button, styles.buttonSecondary]}
+          onPress={onNext}
+          disabled={submitting}
+          accessibilityRole="button"
+        >
+          <Text style={styles.buttonSecondaryText}>Skip for now</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -80,7 +92,11 @@ const styles = StyleSheet.create({
   optionSelected: { borderColor: colors.primary, backgroundColor: '#EAF3EE' },
   optionText: { fontSize: 15, color: colors.text },
   optionTextSelected: { color: colors.primary, fontWeight: '600' },
-  button: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  buttonRow: { flexDirection: 'row', gap: 12 },
+  button: { flex: 1, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
+  buttonPrimary: { backgroundColor: colors.primary },
+  buttonSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
   buttonDisabled: { opacity: 0.4 },
   buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
+  buttonSecondaryText: { color: colors.textMuted, fontSize: 17, fontWeight: '600' },
 });

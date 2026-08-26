@@ -5,6 +5,7 @@ import type {
   LoginRequest,
   RegisterRequest,
   RequestPasswordResetRequest,
+  UpsertFoodPreferenceRequest,
   UserSummary,
 } from '@foodpadi/shared';
 import { tokenStore } from './tokenStore';
@@ -60,6 +61,8 @@ export const api = {
     request<UserSummary>('/users/me/complete-onboarding', { method: 'POST', auth: true }),
   setGoal: (goalType: string) =>
     request('/users/me/goal', { method: 'PUT', body: { goalType }, auth: true }),
+  addPreference: (payload: UpsertFoodPreferenceRequest) =>
+    request('/users/me/preferences', { method: 'POST', body: payload, auth: true }),
   requestPasswordReset: (payload: RequestPasswordResetRequest) =>
     request<void>('/auth/password-reset/request', { method: 'POST', body: payload }),
   confirmPasswordReset: (payload: ConfirmPasswordResetRequest) =>
