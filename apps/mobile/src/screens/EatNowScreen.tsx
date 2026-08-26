@@ -49,7 +49,20 @@ export function EatNowScreen({ navigation, route }: Props) {
     setStep('loading');
     try {
       const token = explicitToken ?? (user ? await tokenStore.getAccessToken() : await guestSession.ensureSession());
-      const found = await api.searchEatNow({ query: searchQuery, maxPricePence }, token ?? '');
+      let found;
+      try {
+        found = await api.searchEatNow({ query: searchQuery, maxPricePence }, token ?? '');
+      } catch (e) {
+        // A cached guest token the server no longer accepts (24h TTL lapsed,
+        // or the API restarted with a rotated secret) surfaces as a 401 —
+        // there's no way to detect that in advance, so recover by minting a
+        // fresh guest session and retrying once before giving up.
+        if (!user && !explicitToken && e instanceof ApiError && e.status === 401) {
+          found = await api.searchEatNow({ query: searchQuery, maxPricePence }, await guestSession.recoverSession());
+        } else {
+          throw e;
+        }
+      }
       setResults(found.slice(0, limit));
       setStep('results');
     } catch (e) {

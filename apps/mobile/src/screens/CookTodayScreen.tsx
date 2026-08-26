@@ -83,15 +83,28 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
     }
   };
 
+  const requestRecipes = (token: string) =>
+    api.generateCookTodayRecipes({ ingredients, timeConstraintMinutes: timeConstraint, servings: 2 }, token);
+
   const findRecipes = async () => {
     setError(null);
     setStep('loading');
     try {
       const token = user ? await tokenStore.getAccessToken() : await guestSession.ensureSession();
-      const results = await api.generateCookTodayRecipes(
-        { ingredients, timeConstraintMinutes: timeConstraint, servings: 2 },
-        token ?? '',
-      );
+      let results;
+      try {
+        results = await requestRecipes(token ?? '');
+      } catch (e) {
+        // A cached guest token the server no longer accepts (24h TTL lapsed,
+        // or the API restarted with a rotated secret) surfaces as a 401 —
+        // there's no way to detect that in advance, so recover by minting a
+        // fresh guest session and retrying once before giving up.
+        if (!user && e instanceof ApiError && e.status === 401) {
+          results = await requestRecipes(await guestSession.recoverSession());
+        } else {
+          throw e;
+        }
+      }
       setRecipes(results);
       setStep('results');
     } catch (e) {
@@ -207,18 +220,24 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
           <Text style={styles.backLinkText}>‹ Home</Text>
         </TouchableOpacity>
         <Text style={styles.title}>A few things you could cook</Text>
-        <ScrollView>
-          {recipes.map((recipe, index) => (
-            <Card key={index} onPress={() => openRecipe(recipe)} style={styles.resultCard}>
-              <Text style={styles.resultTitle}>{recipe.title}</Text>
-              <View style={styles.tagRow}>
-                <Tag label={`${recipe.cookTimeMinutes} min`} />
-                <Tag label={`${recipe.servings} servings`} />
-                {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
-              </View>
-            </Card>
-          ))}
-        </ScrollView>
+        {recipes.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No recipes match that combination. Try a longer time limit, or a few different ingredients.
+          </Text>
+        ) : (
+          <ScrollView>
+            {recipes.map((recipe, index) => (
+              <Card key={index} onPress={() => openRecipe(recipe)} style={styles.resultCard}>
+                <Text style={styles.resultTitle}>{recipe.title}</Text>
+                <View style={styles.tagRow}>
+                  <Tag label={`${recipe.cookTimeMinutes} min`} />
+                  <Tag label={`${recipe.servings} servings`} />
+                  {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
+                </View>
+              </Card>
+            ))}
+          </ScrollView>
+        )}
         <Button label="Start over" variant="secondary" onPress={() => setStep('input')} style={styles.actionSpacing} />
       </View>
     );
@@ -320,6 +339,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: colors.text, fontWeight: '600' },
   errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
+  emptyText: { ...typography.body, color: colors.textMuted },
   actionSpacing: { marginTop: spacing.xl },
   importLink: { marginTop: spacing.lg, alignItems: 'center' },
   importLinkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },

@@ -138,16 +138,22 @@ export function CookTodayForm() {
     return (
       <div>
         <h1 className={styles.title}>A few things you could cook</h1>
-        {recipes.map((recipe, index) => (
-          <button key={index} type="button" className={styles.resultCard} onClick={() => openRecipe(recipe)}>
-            <p className={styles.resultTitle}>{recipe.title}</p>
-            <div className={styles.tagRow}>
-              <span className={styles.tag}>{recipe.cookTimeMinutes} min</span>
-              <span className={styles.tag}>{recipe.servings} servings</span>
-              {recipe.cuisine ? <span className={styles.tag}>{recipe.cuisine}</span> : null}
-            </div>
-          </button>
-        ))}
+        {recipes.length === 0 ? (
+          <p className={styles.emptyText}>
+            No recipes match that combination. Try a longer time limit, or a few different ingredients.
+          </p>
+        ) : (
+          recipes.map((recipe, index) => (
+            <button key={index} type="button" className={styles.resultCard} onClick={() => openRecipe(recipe)}>
+              <p className={styles.resultTitle}>{recipe.title}</p>
+              <div className={styles.tagRow}>
+                <span className={styles.tag}>{recipe.cookTimeMinutes} min</span>
+                <span className={styles.tag}>{recipe.servings} servings</span>
+                {recipe.cuisine ? <span className={styles.tag}>{recipe.cuisine}</span> : null}
+              </div>
+            </button>
+          ))
+        )}
         <button type="button" className={styles.secondaryButton} onClick={() => setStep('input')}>
           Start over
         </button>

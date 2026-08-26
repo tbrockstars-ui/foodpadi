@@ -1,5 +1,7 @@
 import Link from 'next/link';
-import { isAuthenticated } from '../lib/serverApi';
+import { redirect } from 'next/navigation';
+import type { UserSummary } from '@foodpadi/shared';
+import { isAuthenticated, serverFetch } from '../lib/serverApi';
 import { Card } from '../components/Card';
 import styles from './page.module.css';
 import homeStyles from './home.module.css';
@@ -82,8 +84,15 @@ function HomeHub() {
   );
 }
 
-export default function LandingPage() {
+export default async function LandingPage() {
   if (isAuthenticated()) {
+    // Same gate as mobile's RootNavigator: disclaimer is mandatory before
+    // any feature, goal/preferences (OnboardingFlow) are skippable but must
+    // at least be reached once. Mirrors user.disclaimerAcknowledgedAt /
+    // onboardingCompletedAt from UserSummary exactly.
+    const me = await serverFetch<UserSummary>('/users/me');
+    if (!me.disclaimerAcknowledgedAt) redirect('/disclaimer');
+    if (!me.onboardingCompletedAt) redirect('/goal');
     return <HomeHub />;
   }
 

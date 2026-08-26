@@ -16,6 +16,14 @@ interface GuestSessionContextValue {
    * unacknowledged guest session instead of reusing this one. */
   acknowledgeDisclaimer: () => Promise<string>;
   clearSession: () => Promise<void>;
+  /** Recovers from a guest token the server has rejected (401) — e.g. its
+   * 24h TTL lapsed, or the API restarted with a rotated signing secret.
+   * ensureSession() alone can't fix this: it trusts whatever token is
+   * already cached and never re-validates it. Mints a fresh session and, if
+   * the disclaimer was already accepted locally, transparently re-acknowledges
+   * it too (a new token always starts unacknowledged server-side). Returns
+   * the resulting token for the caller to retry its request with. */
+  recoverSession: () => Promise<string>;
 }
 
 const GuestSessionContext = createContext<GuestSessionContextValue | undefined>(undefined);
@@ -55,6 +63,19 @@ export function GuestSessionProvider({ children }: { children: React.ReactNode }
     return updatedToken;
   }, [ensureSession]);
 
+  const recoverSession = useCallback(async () => {
+    const { guestToken: freshToken } = await api.createGuestSession();
+    if (!disclaimerAcknowledged) {
+      await tokenStore.setGuestToken(freshToken);
+      setGuestToken(freshToken);
+      return freshToken;
+    }
+    const { guestToken: ackedToken } = await api.acknowledgeGuestDisclaimer(freshToken);
+    await tokenStore.setGuestToken(ackedToken);
+    setGuestToken(ackedToken);
+    return ackedToken;
+  }, [disclaimerAcknowledged]);
+
   // Called once a guest converts to a real account — guest state is
   // intentionally ephemeral (docs/FOODPADI_AUTHENTICATION_SPEC.md), there is
   // nothing to migrate, just clear it.
@@ -73,8 +94,17 @@ export function GuestSessionProvider({ children }: { children: React.ReactNode }
       ensureSession,
       acknowledgeDisclaimer,
       clearSession,
+      recoverSession,
     }),
-    [isLoading, guestToken, disclaimerAcknowledged, ensureSession, acknowledgeDisclaimer, clearSession],
+    [
+      isLoading,
+      guestToken,
+      disclaimerAcknowledged,
+      ensureSession,
+      acknowledgeDisclaimer,
+      clearSession,
+      recoverSession,
+    ],
   );
 
   return <GuestSessionContext.Provider value={value}>{children}</GuestSessionContext.Provider>;
