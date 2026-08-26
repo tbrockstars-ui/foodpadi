@@ -46,7 +46,7 @@ const PRINCIPLES = [
 const HUB_ACTIONS = [
   { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', href: '/plan', live: true },
   { key: 'eat-now', label: 'Eat now', subtitle: 'Find something to eat', href: '/eat-now', live: true },
-  { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', live: false },
+  { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', href: '/cook-today', live: true },
   { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false },
 ] as const;
 
