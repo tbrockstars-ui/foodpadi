@@ -15,9 +15,5 @@
     "shared:test": "npm run test --workspace=@foodpadi/shared",
     "web:dev": "npm run dev --workspace=@foodpadi/web -- -p 3100",
     "web:build": "npm run build --workspace=@foodpadi/web"
-  },
-  "overrides": {
-    "react": "18.2.0",
-    "react-dom": "18.2.0"
   }
 }
