@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
-import { isAuthenticated, serverFetch } from '../lib/serverApi';
+import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
 import { Card } from '../components/Card';
 import styles from './page.module.css';
 import homeStyles from './home.module.css';
@@ -90,10 +90,22 @@ export default async function LandingPage() {
     // any feature, goal/preferences (OnboardingFlow) are skippable but must
     // at least be reached once. Mirrors user.disclaimerAcknowledgedAt /
     // onboardingCompletedAt from UserSummary exactly.
-    const me = await serverFetch<UserSummary>('/users/me');
-    if (!me.disclaimerAcknowledgedAt) redirect('/disclaimer');
-    if (!me.onboardingCompletedAt) redirect('/goal');
-    return <HomeHub />;
+    try {
+      const me = await serverFetch<UserSummary>('/users/me');
+      if (!me.disclaimerAcknowledgedAt) redirect('/disclaimer');
+      if (!me.onboardingCompletedAt) redirect('/goal');
+      return <HomeHub />;
+    } catch (e) {
+      // A stale cookie (401 — expired/invalid token) or one pointing at a
+      // deleted account (404 — the account no longer exists) both mean "not
+      // really authenticated" here. A Server Component can't clear cookies
+      // mid-render, so this just falls through to the landing page instead
+      // of crashing the whole route; /login overwrites the cookie with a
+      // fresh one regardless, so the stale value is otherwise harmless.
+      if (!(e instanceof ApiError && (e.status === 401 || e.status === 404))) {
+        throw e;
+      }
+    }
   }
 
   return (
