@@ -30,13 +30,16 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 **Exit criteria:** acceptance criteria 6-7 pass (met for the core "generate → view → save" path); AI eval suite green for recipe sanity checks (Layer 3 validation exists and was verified manually against the graceful-failure path; a standing automated eval suite per [TEST_STRATEGY.md](TEST_STRATEGY.md) is not yet built — needs a live `ANTHROPIC_API_KEY` to exercise real model output, not just the 503 path).
 
-## Phase 3 — Plan Ahead
+## Phase 3 — Plan Ahead (first pass ✅, in progress)
 
-- Plan scope selection, plan generation against budget/household/goal constraints (Layer 3 budget engine).
-- Single-meal swap/regenerate (not full-plan regeneration).
-- Shopping list generation from an accepted plan, pantry-subtraction logic (pantry table exists but MVP may have it empty until Phase 6 — subtraction logic still built and tested against seeded data).
+- Plan scope selection (today/3-day/week/custom 1-14 days), optional budget hint. ✅ built (`PlanAheadScreen`, `PlanAheadService.generate`); budget is a soft steering hint passed to the model, not an enforced/priced constraint — no real UK pricing data source exists yet.
+- Plan generation: same Layer 3 (`sanitizeRecipeCandidate`, shared with Cook Today) → Layer 5 (`ClaudeService.generatePlanMeals`) → Layer 6 persistence (`MealPlan`/`MealPlanItem`/`Recipe`) pipeline. Dinner-only, one meal/day, varies across days, respects favourite cuisines/avoided ingredients from the user's saved preferences. ✅ built, account-only (no guest access, per [FOODPADI_ONBOARDING_SPEC.md](FOODPADI_ONBOARDING_SPEC.md)). Verified end-to-end live against the real API/DB, including the graceful "not configured yet" 503 path when `ANTHROPIC_API_KEY` is unset — real AI-generated plan output remains unverified pending a configured key.
+- Single-meal swap/regenerate and remove (not full-plan regeneration). ✅ built (`regenerateItem`, `removeItem`); unverified against real model output for the same API-key reason above.
+- Accept flow (draft → accepted). ✅ built; unverified live for the same reason (requires a successfully generated plan first).
+- Shopping list generation from an accepted plan (idempotent — re-calling returns the existing list), ingredient consolidation by name (quantities/units are joined as distinct strings rather than summed, to avoid fabricating an incorrect numeric total — no unit-conversion table exists). ✅ built (`ShoppingListScreen`, checklist UI with optimistic toggle, add/remove items); unverified live for the same reason. Pantry-subtraction logic — not yet built (pantry table is unused in MVP; tracked as a Phase 6 follow-up).
+- Bug fixed during verification: `GET /plan-ahead/current` returns HTTP 200 with an empty body (not JSON `null`) when no plan exists; the mobile API client's `request()` helper always called `response.json()`, which throws on an empty body — this left `PlanAheadScreen` stuck on its loading spinner forever for any first-time user. Fixed by having `request()` read the body as text and treat an empty string as `null` before parsing.
 
-**Exit criteria:** acceptance criteria 8-11 pass.
+**Exit criteria:** acceptance criteria 8-11 partially verified — the full "generate a plan with real AI output → accept → shopping list" path needs a live `ANTHROPIC_API_KEY` to confirm end-to-end; everything short of an actual model call (routing, scope UI, resume-existing-plan, graceful failure, DB writes) has been verified live.
 
 ## Phase 4 — Eat Now
 

@@ -7,6 +7,7 @@ import { GoalsModule } from './modules/goals/goals.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CookTodayModule } from './modules/cook-today/cook-today.module';
+import { PlanAheadModule } from './modules/plan-ahead/plan-ahead.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -19,6 +20,7 @@ import { AppController } from './app.controller';
     GoalsModule,
     PreferencesModule,
     CookTodayModule,
+    PlanAheadModule,
   ],
   controllers: [AppController],
 })

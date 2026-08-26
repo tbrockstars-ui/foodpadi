@@ -34,6 +34,8 @@ model User {
   aiMemory                 AiMemory[]
   recipes                  Recipe[]
   foodEvents               FoodEvent[]
+  mealPlans                MealPlan[]
+  shoppingLists            ShoppingList[]
 
   @@map("users")
 }
@@ -184,6 +186,7 @@ model Recipe {
   deletedAt       DateTime? @map("deleted_at")
 
   ingredients     RecipeIngredient[]
+  mealPlanItems   MealPlanItem[]
 
   @@map("recipes")
 }
@@ -197,6 +200,77 @@ model RecipeIngredient {
   unit     String?
 
   @@map("recipe_ingredients")
+}
+
+// Plan Ahead is account-first, not guest-accessible (docs/
+// FOODPADI_ONBOARDING_SPEC.md) — its value IS the persisted plan, so every
+// meal gets a real Recipe row the moment it's generated, not only on save
+// (unlike Cook Today's ephemeral-until-saved guest results).
+model MealPlan {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope       String    // "today" | "3day" | "week" | "custom"
+  startDate   DateTime  @map("start_date")
+  endDate     DateTime  @map("end_date")
+  budgetPence Int?      @map("budget_pence")
+  status      String    @default("draft") // "draft" | "accepted" | "completed" | "abandoned"
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  items         MealPlanItem[]
+  shoppingLists ShoppingList[]
+
+  @@map("meal_plans")
+}
+
+model MealPlanItem {
+  id          String   @id @default(uuid())
+  mealPlanId  String   @map("meal_plan_id")
+  mealPlan    MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipeId    String?  @map("recipe_id")
+  recipe      Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  mealSlot    String   @default("dinner") @map("meal_slot") // "breakfast" | "lunch" | "dinner" | "snack"
+  plannedDate DateTime @map("planned_date")
+  servings    Int      @default(2)
+  status      String   @default("planned") // "planned" | "cooked" | "skipped" | "swapped" | "rescued"
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("meal_plan_items")
+}
+
+// Consolidation (duplicate ingredients across a plan's meals collapsed into
+// one line) happens in the service layer at generation time, not here —
+// see docs/PLAN_AHEAD notes in PlanAheadService.buildShoppingListItems.
+model ShoppingList {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealPlanId String?   @map("meal_plan_id")
+  mealPlan   MealPlan? @relation(fields: [mealPlanId], references: [id], onDelete: SetNull)
+  status     String    @default("open") // "open" | "completed"
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  items ShoppingListItem[]
+
+  @@map("shopping_lists")
+}
+
+model ShoppingListItem {
+  id             String       @id @default(uuid())
+  shoppingListId String       @map("shopping_list_id")
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  ingredientName String       @map("ingredient_name")
+  quantity       String?
+  unit           String?
+  checked        Boolean      @default(false)
+  addedManually  Boolean      @default(false) @map("added_manually")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@map("shopping_list_items")
 }
 
 // Long-term AI memory only — curated, user-visible facts (spec §36).

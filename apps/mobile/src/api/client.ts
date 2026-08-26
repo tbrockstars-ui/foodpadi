@@ -1,16 +1,21 @@
 import Constants from 'expo-constants';
 import type {
+  AddShoppingListItemRequest,
   AuthResponse,
   AvoidedIngredientItem,
   ConfirmPasswordResetRequest,
   FoodPreferenceItem,
   GenerateRecipesRequest,
+  GeneratePlanRequest,
   GuestSessionResponse,
   LoginRequest,
+  MealPlanView,
   RecipeView,
   RegisterRequest,
   RequestPasswordResetRequest,
   SaveRecipeRequest,
+  ShoppingListView,
+  UpdateShoppingListItemRequest,
   UpsertFoodPreferenceRequest,
   UserSummary,
 } from '@foodpadi/shared';
@@ -74,7 +79,15 @@ async function request<T>(
   if (response.status === 204) {
     return undefined as T;
   }
-  return (await response.json()) as T;
+
+  // Some 200 responses (e.g. GET /plan-ahead/current with no plan yet) carry
+  // an empty body rather than the literal JSON "null" — response.json() would
+  // throw "Unexpected end of JSON input" on that, so parse text ourselves.
+  const rawBody = await response.text();
+  if (!rawBody) {
+    return null as T;
+  }
+  return JSON.parse(rawBody) as T;
 }
 
 export const api = {
@@ -118,6 +131,25 @@ export const api = {
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
     request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
+  generatePlan: (payload: GeneratePlanRequest) =>
+    request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
+  getCurrentPlan: () => request<MealPlanView | null>('/plan-ahead/current', { auth: true }),
+  acceptPlan: (planId: string) =>
+    request<MealPlanView>(`/plan-ahead/${planId}/accept`, { method: 'POST', auth: true }),
+  regeneratePlanItem: (planId: string, itemId: string) =>
+    request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}/regenerate`, { method: 'POST', auth: true }),
+  removePlanItem: (planId: string, itemId: string) =>
+    request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'DELETE', auth: true }),
+  generateShoppingList: (planId: string) =>
+    request<ShoppingListView>(`/plan-ahead/${planId}/shopping-list`, { method: 'POST', auth: true }),
+  getShoppingList: (listId: string) =>
+    request<ShoppingListView>(`/plan-ahead/shopping-lists/${listId}`, { auth: true }),
+  addShoppingListItem: (listId: string, payload: AddShoppingListItemRequest) =>
+    request(`/plan-ahead/shopping-lists/${listId}/items`, { method: 'POST', body: payload, auth: true }),
+  updateShoppingListItem: (listId: string, itemId: string, payload: UpdateShoppingListItemRequest) =>
+    request(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'PATCH', body: payload, auth: true }),
+  removeShoppingListItem: (listId: string, itemId: string) =>
+    request<void>(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE', auth: true }),
 };
 
 export { ApiError };

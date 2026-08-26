@@ -3,11 +3,15 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CookTodayScreen } from '../screens/CookTodayScreen';
+import { PlanAheadScreen } from '../screens/PlanAheadScreen';
+import { ShoppingListScreen } from '../screens/ShoppingListScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
 
 export type AppStackParamList = {
   Home: undefined;
   CookToday: undefined;
+  PlanAhead: undefined;
+  ShoppingList: { listId: string };
   Profile: undefined;
 };
 
@@ -29,6 +33,8 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="CookToday">
           {(props) => <CookTodayScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
+        <Stack.Screen name="PlanAhead" component={PlanAheadScreen} />
+        <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>

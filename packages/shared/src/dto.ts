@@ -93,6 +93,60 @@ export interface AvoidedIngredientItem {
   note: string | null;
 }
 
+export type PlanScope = 'today' | '3day' | 'week' | 'custom';
+
+export interface GeneratePlanRequest {
+  scope: PlanScope;
+  customDays?: number;
+  budgetPence?: number;
+}
+
+export interface MealPlanItemView {
+  id: string;
+  plannedDate: string;
+  mealSlot: string;
+  servings: number;
+  status: string;
+  recipe: (RecipeView & { id: string }) | null;
+}
+
+export interface MealPlanView {
+  id: string;
+  scope: PlanScope;
+  startDate: string;
+  endDate: string;
+  budgetPence: number | null;
+  status: string;
+  items: MealPlanItemView[];
+}
+
+export interface ShoppingListItemView {
+  id: string;
+  ingredientName: string;
+  quantity: string | null;
+  unit: string | null;
+  checked: boolean;
+  addedManually: boolean;
+}
+
+export interface ShoppingListView {
+  id: string;
+  status: string;
+  items: ShoppingListItemView[];
+}
+
+export interface AddShoppingListItemRequest {
+  ingredientName: string;
+  quantity?: string;
+  unit?: string;
+}
+
+export interface UpdateShoppingListItemRequest {
+  checked?: boolean;
+  quantity?: string;
+  unit?: string;
+}
+
 export const DISCLAIMER_TEXT = `AI Food Companion provides food discovery, ingredient information, meal planning, recipes, shopping assistance and general food-related recommendations.
 
 The service is not an allergy monitoring, allergy-management, medical, diagnostic or emergency service.

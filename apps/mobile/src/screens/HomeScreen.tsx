@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogi
 const PRIMARY_ACTIONS = [
   { key: 'eat-now', label: 'Eat now', subtitle: 'Find something to eat', live: false },
   { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', live: true },
-  { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', live: false },
+  { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', live: true },
   { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false },
 ] as const;
 
@@ -42,6 +42,12 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
               action.live
                 ? () => {
                     if (action.key === 'cook-today') navigation.navigate('CookToday');
+                    // Plan Ahead is account-first (docs/FOODPADI_ONBOARDING_SPEC.md)
+                    // — a guest tapping it goes to signup, not a 401 screen.
+                    if (action.key === 'plan-ahead') {
+                      if (isGuest) onRequestLogin();
+                      else navigation.navigate('PlanAhead');
+                    }
                   }
                 : undefined
             }
@@ -67,7 +73,8 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
         <Card>
           <Text style={styles.companionHeading}>Your companion</Text>
           <Text style={styles.companionBody}>
-            Nothing planned yet — Eat Now and Plan Ahead arrive in the next build phase.
+            Nothing planned yet — try Plan Ahead to get started. Eat Now arrives in the next build
+            phase.
           </Text>
         </Card>
       )}
