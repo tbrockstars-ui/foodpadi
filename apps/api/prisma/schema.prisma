@@ -104,14 +104,22 @@ model HouseholdMember {
 
 // Non-medical goal set only — spec §10 / Decision 13. Never extend this with
 // body-shape or weight-loss framed values.
+//
+// A user's current goals are the isActive=true rows (0-3, exactly one
+// isPrimary). setGoals() deactivates the old active set and inserts a fresh
+// batch rather than mutating in place, so full history is preserved.
 model FoodGoal {
   id        String   @id @default(uuid())
   userId    String   @map("user_id")
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   goalType  String   @map("goal_type")
+  isPrimary Boolean  @default(false) @map("is_primary")
+  isActive  Boolean  @default(true) @map("is_active")
+  note      String?  @map("note") // only set when goalType === 'personal'
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
+  @@index([userId, isActive])
   @@map("food_goals")
 }
 

@@ -4,6 +4,7 @@ import type {
   AuthResponse,
   AvoidedIngredientItem,
   ConfirmPasswordResetRequest,
+  FoodGoalsResponse,
   FoodPreferenceItem,
   GenerateRecipesRequest,
   GeneratePlanRequest,
@@ -14,7 +15,10 @@ import type {
   RegisterRequest,
   RequestPasswordResetRequest,
   SaveRecipeRequest,
+  SearchEatNowRequest,
+  SetFoodGoalsRequest,
   ShoppingListView,
+  TrackGoalEventRequest,
   UpdateShoppingListItemRequest,
   UpsertFoodPreferenceRequest,
   UserSummary,
@@ -100,8 +104,11 @@ export const api = {
     request<UserSummary>('/users/me/disclaimer-acknowledge', { method: 'POST', auth: true }),
   completeOnboarding: () =>
     request<UserSummary>('/users/me/complete-onboarding', { method: 'POST', auth: true }),
-  setGoal: (goalType: string) =>
-    request('/users/me/goal', { method: 'PUT', body: { goalType }, auth: true }),
+  getGoals: () => request<FoodGoalsResponse>('/users/me/goals', { auth: true }),
+  setGoals: (payload: SetFoodGoalsRequest) =>
+    request<FoodGoalsResponse>('/users/me/goals', { method: 'PUT', body: payload, auth: true }),
+  trackGoalEvent: (payload: TrackGoalEventRequest) =>
+    request<void>('/users/me/goals/events', { method: 'POST', body: payload, auth: true }).catch(() => undefined),
   listPreferences: () =>
     request<FoodPreferenceItem[]>('/users/me/preferences', { auth: true }),
   addPreference: (payload: UpsertFoodPreferenceRequest) =>
@@ -131,6 +138,8 @@ export const api = {
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
     request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
+  searchEatNow: (payload: SearchEatNowRequest, token: string) =>
+    request<never>('/eat-now/search', { method: 'POST', body: payload, token }),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
   getCurrentPlan: () => request<MealPlanView | null>('/plan-ahead/current', { auth: true }),

@@ -1,13 +1,15 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { AvoidedIngredientItem, DISCLAIMER_TEXT, FoodPreferenceItem, UserSummary } from '@foodpadi/shared';
+import { AvoidedIngredientItem, DISCLAIMER_TEXT, FoodGoalItem, FoodPreferenceItem, UserSummary } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { DisclaimerBanner } from '../components/DisclaimerBanner';
 import { LoadingState } from '../components/LoadingState';
+import { GOAL_LABELS } from '../constants/goalLabels';
 import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
@@ -17,6 +19,7 @@ export function ProfileScreen({ navigation }: Props) {
   const { logout } = useAuth();
   const [profile, setProfile] = useState<UserSummary | null>(null);
   const [preferences, setPreferences] = useState<FoodPreferenceItem[]>([]);
+  const [goals, setGoals] = useState<FoodGoalItem[]>([]);
   const [avoided, setAvoided] = useState<AvoidedIngredientItem[]>([]);
   const [newCuisine, setNewCuisine] = useState('');
   const [newAvoided, setNewAvoided] = useState('');
@@ -27,20 +30,27 @@ export function ProfileScreen({ navigation }: Props) {
   const [deleting, setDeleting] = useState(false);
 
   const load = async () => {
-    const [me, prefs, avoidedItems] = await Promise.all([
+    const [me, prefs, avoidedItems, goalsResponse] = await Promise.all([
       api.me(),
       api.listPreferences(),
       api.listAvoidedIngredients(),
+      api.getGoals(),
     ]);
     setProfile(me);
     setPreferences(prefs);
     setAvoided(avoidedItems);
+    setGoals(goalsResponse.goals);
     setLoading(false);
   };
 
-  useEffect(() => {
-    load();
-  }, []);
+  // useFocusEffect (not a mount-only useEffect) because native-stack keeps
+  // Profile mounted underneath EditGoals — coming back via goBack() needs to
+  // re-fetch, not just the very first visit.
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, []),
+  );
 
   const addCuisine = async () => {
     const trimmed = newCuisine.trim();
@@ -95,6 +105,25 @@ export function ProfileScreen({ navigation }: Props) {
 
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.email}>{profile.email}</Text>
+
+      <Text style={styles.sectionHeading}>Food & lifestyle goals</Text>
+      <Card style={styles.section}>
+        {goals.length === 0 ? (
+          <Text style={styles.emptyText}>No goals set yet.</Text>
+        ) : (
+          <View style={styles.tagList}>
+            {goals.map((goal) => (
+              <View key={goal.goalType} style={styles.removableTag}>
+                <Text style={styles.removableTagText}>
+                  {GOAL_LABELS[goal.goalType]}
+                  {goal.isPrimary && goals.length > 1 ? ' ★' : ''}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+        <Button label="Edit goals" variant="secondary" onPress={() => navigation.navigate('EditGoals')} />
+      </Card>
 
       <Text style={styles.sectionHeading}>Favourite cuisines</Text>
       <Card style={styles.section}>

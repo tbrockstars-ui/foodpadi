@@ -1,5 +1,22 @@
 import type { FoodGoal } from './foodGoals';
 
+// Analytics events reported directly from client interactions on the Food &
+// Lifestyle Goals screen (view/select/deselect/etc). `food_goals_completed`
+// is excluded — the API tracks that itself when a save actually succeeds.
+export const GOAL_CLIENT_EVENT_TYPES = [
+  'food_goal_screen_viewed',
+  'food_goal_selected',
+  'food_goal_deselected',
+  'food_goal_limit_reached',
+  'food_goal_skipped',
+  'no_particular_goal_selected',
+  'personal_goal_started',
+  'personal_goal_completed',
+  'primary_goal_selected',
+] as const;
+
+export type GoalClientEventType = (typeof GOAL_CLIENT_EVENT_TYPES)[number];
+
 export interface RegisterRequest {
   email: string;
   password: string;
@@ -25,8 +42,28 @@ export interface UserSummary {
   disclaimerAcknowledgedAt: string | null;
 }
 
-export interface SetFoodGoalRequest {
+export interface SetFoodGoalsRequest {
+  /** 1-3 unique goals. If it includes 'none', it must be the only entry. */
+  goalTypes: FoodGoal[];
+  /** Required when goalTypes has 2+ entries; must be one of them. */
+  primaryGoalType?: FoodGoal;
+  /** Only persisted when 'personal' is among goalTypes. */
+  personalGoalNote?: string;
+}
+
+export interface FoodGoalItem {
   goalType: FoodGoal;
+  isPrimary: boolean;
+  note: string | null;
+}
+
+export interface FoodGoalsResponse {
+  goals: FoodGoalItem[];
+}
+
+export interface TrackGoalEventRequest {
+  eventType: GoalClientEventType;
+  goalType?: FoodGoal;
 }
 
 export interface UpsertFoodPreferenceRequest {
@@ -73,6 +110,12 @@ export interface RecipeView {
 }
 
 export type SaveRecipeRequest = RecipeView;
+
+export interface SearchEatNowRequest {
+  query: string;
+  maxPricePence?: number;
+  cuisine?: string;
+}
 
 export interface GuestSessionResponse {
   guestToken: string;

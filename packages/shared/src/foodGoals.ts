@@ -15,3 +15,5 @@ export const FOOD_GOALS = [
 ] as const;
 
 export type FoodGoal = (typeof FOOD_GOALS)[number];
+
+export const MAX_FOOD_GOALS = 3;

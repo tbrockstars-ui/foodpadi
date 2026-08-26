@@ -12,6 +12,7 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 - Postgres (Neon) schema + Prisma migrations for identity/household/preferences/goals tables ([DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) sections 1-2).
 - Auth (email/password — built; Apple/Google + guest session — see below), session handling.
 - Onboarding flow: disclaimer acknowledgement, **skippable** goal selection, optional preferences.
+- Goals upgraded from single-select to multi-select (0-3 active goals, one flagged primary; history preserved via `is_active`/`is_primary` rather than deleting old rows — `20260826120000_goal_multiselect` migration, backfills each existing user's most recent goal as their primary). ✅ built (`EditGoalsScreen`, `GoalCard`, `GoalsEditor`, `GoalsService.setGoals`, `trackGoalEvent`).
 - Privacy controls skeleton: view/export/delete profile.
 - Analytics event pipeline wired to `food_events` from day one (§38 requires this from the start, not bolted on later). ✅ built (`AnalyticsService`, called inline from feature services — Cook Today is the first caller).
 
@@ -41,14 +42,15 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 **Exit criteria:** acceptance criteria 8-11 partially verified — the full "generate a plan with real AI output → accept → shopping list" path needs a live `ANTHROPIC_API_KEY` to confirm end-to-end; everything short of an actual model call (routing, scope UI, resume-existing-plan, graceful failure, DB writes) has been verified live.
 
-## Phase 4 — Eat Now
+## Phase 4 — Eat Now (skeleton ✅, data source integration pending)
 
-- NL request parsing (Layer 5) → structured query → Layer 4 ranking against `products`/`restaurants`/`menu_items` (seeded/licensed UK data source).
-- Location permission flow (optional, foreground-only).
-- Filter UI (price/distance/cuisine/etc.).
-- Source attribution shown wherever product/menu data is displayed.
+- Guest-accessible search screen (`EatNowScreen`) with the same disclaimer-gate pattern as Cook Today, wired into Home (`live: true`), and a real endpoint (`POST /eat-now/search`, `EatNowModule`) reachable by both guests and account users. ✅ built and verified live in both paths.
+- NL request parsing (Layer 5) → structured query → Layer 4 ranking against `products`/`restaurants`/`menu_items` — deliberately **not** built yet: this needs a product decision on which UK data source to license/seed, which hasn't been made. `EatNowService.search` gates on this honestly (a 503 "no product or restaurant data source is connected", mirroring the `ANTHROPIC_API_KEY` gate pattern used elsewhere) rather than returning fabricated results. This is the "skeleton now, integrate the data source later" split requested for this phase.
+- Filter UI (price/distance/cuisine/etc.) — DTO already accepts `maxPricePence`/`cuisine`; no filter chips in the UI yet since there's nothing real to filter against.
+- Location permission flow (optional, foreground-only) — not yet built; deferred with the rest of the data-source integration.
+- Source attribution shown wherever product/menu data is displayed — not yet applicable until a real data source exists.
 
-**Exit criteria:** acceptance criteria 4-5 pass.
+**Exit criteria:** acceptance criteria 4-5 pending — blocked on the UK product/restaurant data source decision, not on anything structural.
 
 ## Phase 5 — Companion
 

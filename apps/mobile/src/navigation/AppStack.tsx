@@ -2,17 +2,21 @@ import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/HomeScreen';
+import { EatNowScreen } from '../screens/EatNowScreen';
 import { CookTodayScreen } from '../screens/CookTodayScreen';
 import { PlanAheadScreen } from '../screens/PlanAheadScreen';
 import { ShoppingListScreen } from '../screens/ShoppingListScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { EditGoalsScreen } from '../screens/EditGoalsScreen';
 
 export type AppStackParamList = {
   Home: undefined;
+  EatNow: undefined;
   CookToday: undefined;
   PlanAhead: undefined;
   ShoppingList: { listId: string };
   Profile: undefined;
+  EditGoals: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -30,12 +34,14 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="Home">
           {(props) => <HomeScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
+        <Stack.Screen name="EatNow" component={EatNowScreen} />
         <Stack.Screen name="CookToday">
           {(props) => <CookTodayScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
         <Stack.Screen name="PlanAhead" component={PlanAheadScreen} />
         <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
