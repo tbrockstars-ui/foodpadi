@@ -18,6 +18,6 @@ export class EatNowController {
         'Acknowledge the food/safety disclaimer before searching for food.',
       );
     }
-    return this.eatNowService.search(dto);
+    return this.eatNowService.search(dto, actor);
   }
 }

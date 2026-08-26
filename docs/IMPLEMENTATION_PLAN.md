@@ -2,6 +2,8 @@
 
 Phasing per spec §33/§44. Each phase ends with tests passing, types checked, and this plan updated with anything learned before moving on (§42).
 
+**Bug fixed while verifying Eat Now live:** `apps/api/src/main.ts`'s CORS config only allowed the Next.js web app's origin (needed for its httpOnly-cookie session work) — this silently broke browser-based testing of the mobile app's web build (`expo start --web`, port 8081), which is a real browser and is CORS-checked (unlike native RN). Added `http://localhost:8081` alongside the web app's origin rather than replacing it.
+
 ## Phase 0 — Product Discovery ✅ (this pass)
 
 Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTURE_ASSESSMENT.md](ARCHITECTURE_ASSESSMENT.md), [RISK_REGISTER.md](RISK_REGISTER.md), [MVP_SCOPE.md](MVP_SCOPE.md), plus the full documentation set in `/docs`. Repository initialized at the project root. No code written yet.
@@ -46,15 +48,15 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 **Exit criteria:** acceptance criteria 8-11 partially verified — the full "generate a plan with real AI output → accept → shopping list" path needs a live `ANTHROPIC_API_KEY` to confirm end-to-end; everything short of an actual model call (routing, scope UI, resume-existing-plan, graceful failure, DB writes) has been verified live.
 
-## Phase 4 — Eat Now (skeleton ✅, data source integration pending)
+## Phase 4 — Eat Now (MVP dataset ✅, real data source integration pending)
 
 - Guest-accessible search screen (`EatNowScreen`) with the same disclaimer-gate pattern as Cook Today, wired into Home (`live: true`), and a real endpoint (`POST /eat-now/search`, `EatNowModule`) reachable by both guests and account users. ✅ built and verified live in both paths.
-- NL request parsing (Layer 5) → structured query → Layer 4 ranking against `products`/`restaurants`/`menu_items` — deliberately **not** built yet: this needs a product decision on which UK data source to license/seed, which hasn't been made. `EatNowService.search` gates on this honestly (a 503 "no product or restaurant data source is connected", mirroring the `ANTHROPIC_API_KEY` gate pattern used elsewhere) rather than returning fabricated results. This is the "skeleton now, integrate the data source later" split requested for this phase.
-- Filter UI (price/distance/cuisine/etc.) — DTO already accepts `maxPricePence`/`cuisine`; no filter chips in the UI yet since there's nothing real to filter against.
-- Location permission flow (optional, foreground-only) — not yet built; deferred with the rest of the data-source integration.
-- Source attribution shown wherever product/menu data is displayed — not yet applicable until a real data source exists.
+- NL request parsing → Layer 4 ranking: since it's MVP and no UK product/restaurant data source has been licensed yet, `EatNowService.search` matches the query (plus optional `cuisine`/`maxPricePence` filters) against a small hand-curated dataset of ~25 generic food ideas (`eat-now-catalog.ts`) via deterministic keyword scoring — not fabricated restaurant/price/availability data, just honest "things you could eat" suggestions in the same spirit as Cook Today's recipes. `EatNowScreen` shows an explicit "example suggestions, not real-time listings" note so this is never mistaken for live commerce data. ✅ built and verified live against several real queries (keyword matches, cuisine filter, empty-result handling all correct).
+- Swappable later: the interface (`search(dto, actor) => FoodIdeaView[]`) stays the same whether ranking comes from this static catalog or, once a real data source and `ANTHROPIC_API_KEY`-backed ranking exist, from a Layer 5 model call.
+- Filter UI (price/distance/cuisine/etc.) — DTO/service already support `maxPricePence`/`cuisine`; no filter chips in the UI yet.
+- Location permission flow, real source attribution — not yet built; deferred with the rest of the real-data-source integration.
 
-**Exit criteria:** acceptance criteria 4-5 pending — blocked on the UK product/restaurant data source decision, not on anything structural.
+**Exit criteria:** acceptance criteria 4-5 pass for the MVP dataset; the real UK product/restaurant data source decision remains open and would replace `eat-now-catalog.ts`, not the surrounding architecture.
 
 ## Phase 5 — Companion
 

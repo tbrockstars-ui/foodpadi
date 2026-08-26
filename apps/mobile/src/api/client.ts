@@ -5,6 +5,7 @@ import type {
   AvoidedIngredientItem,
   ConfirmPasswordResetRequest,
   FoodGoalsResponse,
+  FoodIdeaView,
   FoodPreferenceItem,
   GenerateRecipesRequest,
   GeneratePlanRequest,
@@ -142,7 +143,7 @@ export const api = {
   importRecipe: (payload: ImportRecipeRequest) =>
     request<RecipeView>('/recipe-import', { method: 'POST', body: payload, auth: true }),
   searchEatNow: (payload: SearchEatNowRequest, token: string) =>
-    request<never>('/eat-now/search', { method: 'POST', body: payload, token }),
+    request<FoodIdeaView[]>('/eat-now/search', { method: 'POST', body: payload, token }),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
   getCurrentPlan: () => request<MealPlanView | null>('/plan-ahead/current', { auth: true }),

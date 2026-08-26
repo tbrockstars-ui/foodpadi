@@ -121,6 +121,15 @@ export interface SearchEatNowRequest {
   cuisine?: string;
 }
 
+export interface FoodIdeaView {
+  id: string;
+  title: string;
+  description: string;
+  cuisine: string;
+  budgetTier: 'low' | 'medium' | 'high';
+  tags: string[];
+}
+
 export interface GuestSessionResponse {
   guestToken: string;
 }

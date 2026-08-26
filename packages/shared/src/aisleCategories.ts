@@ -1,6 +1,7 @@
 // Deterministic keyword-based aisle grouping for the shopping list — inspired
 // by Samsung Food's "sort by aisle" shopping list feature. Keyword matching,
-// not AI: works with no external dependency and no ANTHROPIC_API_KEY.
+// not AI: works with no external dependency and no ANTHROPIC_API_KEY. Shared
+// between mobile and web so both platforms group items identically.
 
 export const AISLE_ORDER = [
   'Fruit & Veg',

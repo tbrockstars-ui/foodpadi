@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { ShoppingListView } from '@foodpadi/shared';
+import { AISLE_ORDER, categorizeIngredient, ShoppingListView } from '@foodpadi/shared';
 import { api } from '../api/client';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
-import { AISLE_ORDER, categorizeIngredient } from '../constants/aisleCategories';
 import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 

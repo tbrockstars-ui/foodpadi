@@ -1,19 +1,27 @@
 import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { DISCLAIMER_TEXT } from '@foodpadi/shared';
+import { DISCLAIMER_TEXT, FoodIdeaView } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
 import { Button } from '../components/Button';
+import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
+import { Tag } from '../components/Tag';
 import { colors, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'EatNow'>;
 
-type Step = 'disclaimer' | 'search' | 'loading';
+type Step = 'disclaimer' | 'search' | 'loading' | 'results';
+
+const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
+  low: '£',
+  medium: '££',
+  high: '£££',
+};
 
 export function EatNowScreen({ navigation }: Props) {
   const { user } = useAuth();
@@ -22,6 +30,7 @@ export function EatNowScreen({ navigation }: Props) {
 
   const [step, setStep] = useState<Step>(needsGuestDisclaimer ? 'disclaimer' : 'search');
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<FoodIdeaView[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [acknowledging, setAcknowledging] = useState(false);
 
@@ -42,14 +51,15 @@ export function EatNowScreen({ navigation }: Props) {
     setStep('loading');
     try {
       const token = user ? await tokenStore.getAccessToken() : await guestSession.ensureSession();
-      await api.searchEatNow({ query: trimmed }, token ?? '');
+      const found = await api.searchEatNow({ query: trimmed }, token ?? '');
+      setResults(found);
+      setStep('results');
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
         setError("Eat Now isn't ready yet — there's no food data source connected. Check back soon.");
       } else {
         setError('Something went wrong searching for food. Please try again.');
       }
-    } finally {
       setStep('search');
     }
   };
@@ -68,6 +78,36 @@ export function EatNowScreen({ navigation }: Props) {
 
   if (step === 'loading') {
     return <LoadingState message="Looking for something to eat…" />;
+  }
+
+  if (step === 'results') {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+        <TouchableOpacity onPress={() => setStep('search')} style={styles.backLink}>
+          <Text style={styles.backLinkText}>‹ Try another search</Text>
+        </TouchableOpacity>
+        <Text style={styles.title}>A few ideas</Text>
+        <Text style={styles.disclaimerNote}>
+          Example suggestions from a small curated list — not real-time restaurant listings, prices,
+          or availability.
+        </Text>
+
+        {results.length === 0 ? (
+          <Text style={styles.emptyText}>Nothing matched that. Try different words, like a cuisine or "quick".</Text>
+        ) : (
+          results.map((idea) => (
+            <Card key={idea.id} style={styles.resultCard}>
+              <Text style={styles.resultTitle}>{idea.title}</Text>
+              <Text style={styles.resultBody}>{idea.description}</Text>
+              <View style={styles.tagRow}>
+                <Tag label={idea.cuisine} />
+                <Tag label={BUDGET_LABEL[idea.budgetTier]} />
+              </View>
+            </Card>
+          ))
+        )}
+      </ScrollView>
+    );
   }
 
   return (
@@ -103,6 +143,8 @@ const styles = StyleSheet.create({
   backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+  disclaimerNote: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+  emptyText: { ...typography.body, color: colors.textMuted },
   searchInput: {
     borderWidth: 1,
     borderColor: colors.border,
@@ -115,6 +157,10 @@ const styles = StyleSheet.create({
   },
   errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
+  resultCard: { marginBottom: spacing.md },
+  resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  resultBody: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   disclaimerBox: {
     flex: 1,
     borderWidth: 1,
