@@ -39,6 +39,9 @@ All product, architecture, safety, privacy, and process documentation lives in [
 | [RISK_REGISTER.md](docs/RISK_REGISTER.md) | Live risk tracking |
 | [TEST_STRATEGY.md](docs/TEST_STRATEGY.md) | Test and AI-eval coverage requirements |
 | [IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phase-by-phase build plan |
+| [FOODPADI_LOGIN_ONBOARDING_RESEARCH.md](docs/FOODPADI_LOGIN_ONBOARDING_RESEARCH.md) | Competitor/Reddit/privacy research behind the login & onboarding decision |
+| [FOODPADI_ONBOARDING_SPEC.md](docs/FOODPADI_ONBOARDING_SPEC.md) / [FOODPADI_AUTHENTICATION_SPEC.md](docs/FOODPADI_AUTHENTICATION_SPEC.md) | Onboarding flows and auth architecture (guest mode, Apple/Google sign-in) |
+| [FOODPADI_PERSONALISATION_SPEC.md](docs/FOODPADI_PERSONALISATION_SPEC.md) / [FOODPADI_ONBOARDING_ANALYTICS.md](docs/FOODPADI_ONBOARDING_ANALYTICS.md) | Progressive personalisation and onboarding funnel analytics/A-B tests |
 
 ## Non-Negotiable Boundary
 

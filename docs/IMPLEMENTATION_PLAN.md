@@ -10,12 +10,14 @@ Deliverables produced: [PRODUCT_DISCOVERY.md](PRODUCT_DISCOVERY.md), [ARCHITECTU
 
 - Repo scaffold: `/apps/mobile` (Expo/TypeScript, the only user-facing client), `/apps/api` (NestJS/TypeScript), `/apps/web` (Next.js — landing page + staff-only admin/support page, no user-facing features), `/packages/shared` (shared types/DTOs).
 - Postgres (Neon) schema + Prisma migrations for identity/household/preferences/goals tables ([DATABASE_SCHEMA.md](DATABASE_SCHEMA.md) sections 1-2).
-- Auth (email + Apple/Google), session handling.
-- Onboarding flow: disclaimer acknowledgement, goal selection, optional preferences.
+- Auth (email/password — built; Apple/Google + guest session — see below), session handling.
+- Onboarding flow: disclaimer acknowledgement, **skippable** goal selection, optional preferences.
 - Privacy controls skeleton: view/export/delete profile.
 - Analytics event pipeline wired to `food_events` from day one (§38 requires this from the start, not bolted on later).
 
-**Exit criteria:** a user can sign up, see the disclaimer, pick a goal, and land on Home. Acceptance criteria 1-3, 17 from §40 pass.
+**Exit criteria:** a user can sign up, see the disclaimer, pick or skip a goal, and land on Home. Acceptance criteria 1-3, 17 from §40 pass.
+
+**Superseded/refined by dedicated research:** the onboarding model above (mandatory goal, login-before-everything) was revisited in a full competitor/Reddit/privacy research pass — see [FOODPADI_LOGIN_ONBOARDING_RESEARCH.md](FOODPADI_LOGIN_ONBOARDING_RESEARCH.md) and its companion specs ([FOODPADI_ONBOARDING_SPEC.md](FOODPADI_ONBOARDING_SPEC.md), [FOODPADI_AUTHENTICATION_SPEC.md](FOODPADI_AUTHENTICATION_SPEC.md), [FOODPADI_PERSONALISATION_SPEC.md](FOODPADI_PERSONALISATION_SPEC.md), [FOODPADI_ONBOARDING_ANALYTICS.md](FOODPADI_ONBOARDING_ANALYTICS.md)). Net changes: the goal question becomes skippable; a guest-session concept is added so Eat Now/Cook Today can be used before an account exists (Plan Ahead remains account-first). Those docs' own P0-P3 backlogs are the authoritative sequencing for this area going forward.
 
 ## Phase 2 — Cook Today
 
