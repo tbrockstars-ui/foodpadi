@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
+import { Button } from '../components/Button';
 import { colors } from '../theme/colors';
 
 interface Props {
@@ -83,18 +84,13 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.primaryButton, !canSubmit && styles.primaryButtonDisabled]}
+      <Button
+        label={mode === 'login' ? 'Log in' : 'Create account'}
         onPress={submit}
-        disabled={submitting || !canSubmit}
-        accessibilityRole="button"
-      >
-        {submitting ? (
-          <ActivityIndicator color={colors.primaryText} />
-        ) : (
-          <Text style={styles.primaryButtonText}>{mode === 'login' ? 'Log in' : 'Create account'}</Text>
-        )}
-      </TouchableOpacity>
+        disabled={!canSubmit}
+        loading={submitting}
+        style={styles.primaryButton}
+      />
 
       {mode === 'login' ? (
         <TouchableOpacity onPress={onForgotPassword}>
@@ -140,15 +136,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     color: colors.text,
   },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  primaryButtonDisabled: { opacity: 0.4 },
-  primaryButtonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
+  primaryButton: { marginTop: 8 },
   hint: { color: colors.textMuted, fontSize: 13, marginTop: -6, marginBottom: 12 },
   forgotPasswordText: { color: colors.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
   switchModeText: { color: colors.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },

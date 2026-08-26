@@ -3,10 +3,12 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { HomeScreen } from '../screens/HomeScreen';
 import { CookTodayScreen } from '../screens/CookTodayScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 
 export type AppStackParamList = {
   Home: undefined;
   CookToday: undefined;
+  Profile: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -27,6 +29,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="CookToday">
           {(props) => <CookTodayScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
+        <Stack.Screen name="Profile" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -78,6 +78,21 @@ export interface GuestSessionResponse {
   guestToken: string;
 }
 
+export interface FoodPreferenceItem {
+  id: string;
+  cuisine: string | null;
+  likedMeal: string | null;
+  dislikedIngredient: string | null;
+  textureDislike: string | null;
+  cookingStyle: string | null;
+}
+
+export interface AvoidedIngredientItem {
+  id: string;
+  ingredientName: string;
+  note: string | null;
+}
+
 export const DISCLAIMER_TEXT = `AI Food Companion provides food discovery, ingredient information, meal planning, recipes, shopping assistance and general food-related recommendations.
 
 The service is not an allergy monitoring, allergy-management, medical, diagnostic or emergency service.

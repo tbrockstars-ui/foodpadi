@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
+import { Button } from '../components/Button';
+import { Chip } from '../components/Chip';
+import { colors, spacing } from '../theme/colors';
 
 // A starting set of cuisines, not an exhaustive list — this is deliberately
 // small and skippable (docs/FOODPADI_ONBOARDING_SPEC.md, docs/
@@ -62,40 +64,18 @@ export function PreferencesScreen({ onDone }: { onDone: () => void }) {
         Pick as many as you like — FoodPadi will learn more about your taste as you go.
       </Text>
       <View style={styles.chipWrap}>
-        {CUISINES.map((cuisine) => {
-          const isSelected = selected.includes(cuisine);
-          return (
-            <TouchableOpacity
-              key={cuisine}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-              onPress={() => toggle(cuisine)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: isSelected }}
-            >
-              <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{cuisine}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {CUISINES.map((cuisine) => (
+          <Chip key={cuisine} label={cuisine} selected={selected.includes(cuisine)} onPress={() => toggle(cuisine)} />
+        ))}
       </View>
       <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonPrimary]}
+        <Button
+          label={selected.length > 0 ? `Continue (${selected.length})` : 'Continue'}
           onPress={finish}
-          disabled={submitting}
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>
-            {selected.length > 0 ? `Continue (${selected.length})` : 'Continue'}
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonSecondary]}
-          onPress={skip}
-          disabled={submitting}
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonSecondaryText}>Skip for now</Text>
-        </TouchableOpacity>
+          loading={submitting}
+          style={{ flex: 1 }}
+        />
+        <Button label="Skip for now" variant="secondary" onPress={skip} disabled={submitting} style={{ flex: 1 }} />
       </View>
     </View>
   );
@@ -106,21 +86,5 @@ const styles = StyleSheet.create({
   heading: { fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 8 },
   subtitle: { fontSize: 14, color: colors.textMuted, marginBottom: 20, lineHeight: 20 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, flexGrow: 1, alignContent: 'flex-start' },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-  },
-  chipSelected: { borderColor: colors.primary, backgroundColor: '#EAF3EE' },
-  chipText: { fontSize: 14, color: colors.text },
-  chipTextSelected: { color: colors.primary, fontWeight: '600' },
-  buttonRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
-  button: { flex: 1, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  buttonPrimary: { backgroundColor: colors.primary },
-  buttonSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
-  buttonSecondaryText: { color: colors.textMuted, fontSize: 17, fontWeight: '600' },
+  buttonRow: { flexDirection: 'row', gap: spacing.md, marginTop: 20 },
 });

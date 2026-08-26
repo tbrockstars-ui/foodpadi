@@ -1,7 +1,9 @@
 import Constants from 'expo-constants';
 import type {
   AuthResponse,
+  AvoidedIngredientItem,
   ConfirmPasswordResetRequest,
+  FoodPreferenceItem,
   GenerateRecipesRequest,
   GuestSessionResponse,
   LoginRequest,
@@ -87,8 +89,20 @@ export const api = {
     request<UserSummary>('/users/me/complete-onboarding', { method: 'POST', auth: true }),
   setGoal: (goalType: string) =>
     request('/users/me/goal', { method: 'PUT', body: { goalType }, auth: true }),
+  listPreferences: () =>
+    request<FoodPreferenceItem[]>('/users/me/preferences', { auth: true }),
   addPreference: (payload: UpsertFoodPreferenceRequest) =>
     request('/users/me/preferences', { method: 'POST', body: payload, auth: true }),
+  deletePreference: (id: string) =>
+    request<void>(`/users/me/preferences/${id}`, { method: 'DELETE', auth: true }),
+  listAvoidedIngredients: () =>
+    request<AvoidedIngredientItem[]>('/users/me/avoided-ingredients', { auth: true }),
+  addAvoidedIngredient: (ingredientName: string) =>
+    request('/users/me/avoided-ingredients', { method: 'POST', body: { ingredientName }, auth: true }),
+  deleteAvoidedIngredient: (id: string) =>
+    request<void>(`/users/me/avoided-ingredients/${id}`, { method: 'DELETE', auth: true }),
+  exportData: () => request<Record<string, unknown>>('/users/me/export', { auth: true }),
+  deleteAccount: () => request<void>('/users/me', { method: 'DELETE', auth: true }),
   requestPasswordReset: (payload: RequestPasswordResetRequest) =>
     request<void>('/auth/password-reset/request', { method: 'POST', body: payload }),
   confirmPasswordReset: (payload: ConfirmPasswordResetRequest) =>

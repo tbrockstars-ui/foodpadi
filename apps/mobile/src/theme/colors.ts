@@ -9,8 +9,17 @@ export const colors = {
   primaryDark: '#204A37',
   primarySoft: '#EAF3EE',
   primaryText: '#FFFFFF',
+  // "accent" is kept as an alias for existing call sites (Tag uses it);
+  // "secondary" is the same colour, named per docs/FOODPADI_DESIGN_SYSTEM.md's
+  // design-system table — new code should reach for `secondary`.
   accent: '#C2760C',
   accentSoft: '#FBF0DE',
+  secondary: '#C2760C',
+  secondarySoft: '#FBF0DE',
+  success: '#3B7A3B',
+  successSoft: '#EAF3EA',
+  warning: '#B7791F',
+  warningSoft: '#FBF1E2',
   border: '#E7E4DB',
   borderStrong: '#D4D0C4',
   danger: '#B3261E',

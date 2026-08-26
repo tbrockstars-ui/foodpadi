@@ -1,21 +1,18 @@
 import React, { useState } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DISCLAIMER_TEXT, RecipeView } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
+import { Button } from '../components/Button';
+import { Card } from '../components/Card';
+import { Chip } from '../components/Chip';
+import { LoadingState } from '../components/LoadingState';
 import { SignupPromptModal } from '../components/SignupPromptModal';
-import { colors, radius, shadow, spacing, typography } from '../theme/colors';
+import { Tag } from '../components/Tag';
+import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CookToday'> & { onRequestLogin: () => void };
@@ -133,20 +130,13 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
         <ScrollView style={styles.disclaimerBox} contentContainerStyle={{ padding: spacing.lg }}>
           <Text style={styles.disclaimerText}>{DISCLAIMER_TEXT}</Text>
         </ScrollView>
-        <TouchableOpacity style={styles.primaryButton} onPress={acknowledgeDisclaimer} disabled={acknowledging}>
-          <Text style={styles.primaryButtonText}>I understand</Text>
-        </TouchableOpacity>
+        <Button label="I understand" onPress={acknowledgeDisclaimer} loading={acknowledging} style={styles.actionSpacing} />
       </View>
     );
   }
 
   if (step === 'loading') {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator color={colors.primary} size="large" />
-        <Text style={styles.loadingText}>Finding a few things you could cook…</Text>
-      </View>
-    );
+    return <LoadingState message="Finding a few things you could cook…" />;
   }
 
   if (step === 'detail' && selectedRecipe) {
@@ -164,40 +154,36 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
         </View>
 
         <Text style={styles.sectionHeading}>Ingredients</Text>
-        <View style={styles.card}>
+        <Card style={styles.section}>
           {selectedRecipe.ingredients.map((ingredient, index) => (
             <Text key={index} style={styles.ingredientLine}>
               {[ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ')}
             </Text>
           ))}
-        </View>
+        </Card>
 
         <Text style={styles.sectionHeading}>Steps</Text>
-        <View style={styles.card}>
+        <Card style={styles.section}>
           {selectedRecipe.steps.map((step_, index) => (
             <View key={index} style={styles.stepRow}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
               <Text style={styles.stepText}>{step_}</Text>
             </View>
           ))}
-        </View>
+        </Card>
 
         <Text style={styles.safetyNotice}>
           Food information only. FoodPadi does not monitor allergies, allergic reactions or medical
           conditions and does not determine whether food is medically safe for you.
         </Text>
 
-        <TouchableOpacity
-          style={[styles.primaryButton, saved && styles.primaryButtonSaved]}
+        <Button
+          label={saved ? 'Saved' : 'Save this recipe'}
           onPress={saveRecipe}
-          disabled={saving || saved}
-        >
-          {saving ? (
-            <ActivityIndicator color={colors.primaryText} />
-          ) : (
-            <Text style={styles.primaryButtonText}>{saved ? 'Saved' : 'Save this recipe'}</Text>
-          )}
-        </TouchableOpacity>
+          disabled={saved}
+          loading={saving}
+          style={styles.actionSpacing}
+        />
 
         <SignupPromptModal
           visible={showSignupPrompt}
@@ -221,19 +207,17 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
         <Text style={styles.title}>A few things you could cook</Text>
         <ScrollView>
           {recipes.map((recipe, index) => (
-            <TouchableOpacity key={index} style={styles.resultCard} onPress={() => openRecipe(recipe)}>
+            <Card key={index} onPress={() => openRecipe(recipe)} style={styles.resultCard}>
               <Text style={styles.resultTitle}>{recipe.title}</Text>
               <View style={styles.tagRow}>
                 <Tag label={`${recipe.cookTimeMinutes} min`} />
                 <Tag label={`${recipe.servings} servings`} />
                 {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
               </View>
-            </TouchableOpacity>
+            </Card>
           ))}
         </ScrollView>
-        <TouchableOpacity style={styles.secondaryButton} onPress={() => setStep('input')}>
-          <Text style={styles.secondaryButtonText}>Start over</Text>
-        </TouchableOpacity>
+        <Button label="Start over" variant="secondary" onPress={() => setStep('input')} style={styles.actionSpacing} />
       </View>
     );
   }
@@ -248,24 +232,13 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
       <Text style={styles.subtitle}>Tap what you have, or add something else.</Text>
 
       <View style={styles.chipWrap}>
-        {QUICK_INGREDIENTS.map((name) => {
-          const isSelected = ingredients.includes(name);
-          return (
-            <TouchableOpacity
-              key={name}
-              style={[styles.chip, isSelected && styles.chipSelected]}
-              onPress={() => toggleIngredient(name)}
-            >
-              <Text style={[styles.chipText, isSelected && styles.chipTextSelected]}>{name}</Text>
-            </TouchableOpacity>
-          );
-        })}
+        {QUICK_INGREDIENTS.map((name) => (
+          <Chip key={name} label={name} selected={ingredients.includes(name)} onPress={() => toggleIngredient(name)} />
+        ))}
         {ingredients
           .filter((i) => !(QUICK_INGREDIENTS as readonly string[]).includes(i))
           .map((name) => (
-            <TouchableOpacity key={name} style={[styles.chip, styles.chipSelected]} onPress={() => toggleIngredient(name)}>
-              <Text style={styles.chipTextSelected}>{name} ✕</Text>
-            </TouchableOpacity>
+            <Chip key={name} label={`${name} ✕`} selected onPress={() => toggleIngredient(name)} />
           ))}
       </View>
 
@@ -278,6 +251,8 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
           onChangeText={setCustomIngredient}
           onSubmitEditing={addCustomIngredient}
           returnKeyType="done"
+          autoComplete="off"
+          autoCorrect={false}
         />
         <TouchableOpacity style={styles.addButton} onPress={addCustomIngredient}>
           <Text style={styles.addButtonText}>Add</Text>
@@ -287,59 +262,36 @@ export function CookTodayScreen({ navigation, onRequestLogin }: Props) {
       <Text style={styles.sectionHeading}>How much time have you got?</Text>
       <View style={styles.chipWrap}>
         {TIME_OPTIONS.map((option) => (
-          <TouchableOpacity
+          <Chip
             key={option.label}
-            style={[styles.chip, timeConstraint === option.value && styles.chipSelected]}
+            label={option.label}
+            selected={timeConstraint === option.value}
             onPress={() => setTimeConstraint(option.value)}
-          >
-            <Text style={[styles.chipText, timeConstraint === option.value && styles.chipTextSelected]}>
-              {option.label}
-            </Text>
-          </TouchableOpacity>
+          />
         ))}
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <TouchableOpacity
-        style={[styles.primaryButton, ingredients.length === 0 && styles.primaryButtonDisabled]}
+      <Button
+        label="Find recipes"
         onPress={findRecipes}
         disabled={ingredients.length === 0}
-      >
-        <Text style={styles.primaryButtonText}>Find recipes</Text>
-      </TouchableOpacity>
+        style={styles.actionSpacing}
+      />
     </ScrollView>
-  );
-}
-
-function Tag({ label }: { label: string }) {
-  return (
-    <View style={styles.tag}>
-      <Text style={styles.tagText}>{label}</Text>
-    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  centered: { alignItems: 'center', justifyContent: 'center' },
   backLink: { marginBottom: spacing.md },
   backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   sectionHeading: { ...typography.label, color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
+  section: { marginBottom: spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chip: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.pill,
-    paddingVertical: 10,
-    paddingHorizontal: spacing.lg,
-  },
-  chipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  chipText: { fontSize: 14, color: colors.text },
-  chipTextSelected: { color: colors.primary, fontWeight: '600' },
   addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   addInput: {
     flex: 1,
@@ -360,41 +312,10 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: colors.text, fontWeight: '600' },
   errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginTop: spacing.xl,
-  },
-  primaryButtonSaved: { backgroundColor: colors.primaryDark },
-  primaryButtonDisabled: { opacity: 0.4 },
-  primaryButtonText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
-  secondaryButton: { paddingVertical: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-  secondaryButtonText: { color: colors.textMuted, fontSize: 15, fontWeight: '500' },
-  loadingText: { ...typography.body, color: colors.textMuted, marginTop: spacing.lg, textAlign: 'center' },
-  resultCard: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...shadow.card,
-  },
+  actionSpacing: { marginTop: spacing.xl },
+  resultCard: { marginBottom: spacing.md },
   resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  tag: {
-    backgroundColor: colors.accentSoft,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-  },
-  tagText: { fontSize: 12, fontWeight: '600', color: colors.accent },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    ...shadow.card,
-  },
   ingredientLine: { ...typography.body, color: colors.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
   stepNumber: {

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { FOOD_GOALS, FoodGoal } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
+import { Button } from '../components/Button';
+import { colors, spacing } from '../theme/colors';
 
 // Labels for the non-medical goal set (spec §10 / Decision 13). Never add a
 // body-shape or weight-loss framed option to this list.
@@ -39,6 +40,10 @@ export function GoalScreen({ onNext }: { onNext: () => void }) {
   return (
     <View style={styles.container}>
       <Text style={styles.heading}>What is your food & lifestyle goal?</Text>
+      {/* A vertical list of full-width rows, not chips — with 9 fairly long
+          textual options this reads more clearly than a wrapped pill grid;
+          see docs/FOODPADI_DESIGN_SYSTEM.md §7 for why this stays distinct
+          from the Chip component used elsewhere. */}
       <View style={styles.options}>
         {FOOD_GOALS.map((goal) => (
           <TouchableOpacity
@@ -55,22 +60,8 @@ export function GoalScreen({ onNext }: { onNext: () => void }) {
         ))}
       </View>
       <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonPrimary, !selected && styles.buttonDisabled]}
-          onPress={confirm}
-          disabled={!selected || submitting}
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.button, styles.buttonSecondary]}
-          onPress={onNext}
-          disabled={submitting}
-          accessibilityRole="button"
-        >
-          <Text style={styles.buttonSecondaryText}>Skip for now</Text>
-        </TouchableOpacity>
+        <Button label="Continue" onPress={confirm} disabled={!selected} loading={submitting} style={{ flex: 1 }} />
+        <Button label="Skip for now" variant="secondary" onPress={onNext} disabled={submitting} style={{ flex: 1 }} />
       </View>
     </View>
   );
@@ -89,14 +80,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 10,
   },
-  optionSelected: { borderColor: colors.primary, backgroundColor: '#EAF3EE' },
+  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
   optionText: { fontSize: 15, color: colors.text },
   optionTextSelected: { color: colors.primary, fontWeight: '600' },
-  buttonRow: { flexDirection: 'row', gap: 12 },
-  button: { flex: 1, borderRadius: 12, paddingVertical: 16, alignItems: 'center' },
-  buttonPrimary: { backgroundColor: colors.primary },
-  buttonSecondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  buttonDisabled: { opacity: 0.4 },
-  buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
-  buttonSecondaryText: { color: colors.textMuted, fontSize: 17, fontWeight: '600' },
+  buttonRow: { flexDirection: 'row', gap: spacing.md },
 });
