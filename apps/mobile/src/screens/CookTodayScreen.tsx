@@ -302,9 +302,14 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
       />
 
       {user ? (
-        <TouchableOpacity onPress={() => navigation.navigate('ImportRecipe')} style={styles.importLink}>
-          <Text style={styles.importLinkText}>Or import a recipe from a link →</Text>
-        </TouchableOpacity>
+        <>
+          <TouchableOpacity onPress={() => navigation.navigate('ImportRecipe')} style={styles.importLink}>
+            <Text style={styles.importLinkText}>Or import a recipe from a link →</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('SavedRecipes')} style={styles.importLink}>
+            <Text style={styles.importLinkText}>View my saved recipes →</Text>
+          </TouchableOpacity>
+        </>
       ) : null}
     </ScrollView>
   );

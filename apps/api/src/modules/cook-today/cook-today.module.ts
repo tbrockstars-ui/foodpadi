@@ -8,5 +8,6 @@ import { CookTodayService } from './cook-today.service';
   imports: [AuthModule, AiModule],
   controllers: [CookTodayController],
   providers: [CookTodayService],
+  exports: [CookTodayService], // reused directly by DecideModule
 })
 export class CookTodayModule {}

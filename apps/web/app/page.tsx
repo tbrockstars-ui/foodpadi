@@ -1,32 +1,23 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
-import { Card } from '../components/Card';
+import { DecideFlow } from './DecideFlow';
+import { HeroContent } from './HeroContent';
+import { ScrollReveal } from '../components/motion/ScrollReveal';
+import { FloatingFoodCards } from '../components/motion/FloatingFoodCards';
+import { HeroDecor } from '../components/motion/HeroDecor';
+import { ChipRow } from '../components/motion/ChipRow';
+import { FoodCarousel } from '../components/motion/FoodCarousel';
+import { WeekStrip } from '../components/motion/WeekStrip';
+import { IntentCard } from '../components/motion/IntentCard';
+import { IMAGE_ASSETS } from '../lib/imageAssets';
 import styles from './page.module.css';
 import homeStyles from './home.module.css';
 
-// Placeholder store links — swap for real App Store/Play Store URLs once listed.
-const APP_STORE_URL = '#';
-const PLAY_STORE_URL = '#';
-
-const MODES = [
-  {
-    emoji: '🍽️',
-    title: 'Eat Now',
-    body: "I'm hungry. What can I eat right now?",
-  },
-  {
-    emoji: '🍳',
-    title: 'Cook Today',
-    body: "What can I cook with what I've got?",
-  },
-  {
-    emoji: '🗓️',
-    title: 'Plan Ahead',
-    body: 'Help me plan my meals — flexibly.',
-  },
-] as const;
+// Placeholder support address — swap for the real inbox once set up.
+const SUPPORT_EMAIL = 'support@foodpadi.app';
 
 const PRINCIPLES = [
   {
@@ -43,42 +34,95 @@ const PRINCIPLES = [
   },
 ] as const;
 
-// v1 web slice ships Plan Ahead only — see docs/TECHNICAL_ARCHITECTURE.md
-// §2.7. The rest mirror mobile's HomeScreen "Soon" treatment until they land.
-const HUB_ACTIONS = [
-  { key: 'plan-ahead', label: 'Plan ahead', subtitle: 'Plan your meals', href: '/plan', live: true },
-  { key: 'eat-now', label: 'Eat now', subtitle: 'Find something to eat', href: '/eat-now', live: true },
-  { key: 'cook-today', label: 'Cook today', subtitle: 'Choose something to cook', href: '/cook-today', live: true },
-  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false },
-] as const;
+interface HubAction {
+  key: string;
+  label: string;
+  subtitle: string;
+  href?: string;
+  live: boolean;
+  disabledTag?: string;
+}
+
+// The three "Understand Intent" branches from the FoodPadi decision-loop
+// architecture (docs — the user's 2026-08-27 core-flow brief): FoodPadi
+// should be one intent-first front door, not four equally-weighted modes
+// the user has to pick between blind. Right now -> Eat Now, Cooking -> Cook
+// Today, Plan ahead -> Plan Ahead.
+//
+// The "Understand Context" / "FoodPadi Decides (3 options)" layer above
+// these now exists too — see <DecideFlow /> below, which calls POST /decide
+// (blending real Cook Today + Eat Now results into explained cook-it/get-it
+// options). These three cards remain as a direct-to-mode alternative for
+// anyone who'd rather skip straight to a specific tool — each rendered as
+// its own visual "journey" (IntentCard: real photo + accent colour + badge)
+// rather than three identical flat cards.
+
+// Scan is mobile-only by design (docs/TECHNICAL_ARCHITECTURE.md §2.7) — it
+// needs a camera, so it's never coming to web. "App only" says so directly
+// instead of the generic "Soon", which would wrongly promise a web version.
+// It's not one of the three intent branches, so it's a demoted secondary
+// link below the primary row rather than a fourth equal-weight card.
+const SECONDARY_ACTIONS: HubAction[] = [
+  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
+];
 
 function HomeHub() {
   return (
     <main className={homeStyles.container}>
       <div className={homeStyles.header}>
-        <h1 className={homeStyles.heading}>What do you need today?</h1>
-        <form action="/api/auth/logout" method="POST">
-          <button type="submit" className={homeStyles.logoutLink}>
-            Log out
-          </button>
-        </form>
+        <h1 className={homeStyles.heading}>What should I eat? 🍽️</h1>
+        <div className={homeStyles.headerLinks}>
+          <Link href="/profile" className={homeStyles.logoutLink}>
+            Profile
+          </Link>
+          <Link href="/cook-today/saved" className={homeStyles.logoutLink}>
+            Saved recipes
+          </Link>
+          <form action="/api/auth/logout" method="POST">
+            <button type="submit" className={homeStyles.logoutLink}>
+              Log out
+            </button>
+          </form>
+        </div>
+      </div>
+      <p className={homeStyles.subheading}>Tell FoodPadi what you&apos;re in the mood for, and we&apos;ll help you decide.</p>
+
+      <DecideFlow />
+
+      <div className={homeStyles.primaryGrid}>
+        <IntentCard
+          href="/eat-now"
+          badge="🍽️"
+          label="Right now"
+          subtitle="I'm hungry — find something to eat"
+          image={IMAGE_ASSETS.rightNow}
+          accent="right-now"
+        />
+        <IntentCard
+          href="/cook-today"
+          badge="🥕"
+          label="Cooking"
+          subtitle="Use what I've got"
+          image={IMAGE_ASSETS.cooking}
+          accent="cooking"
+        />
+        <IntentCard
+          href="/plan"
+          badge="📅"
+          label="Plan ahead"
+          subtitle="Plan my meals"
+          image={IMAGE_ASSETS.planAhead}
+          accent="plan-ahead"
+        />
       </div>
 
-      <div className={homeStyles.grid}>
-        {HUB_ACTIONS.map((action) =>
-          action.live ? (
-            <Card key={action.key} href={action.href} className={homeStyles.actionCard}>
-              <p className={homeStyles.actionLabel}>{action.label}</p>
-              <p className={homeStyles.actionSubtitle}>{action.subtitle}</p>
-            </Card>
-          ) : (
-            <div key={action.key} className={homeStyles.actionCardDisabled}>
-              <p className={homeStyles.actionLabelDisabled}>{action.label}</p>
-              <p className={homeStyles.actionSubtitle}>{action.subtitle}</p>
-              <span className={homeStyles.soonTag}>Soon</span>
-            </div>
-          ),
-        )}
+      <div className={homeStyles.secondaryRow}>
+        {SECONDARY_ACTIONS.map((action) => (
+          <span key={action.key} className={homeStyles.secondaryLink}>
+            {action.label} · {action.subtitle}
+            {action.disabledTag ? <span className={homeStyles.soonTag}>{action.disabledTag}</span> : null}
+          </span>
+        ))}
       </div>
     </main>
   );
@@ -111,75 +155,128 @@ export default async function LandingPage() {
   return (
     <>
       <section className={styles.hero}>
-        <div className={styles.heroInner}>
-          <div className={styles.heroContent}>
-            <p className={styles.eyebrow}>UK · in development</p>
-            <h1 className={styles.title}>Get the free FoodPadi app</h1>
-            <p className={styles.subtext}>
-              Your food companion that plans with you, not for you. Eat Now, Cook Today, or Plan
-              Ahead — FoodPadi adapts to real life instead of asking you to plan your life around a
-              meal plan.
-            </p>
+        <HeroDecor />
 
-            <div className={styles.storeLinks}>
-              <a className={styles.storeButton} href={APP_STORE_URL}>
-                Download on the App Store
-              </a>
-              <a className={`${styles.storeButton} ${styles.storeButtonSecondary}`} href={PLAY_STORE_URL}>
-                Get it on Google Play
-              </a>
-            </div>
-            <Link className={styles.loginLink} href="/login">
-              Already have an account? Log in
-            </Link>
+        <nav className={styles.heroNav} aria-label="Primary">
+          <a className={styles.navLink} href="#how-it-works">
+            How it works
+          </a>
+          <a className={styles.navLink} href="#about">
+            About
+          </a>
+          <a className={styles.navLink} href="#contact">
+            Contact
+          </a>
+          <Link className={styles.navLink} href="/login">
+            Log in
+          </Link>
+          <a className={styles.navWaitlistButton} href="#waitlist-email">
+            Join the waitlist
+          </a>
+        </nav>
+
+        <div className={styles.heroGrid}>
+          <div className={styles.heroLogoCol}>
+            <Image
+              src="/decor/logo.png"
+              alt="FoodPadi — your instant meal companion"
+              width={420}
+              height={420}
+              className={styles.heroLogoImg}
+              priority
+            />
+          </div>
+
+          <div className={styles.heroContent}>
+            <HeroContent />
           </div>
 
           <div className={styles.heroVisual} aria-hidden="true">
-            <svg viewBox="0 0 320 320" className={styles.heroSvg} xmlns="http://www.w3.org/2000/svg">
-              <circle cx="160" cy="160" r="150" fill="rgba(255,255,255,0.08)" />
-              <circle cx="120" cy="120" r="90" fill="rgba(255,255,255,0.10)" />
-              <circle cx="210" cy="210" r="60" fill="rgba(255,255,255,0.14)" />
-            </svg>
-            <span className={styles.heroEmoji}>🥗</span>
+            <FloatingFoodCards />
           </div>
         </div>
       </section>
 
       <main className={styles.main}>
+        <section id="how-it-works" className={styles.section}>
+          <ScrollReveal>
+            <h2 className={styles.sectionHeading}>FoodPadi gets to know what you like.</h2>
+            <p className={styles.sectionSubtext}>
+              Cuisines you love, how much time you&apos;ve got, who you&apos;re feeding — a few taps, not a form.
+            </p>
+          </ScrollReveal>
+          <ScrollReveal delay={0.15}>
+            <ChipRow />
+          </ScrollReveal>
+        </section>
+
         <section className={styles.section}>
-          <h2 className={styles.sectionHeading}>Three ways to eat</h2>
-          <p className={styles.sectionSubtext}>Pick whichever fits the moment — none of them are mandatory.</p>
-          <div className={styles.modes}>
-            {MODES.map((mode) => (
-              <div key={mode.title} className={styles.modeCard}>
-                <span className={styles.modeEmoji} aria-hidden="true">
-                  {mode.emoji}
-                </span>
-                <h3>{mode.title}</h3>
-                <p>{mode.body}</p>
-              </div>
-            ))}
-          </div>
+          <ScrollReveal>
+            <h2 className={styles.sectionHeading}>Then it finds ideas for you.</h2>
+            <p className={styles.sectionSubtext}>Real dishes from FoodPadi&apos;s food-idea catalogue, matched to what you asked for.</p>
+          </ScrollReveal>
+          <ScrollReveal delay={0.1}>
+            <FoodCarousel />
+          </ScrollReveal>
         </section>
 
-        <section className={`${styles.section} ${styles.sectionAlt}`}>
-          <h2 className={styles.sectionHeading}>Why FoodPadi is different</h2>
+        <section className={styles.section}>
+          <ScrollReveal>
+            <h2 className={styles.sectionHeading}>Then it helps you plan.</h2>
+            <p className={styles.sectionSubtext}>Turn today&apos;s decision into a week that&apos;s actually easy to follow.</p>
+          </ScrollReveal>
+          <ScrollReveal delay={0.15}>
+            <WeekStrip />
+          </ScrollReveal>
+        </section>
+
+        <section id="about" className={`${styles.section} ${styles.sectionAlt}`}>
+          <ScrollReveal>
+            <h2 className={styles.sectionHeading}>
+              Why <span className={styles.brandGreen}>FoodPadi</span> is different
+            </h2>
+          </ScrollReveal>
           <div className={styles.principles}>
-            {PRINCIPLES.map((principle) => (
-              <div key={principle.title} className={styles.principleCard}>
-                <h3>{principle.title}</h3>
-                <p>{principle.body}</p>
-              </div>
+            {PRINCIPLES.map((principle, i) => (
+              <ScrollReveal key={principle.title} delay={i * 0.1}>
+                <div className={styles.principleCard}>
+                  <h3>{principle.title}</h3>
+                  <p>{principle.body}</p>
+                </div>
+              </ScrollReveal>
             ))}
           </div>
         </section>
 
-        <footer className={styles.footer}>
+        <section className={styles.section}>
+          <ScrollReveal>
+            <div className={styles.closingBlock}>
+              <h2 className={styles.sectionHeading}>Your food. Your choices. Your plan.</h2>
+              <p className={styles.sectionSubtext}>
+                FoodPadi is still in development — join the waitlist above and we&apos;ll email you the
+                moment it launches.
+              </p>
+            </div>
+          </ScrollReveal>
+        </section>
+
+        <footer id="contact" className={styles.footer}>
           <Link href="/legal/disclaimer">Food & safety information</Link>
           <span className={styles.footerDivider}>·</span>
           <Link href="/legal/privacy">Privacy</Link>
+          <span className={styles.footerDivider}>·</span>
+          <a href={`mailto:${SUPPORT_EMAIL}`}>Support</a>
         </footer>
       </main>
+
+      <a
+        className={styles.supportFab}
+        href={`mailto:${SUPPORT_EMAIL}`}
+        aria-label="Contact support"
+        title="Contact support"
+      >
+        💬
+      </a>
     </>
   );
 }

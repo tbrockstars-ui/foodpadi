@@ -1,0 +1,62 @@
+# Render Blueprint for the FoodPadi NestJS API.
+# Create it: Render Dashboard -> New -> Blueprint -> pick this repo.
+# Render reads this file, creates the service, and prompts for every
+# `sync: false` secret. See DEPLOYMENT.md for the full runbook and the
+# exact values to paste.
+services:
+  - type: web
+    name: foodpadi-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    # us-east-2 Neon lives closest to Render's Ohio region — keep the API and
+    # DB co-located (many queries per request) rather than near end users
+    # (one hop, and Vercel is global anyway). Change if you move the DB.
+    region: ohio
+    # `starter` stays warm. `free` spins down after ~15 min idle (30-60s cold
+    # start on the next request) — fine for a demo, rough for real use.
+    plan: starter
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # --- Neon Postgres (both required; DIRECT_URL is the unpooled string
+      #     Prisma Migrate needs). Paste from your Neon dashboard. ---
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      # --- Auth secrets: generate fresh, do NOT reuse the local dev values.
+      #     e.g. `openssl rand -hex 32` for each. (Refresh tokens are opaque
+      #     random strings hashed in the DB — no JWT_REFRESH_SECRET needed.) ---
+      - key: JWT_ACCESS_SECRET
+        sync: false
+      - key: JWT_GUEST_SECRET
+        sync: false
+      - key: JWT_ACCESS_TTL
+        value: 15m
+      - key: JWT_REFRESH_TTL
+        value: 30d
+      - key: JWT_GUEST_TTL
+        value: 24h
+      # --- Anthropic (Cook Today / Decide / Scan). Without it the API serves
+      #     curated fallbacks instead of failing. ---
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: claude-sonnet-5
+      # "true" = Scan uses a local mock, no AI spend. Flip to "false" for real
+      # photo analysis once you're happy with the cost.
+      - key: SCAN_DEMO_MODE
+        value: "true"
+      # --- Admin: must byte-match the same two vars in the Vercel project. ---
+      - key: ADMIN_API_SECRET
+        sync: false
+      - key: ADMIN_SESSION_SECRET
+        sync: false
+      # Comma-separated allowed browser origins. Set to your Vercel production
+      # URL (and any preview URL you want to allow). The web app calls the API
+      # server-to-server so this only gates real browser-origin callers.
+      - key: WEB_APP_URL
+        sync: false

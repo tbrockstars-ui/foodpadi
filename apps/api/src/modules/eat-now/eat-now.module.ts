@@ -8,5 +8,6 @@ import { EatNowService } from './eat-now.service';
   imports: [AuthModule, AnalyticsModule],
   controllers: [EatNowController],
   providers: [EatNowService],
+  exports: [EatNowService], // reused directly by DecideModule
 })
 export class EatNowModule {}

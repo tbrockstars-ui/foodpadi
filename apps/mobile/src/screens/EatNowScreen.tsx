@@ -9,6 +9,7 @@ import { tokenStore } from '../api/tokenStore';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
+import { LocalFoodSearch } from '../components/LocalFoodSearch';
 import { Tag } from '../components/Tag';
 import { colors, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
@@ -106,6 +107,8 @@ export function EatNowScreen({ navigation, route }: Props) {
     await runSearch(trimmed);
   };
 
+  const getToken = async () => (user ? ((await tokenStore.getAccessToken()) ?? '') : guestSession.ensureSession());
+
   if (step === 'disclaimer') {
     return (
       <View style={styles.container}>
@@ -188,6 +191,8 @@ export function EatNowScreen({ navigation, route }: Props) {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <Button label="Find food" onPress={search} disabled={!query.trim()} style={styles.actionSpacing} />
+
+      <LocalFoodSearch query={query} getToken={getToken} />
     </ScrollView>
   );
 }

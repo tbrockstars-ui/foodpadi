@@ -19,6 +19,13 @@
   margin: 0;
 }
 
+.headerLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  flex-shrink: 0;
+}
+
 .logoutLink {
   background: none;
   border: none;
@@ -28,30 +35,39 @@
   cursor: pointer;
   padding: 6px 0;
   font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.grid {
+.subheading {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin: 0 0 var(--space-lg);
+}
+
+.primaryGrid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
 }
 
-@media (max-width: 480px) {
-  .grid {
+@media (max-width: 640px) {
+  .primaryGrid {
     grid-template-columns: 1fr;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .headerLinks {
+    flex-wrap: wrap;
   }
 }
 
 .actionCard {
   position: relative;
-}
-
-.actionCardDisabled {
-  background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  opacity: 0.55;
-  box-shadow: none;
 }
 
 .actionLabel {
@@ -61,26 +77,215 @@
   margin: 0;
 }
 
-.actionLabelDisabled {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  margin: 0;
-}
-
 .actionSubtitle {
   font-size: 13px;
   color: var(--text-muted);
   margin: 4px 0 0;
 }
 
+.secondaryRow {
+  margin-top: var(--space-xl);
+  text-align: center;
+}
+
+.secondaryLink {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
 .soonTag {
   display: inline-block;
-  margin-top: var(--space-sm);
+  margin-left: var(--space-sm);
   background: var(--surface-sunken);
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 600;
   padding: 2px 10px;
   border-radius: var(--radius-pill);
+}
+
+/* Decide flow — "FoodPadi decides" (Understand Context -> 3 explained options) */
+
+.decideSection {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-xl);
+  box-shadow: 0 2px 10px rgba(20, 21, 15, 0.05);
+}
+
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: var(--space-md);
+}
+
+.promptChip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.promptChipSelected {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+
+.decideInput {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 16px 24px;
+  font-size: 16px;
+  color: var(--text);
+  font-family: inherit;
+  margin-bottom: var(--space-md);
+}
+
+.decideInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+}
+
+.constraintsRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.constraintInput {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--background);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.decideButton {
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.decideButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.optionCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.optionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+
+.optionTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-xs);
+}
+
+.optionReason {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.optionTypeBadge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.optionTypeCook {
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.optionTypeGet {
+  background: var(--secondary-soft);
+  color: var(--secondary);
+}
+
+.optionAction {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  margin-top: var(--space-md);
+}
+
+.optionDetail {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-lg);
+  border-top: 1px solid var(--border);
+}
+
+.ingredientLine {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.stepRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.stepNumber {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 22px;
+}
+
+.stepText {
+  font-size: 14px;
+  color: var(--text);
+  line-height: 1.5;
 }

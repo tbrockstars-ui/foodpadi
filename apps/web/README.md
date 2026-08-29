@@ -46,16 +46,29 @@ npm run dev --workspace=@foodpadi/web
 ```
 
 Needs `API_URL` (see `apps/web/.env.example`) to reach the NestJS API, and
-`ADMIN_ACCESS_CODE` / `ADMIN_SESSION_SECRET` (root `.env.example`) to reach
+`ADMIN_SESSION_SECRET` / `ADMIN_API_SECRET` (root `.env.example`) to reach
 `/admin` at all.
 
-## ⚠️ Admin auth is a placeholder
+## Admin auth
 
-`/admin` is currently gated by a single shared access code
-(`lib/adminSession.ts`), HMAC-signed into a cookie so it isn't a bare flag —
-but it is **not** real staff authentication and must not be treated as
-sufficient once this page reads or writes any real user/support data. Before
-that happens, replace it with per-person staff accounts, kept entirely
-separate from end-user auth (never share a login mechanism between a
-consumer account and staff access — see the architecture doc's non-negotiable
-rules). This is tracked as an open Phase 1 follow-up, not a silent shortcut.
+`/admin` is gated by real per-person staff accounts (`AdminStaffUser`, its own
+table — never shared with end-user `User` rows or login), authenticated by
+username + password (`apps/api/src/modules/admin/admin-auth.{controller,service}.ts`,
+`bcryptjs`-hashed). A successful login gets an HMAC-signed cookie
+(`lib/adminSession.ts`) carrying the staff member's identity, so every admin
+action taken afterwards is attributable to a specific person, not just
+"someone who knew a code."
+
+There's no self-service signup or in-app staff management yet — accounts are
+created (or password-reset) with a one-off script, run from `apps/api`:
+
+```bash
+npm run admin:create-staff-user -- <username> <password> ["Display Name"]
+```
+
+`ADMIN_API_SECRET` remains the separate service-to-service secret between this
+app's admin routes and the API's `AdminApiGuard` (see
+`apps/api/src/modules/admin/admin-api.guard.ts`) — it proves "this request
+came from the web app's gated admin area," while the staff login above proves
+*which person* is behind it. `ADMIN_ACCESS_CODE` is no longer used and can be
+removed from `.env`.

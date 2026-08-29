@@ -1,15 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { MealPlanView, PlanScope } from '@foodpadi/shared';
+import { MealChoice, MealPlanItemView, MealPlanView, PlanScope } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
+import { cancelMealReminder, scheduleMealReminder } from '../lib/mealReminders';
 import { colors, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type Props = NativeStackScreenProps<AppStackParamList, 'PlanAhead'>;
 
@@ -24,6 +27,15 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
+/** The reminder fires 30 minutes before plannedTime — shown so "30 min before X" isn't left for the user to do the maths on. */
+function formatReminderTime(plannedTime: string): string {
+  const [hours, minutes] = plannedTime.split(':').map(Number);
+  const total = (hours * 60 + minutes - 30 + 24 * 60) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export function PlanAheadScreen({ navigation }: Props) {
   const [step, setStep] = useState<'scope' | 'loading' | 'plan'>('scope');
   const [scope, setScope] = useState<PlanScope>('3day');
@@ -35,6 +47,10 @@ export function PlanAheadScreen({ navigation }: Props) {
   const [accepting, setAccepting] = useState(false);
   const [creatingList, setCreatingList] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
+  // Draft text for each item's time field, keyed by item id — separate from
+  // the committed plannedTime so typing doesn't fire a request per keystroke.
+  const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
+  const [timeError, setTimeError] = useState<string | null>(null);
 
   // A user returning to Plan Ahead should see the plan they already have,
   // not be asked to create a new one every time (docs/USER_JOURNEYS.md's
@@ -45,6 +61,12 @@ export function PlanAheadScreen({ navigation }: Props) {
       if (current) {
         setPlan(current);
         setStep('plan');
+        // Re-arm reminders on load — local notifications are scheduled by
+        // *this device*, so a reinstalled app or a plan edited from
+        // elsewhere needs them re-synced rather than assumed still pending.
+        for (const item of current.items) {
+          if (item.plannedTime) scheduleMealReminder(item);
+        }
       }
       setCheckingExisting(false);
     })();
@@ -79,7 +101,12 @@ export function PlanAheadScreen({ navigation }: Props) {
     if (!plan) return;
     setBusyItemId(itemId);
     try {
-      setPlan(await api.regeneratePlanItem(plan.id, itemId));
+      const updated = await api.regeneratePlanItem(plan.id, itemId);
+      setPlan(updated);
+      // The recipe changed but mealChoice/plannedTime didn't — re-schedule
+      // so the reminder's body text reflects the new meal, not the old one.
+      const item = updated.items.find((i) => i.id === itemId);
+      if (item?.plannedTime) scheduleMealReminder(item);
     } finally {
       setBusyItemId(null);
     }
@@ -90,6 +117,7 @@ export function PlanAheadScreen({ navigation }: Props) {
     setBusyItemId(itemId);
     try {
       setPlan(await api.removePlanItem(plan.id, itemId));
+      await cancelMealReminder(itemId);
     } finally {
       setBusyItemId(null);
     }
@@ -102,6 +130,45 @@ export function PlanAheadScreen({ navigation }: Props) {
       setPlan(await api.acceptPlan(plan.id));
     } finally {
       setAccepting(false);
+    }
+  };
+
+  const setMealChoice = async (itemId: string, mealChoice: MealChoice) => {
+    if (!plan) return;
+    setBusyItemId(itemId);
+    try {
+      const updated = await api.updatePlanItem(plan.id, itemId, { mealChoice });
+      setPlan(updated);
+      const item = updated.items.find((i) => i.id === itemId);
+      if (item?.plannedTime) scheduleMealReminder(item); // wording differs by choice — resync
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
+  const applyPlannedTime = async (item: MealPlanItemView) => {
+    const draft = (timeDrafts[item.id] ?? '').trim();
+    setTimeError(null);
+    if (draft && !TIME_PATTERN.test(draft)) {
+      setTimeError('Enter a time as HH:mm, e.g. 18:30.');
+      return;
+    }
+    if (!plan) return;
+    setBusyItemId(item.id);
+    try {
+      const updated = await api.updatePlanItem(plan.id, item.id, { plannedTime: draft || null });
+      setPlan(updated);
+      const updatedItem = updated.items.find((i) => i.id === item.id);
+      if (updatedItem) {
+        if (updatedItem.plannedTime) {
+          const scheduled = await scheduleMealReminder(updatedItem);
+          if (!scheduled) setTimeError("That time's already passed today — no reminder was set.");
+        } else {
+          await cancelMealReminder(item.id);
+        }
+      }
+    } finally {
+      setBusyItemId(null);
     }
   };
 
@@ -134,6 +201,7 @@ export function PlanAheadScreen({ navigation }: Props) {
         <Text style={styles.subtitle}>
           {plan.status === 'accepted' ? 'Accepted — ready for shopping.' : "Review it, then accept when you're happy."}
         </Text>
+        {timeError ? <Text style={styles.errorText}>{timeError}</Text> : null}
 
         {plan.items.map((item) => (
           <Card key={item.id} style={styles.mealCard}>
@@ -150,6 +218,44 @@ export function PlanAheadScreen({ navigation }: Props) {
             ) : (
               <Text style={styles.mealTitle}>Nothing planned for this day</Text>
             )}
+
+            <View style={styles.chipWrap}>
+              <Chip
+                label="Cook it"
+                role="radio"
+                selected={item.mealChoice === 'cook'}
+                onPress={() => setMealChoice(item.id, 'cook')}
+              />
+              <Chip
+                label="Eat out"
+                role="radio"
+                selected={item.mealChoice === 'eat_out'}
+                onPress={() => setMealChoice(item.id, 'eat_out')}
+              />
+            </View>
+
+            <View style={styles.timeRow}>
+              <TextInput
+                style={styles.timeInput}
+                placeholder="HH:mm, e.g. 18:30"
+                placeholderTextColor={colors.textFaint}
+                keyboardType="numbers-and-punctuation"
+                value={timeDrafts[item.id] ?? item.plannedTime ?? ''}
+                onChangeText={(text) => setTimeDrafts((current) => ({ ...current, [item.id]: text }))}
+                onSubmitEditing={() => applyPlannedTime(item)}
+                autoComplete="off"
+              />
+              <TouchableOpacity onPress={() => applyPlannedTime(item)} disabled={busyItemId === item.id}>
+                <Text style={styles.itemActionText}>{item.plannedTime ? 'Update' : 'Set time'}</Text>
+              </TouchableOpacity>
+            </View>
+            {item.plannedTime ? (
+              <Text style={styles.reminderNote}>
+                🔔 We&apos;ll remind you at {formatReminderTime(item.plannedTime)} — 30 min before it&apos;s time to{' '}
+                {item.mealChoice === 'eat_out' ? 'order' : 'start cooking'}.
+              </Text>
+            ) : null}
+
             {plan.status === 'draft' ? (
               <View style={styles.itemActions}>
                 <TouchableOpacity onPress={() => regenerate(item.id)} disabled={busyItemId === item.id}>
@@ -259,4 +365,18 @@ const styles = StyleSheet.create({
   itemActions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.xs },
   itemActionText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   itemActionTextDanger: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  timeInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.text,
+    maxWidth: 160,
+    flex: 1,
+  },
+  reminderNote: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
 });

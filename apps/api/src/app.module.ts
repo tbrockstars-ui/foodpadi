@@ -9,8 +9,12 @@ import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { CookTodayModule } from './modules/cook-today/cook-today.module';
 import { PlanAheadModule } from './modules/plan-ahead/plan-ahead.module';
 import { EatNowModule } from './modules/eat-now/eat-now.module';
+import { LocalFoodSearchModule } from './modules/local-food-search/local-food-search.module';
+import { DecideModule } from './modules/decide/decide.module';
 import { RecipeImportModule } from './modules/recipe-import/recipe-import.module';
 import { ScanModule } from './modules/scan/scan.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -25,8 +29,12 @@ import { AppController } from './app.controller';
     CookTodayModule,
     PlanAheadModule,
     EatNowModule,
+    LocalFoodSearchModule,
+    DecideModule,
     RecipeImportModule,
     ScanModule,
+    AdminModule,
+    WaitlistModule,
   ],
   controllers: [AppController],
 })

@@ -10,6 +10,7 @@ import { ProfileScreen } from '../screens/ProfileScreen';
 import { EditGoalsScreen } from '../screens/EditGoalsScreen';
 import { ImportRecipeScreen } from '../screens/ImportRecipeScreen';
 import { ScanScreen } from '../screens/ScanScreen';
+import { SavedRecipesScreen } from '../screens/SavedRecipesScreen';
 
 export type AppStackParamList = {
   Home: undefined;
@@ -21,6 +22,7 @@ export type AppStackParamList = {
   EditGoals: undefined;
   ImportRecipe: undefined;
   Scan: undefined;
+  SavedRecipes: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -48,6 +50,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
         <Stack.Screen name="ImportRecipe" component={ImportRecipeScreen} />
         <Stack.Screen name="Scan" component={ScanScreen} />
+        <Stack.Screen name="SavedRecipes" component={SavedRecipesScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

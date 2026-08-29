@@ -6,15 +6,37 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": ["**/*"],
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "uk.foodpadi.app"
     },
     "android": {
-      "package": "uk.foodpadi.app"
+      "package": "uk.foodpadi.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#0E5135"
+      }
     },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FoodPadi uses your location to find nearby places that offer the food you're looking for."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 220,
+          "resizeMode": "contain",
+          "backgroundColor": "#FBFAF7"
+        }
+      ]
+    ],
     "extra": {
-      "apiBaseUrl": "http://localhost:4310"
+      "apiBaseUrl": "http://192.168.0.205:4310"
     }
   }
 }

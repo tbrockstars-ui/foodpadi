@@ -6,6 +6,8 @@ import type {
   AuthResponse,
   AvoidedIngredientItem,
   ConfirmPasswordResetRequest,
+  DecideRequest,
+  DecideResponse,
   FoodGoalsResponse,
   FoodIdeaView,
   FoodPreferenceItem,
@@ -13,11 +15,14 @@ import type {
   GeneratePlanRequest,
   GuestSessionResponse,
   ImportRecipeRequest,
+  LocalFoodSearchRequest,
+  LocalFoodSearchResponse,
   LoginRequest,
   MealPlanView,
   RecipeView,
   RegisterRequest,
   RequestPasswordResetRequest,
+  SavedRecipeView,
   SaveRecipeRequest,
   ScanPhotoRequest,
   ScanPhotoResponse,
@@ -25,6 +30,7 @@ import type {
   SetFoodGoalsRequest,
   ShoppingListView,
   TrackGoalEventRequest,
+  UpdateMealPlanItemRequest,
   UpdateShoppingListItemRequest,
   UpsertFoodPreferenceRequest,
   UserSummary,
@@ -144,10 +150,19 @@ export const api = {
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
     request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
+  listSavedRecipes: () => request<SavedRecipeView[]>('/cook-today/recipes', { auth: true }),
+  deleteSavedRecipe: (id: string) =>
+    request<void>(`/cook-today/recipes/${id}`, { method: 'DELETE', auth: true }),
   importRecipe: (payload: ImportRecipeRequest) =>
     request<RecipeView>('/recipe-import', { method: 'POST', body: payload, auth: true }),
   searchEatNow: (payload: SearchEatNowRequest, token: string) =>
     request<FoodIdeaView[]>('/eat-now/search', { method: 'POST', body: payload, token }),
+  // Guest-or-auth, same as searchEatNow/localFoodSearch — the unified
+  // "FoodPadi decides" entry point (web counterpart: apps/web/app/DecideFlow.tsx).
+  decide: (payload: DecideRequest, token: string) =>
+    request<DecideResponse>('/decide', { method: 'POST', body: payload, token }),
+  localFoodSearch: (payload: LocalFoodSearchRequest, token: string) =>
+    request<LocalFoodSearchResponse>('/local-food-search', { method: 'POST', body: payload, token }),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
   getCurrentPlan: () => request<MealPlanView | null>('/plan-ahead/current', { auth: true }),
@@ -157,6 +172,8 @@ export const api = {
     request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}/regenerate`, { method: 'POST', auth: true }),
   removePlanItem: (planId: string, itemId: string) =>
     request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'DELETE', auth: true }),
+  updatePlanItem: (planId: string, itemId: string, payload: UpdateMealPlanItemRequest) =>
+    request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'PATCH', body: payload, auth: true }),
   generateShoppingList: (planId: string) =>
     request<ShoppingListView>(`/plan-ahead/${planId}/shopping-list`, { method: 'POST', auth: true }),
   getShoppingList: (listId: string) =>

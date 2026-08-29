@@ -4,8 +4,14 @@ import { useState } from 'react';
 import type { RecipeView } from '@foodpadi/shared';
 import styles from './cook-today.module.css';
 
+// Grouped loosely (protein / carb / veg / dairy) for scannability, but kept
+// as one flat tappable list — same simple chip-wrap layout as before, just
+// more starting options so most people find something without typing.
 const QUICK_INGREDIENTS = [
-  'Chicken', 'Rice', 'Onions', 'Peppers', 'Eggs', 'Pasta', 'Tomatoes', 'Spinach', 'Potatoes', 'Garlic',
+  'Chicken', 'Beef', 'Fish', 'Prawns', 'Eggs', 'Tofu', 'Beans',
+  'Rice', 'Pasta', 'Noodles', 'Bread', 'Potatoes', 'Plantain',
+  'Onions', 'Peppers', 'Tomatoes', 'Garlic', 'Spinach', 'Carrots', 'Broccoli', 'Mushrooms', 'Cabbage', 'Sweetcorn',
+  'Cheese', 'Milk', 'Butter', 'Coconut milk',
 ];
 
 const TIME_OPTIONS: { label: string; value: number | undefined }[] = [

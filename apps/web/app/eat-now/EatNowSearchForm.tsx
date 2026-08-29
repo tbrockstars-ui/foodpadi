@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import type { FoodIdeaView } from '@foodpadi/shared';
 import styles from './eat-now.module.css';
+import { LocalFoodSearch } from './LocalFoodSearch';
 
 const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
   low: '£',
@@ -94,6 +95,8 @@ export function EatNowSearchForm() {
           )}
         </>
       ) : null}
+
+      <LocalFoodSearch query={query} />
     </div>
   );
 }

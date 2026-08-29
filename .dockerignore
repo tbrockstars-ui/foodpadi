@@ -1,0 +1,24 @@
+# Keep the Docker build context (repo root) small and reproducible.
+# node_modules are reinstalled inside the image from the lockfile.
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+
+# The API image has no use for the mobile app or its (large) toolchain.
+apps/mobile
+
+# VCS / editor / local-only
+.git
+.gitignore
+.github
+.vercel
+.claude
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
+npm-debug.log*
+
+# Docs aren't needed to run the service
+docs

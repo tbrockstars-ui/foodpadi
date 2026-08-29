@@ -10,7 +10,8 @@
     "test": "jest",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:deploy": "prisma migrate deploy"
+    "prisma:deploy": "prisma migrate deploy",
+    "admin:create-staff-user": "ts-node scripts/create-admin-staff-user.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",

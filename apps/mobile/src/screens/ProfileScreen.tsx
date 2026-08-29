@@ -106,6 +106,11 @@ export function ProfileScreen({ navigation }: Props) {
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.email}>{profile.email}</Text>
 
+      <Text style={styles.sectionHeading}>Recipes</Text>
+      <Card style={styles.section}>
+        <Button label="View saved recipes" variant="secondary" onPress={() => navigation.navigate('SavedRecipes')} />
+      </Card>
+
       <Text style={styles.sectionHeading}>Food & lifestyle goals</Text>
       <Card style={styles.section}>
         {goals.length === 0 ? (

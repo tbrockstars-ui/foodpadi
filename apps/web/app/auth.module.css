@@ -12,6 +12,16 @@
   max-width: 360px;
 }
 
+.brandStage {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+}
+
+.brandBadge {
+  filter: drop-shadow(0 6px 16px rgba(20, 21, 15, 0.16));
+}
+
 .title {
   font-size: 32px;
   font-weight: 700;
@@ -38,6 +48,45 @@
   margin-bottom: 12px;
   color: var(--text);
   font-family: inherit;
+}
+
+.inputWrap {
+  position: relative;
+}
+
+.inputWrap .input {
+  padding-right: 44px;
+}
+
+.passwordToggle {
+  position: absolute;
+  top: 0;
+  bottom: 12px;
+  right: 4px;
+  width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.passwordToggle:hover {
+  color: var(--text);
+}
+
+.passwordToggle:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.passwordToggle svg {
+  width: 20px;
+  height: 20px;
 }
 
 .hint {
@@ -78,4 +127,29 @@
   text-align: center;
   margin-top: 16px;
   font-size: 14px;
+}
+.switchModeText {
+  display: block;
+  color: var(--primary);
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+}
+
+.forgotPasswordText {
+  display: block;
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+}
+
+@media (max-width: 540px) {
+  .container {
+    padding-top: 18px;
+  }
+
+  .brandStage {
+    margin-bottom: 8px;
+  }
 }

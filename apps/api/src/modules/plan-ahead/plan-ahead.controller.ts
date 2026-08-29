@@ -3,6 +3,7 @@ import { CurrentUser, CurrentUserPayload } from '../../common/current-user.decor
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlanAheadService } from './plan-ahead.service';
 import { GeneratePlanDto } from './dto/generate-plan.dto';
+import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 
 // Account-first by design (docs/FOODPADI_ONBOARDING_SPEC.md) — every route
@@ -34,6 +35,20 @@ export class PlanAheadController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.planAheadService.regenerateItem(planId, itemId, user.userId);
+  }
+
+  // Sets whether a day is Cook It or Eat Out and/or the planned time for it
+  // — the client (currently mobile only) uses plannedTime to schedule a
+  // local "30 minutes to go" reminder, so the user doesn't miss the window
+  // to start cooking or place an order.
+  @Patch(':planId/items/:itemId')
+  updateItem(
+    @Param('planId') planId: string,
+    @Param('itemId') itemId: string,
+    @Body() dto: UpdateMealPlanItemDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.planAheadService.updateItem(planId, itemId, user.userId, dto);
   }
 
   @Delete(':planId/items/:itemId')

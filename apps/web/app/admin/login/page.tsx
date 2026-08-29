@@ -12,15 +12,24 @@ export default function AdminLoginPage({
       <div className={styles.card}>
         <h1 className={styles.heading}>FoodPadi admin</h1>
         <p className={styles.subtext}>Staff access only.</p>
-        {searchParams.error ? <p className={styles.error}>Incorrect access code.</p> : null}
+        {searchParams.error ? <p className={styles.error}>Incorrect username or password.</p> : null}
         <form action="/api/admin/login" method="POST" className={styles.form}>
           <input
-            type="password"
-            name="accessCode"
-            placeholder="Access code"
+            type="text"
+            name="username"
+            placeholder="Username"
             required
             className={styles.input}
             autoFocus
+            autoComplete="username"
+          />
+          <input
+            type="password"
+            name="password"
+            placeholder="Password"
+            required
+            className={styles.input}
+            autoComplete="current-password"
           />
           <button type="submit" className={styles.button}>
             Sign in

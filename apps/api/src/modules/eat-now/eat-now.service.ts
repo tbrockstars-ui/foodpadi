@@ -14,7 +14,10 @@ export type FoodIdeaResult = FoodIdea & {
   pricePenceMax: number;
 };
 
-const MAX_RESULTS = 5;
+// Raised alongside the catalog widening (eat-now-catalog.ts, 31 -> 68
+// entries) — 5 was leaving plenty of relevant matches on the table for a
+// broad query (e.g. a cuisine name) now that there's more to find.
+const MAX_RESULTS = 12;
 
 // "Something different" (the unified Home decision flow's wildcard chip) has
 // no matching catalog tag by design — it means "surprise me", not a keyword.
@@ -30,11 +33,41 @@ const SURPRISE_ME_TRIGGERS = ['different', 'surprise', 'anything', 'variety'];
 // that without changing how real keywords are matched.
 const STOP_WORDS = new Set([
   'a', 'an', 'the', 'of', 'to', 'for', 'and', 'or', 'in', 'on', 'me', 'my',
-  'some', 'want', 'need', 'like', 'with', 'please', 'get', 'find', 'looking', 'fancy',
+  'some', 'want', 'need', 'like', 'with', 'please', 'get', 'find', 'looking', 'fancy', 'bit',
 ]);
 
 function meaningfulTokens(queryTokens: string[]): string[] {
   return queryTokens.filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
+}
+
+// Levenshtein distance, capped/short-circuited at `max` — a query token more
+// than `max` edits away from a candidate word can't possibly be a near-miss
+// typo of it, so there's no need to finish computing the exact distance.
+function levenshteinWithin(a: string, b: string, max: number): boolean {
+  if (Math.abs(a.length - b.length) > max) return false;
+  const prev = new Array(b.length + 1);
+  for (let j = 0; j <= b.length; j++) prev[j] = j;
+  for (let i = 1; i <= a.length; i++) {
+    let rowMin = i;
+    const curr = new Array(b.length + 1);
+    curr[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      curr[j] = a[i - 1] === b[j - 1] ? prev[j - 1] : 1 + Math.min(prev[j - 1], prev[j], curr[j - 1]);
+      rowMin = Math.min(rowMin, curr[j]);
+    }
+    if (rowMin > max) return false; // whole row exceeds budget — no cell ahead can recover
+    prev.splice(0, prev.length, ...curr);
+  }
+  return prev[b.length] <= max;
+}
+
+// One typo of slack for a short word, two for a longer one — "spagetti" (one
+// letter short of "spaghetti") should still match; "pizza" vs "salad"
+// shouldn't. Never applied to words under 4 letters, where a 1-edit fuzzy
+// match is more often a false positive (e.g. "egg" ~ "egg" is exact anyway,
+// but "rat"~"rice" territory gets noisy fast on short words).
+function fuzzyDistanceBudget(word: string): number {
+  return word.length <= 6 ? 1 : 2;
 }
 
 // A favourite-cuisine match only re-ranks within already-relevant results
@@ -68,9 +101,70 @@ function ideaHaystack(idea: FoodIdea): string {
   return `${idea.title} ${idea.description} ${idea.cuisine} ${idea.tags.join(' ')}`.toLowerCase();
 }
 
-function scoreIdea(idea: FoodIdea, queryTokens: string[]): number {
-  const haystack = ideaHaystack(idea);
-  return queryTokens.reduce((score, token) => (haystack.includes(token) ? score + 1 : score), 0);
+// Every distinct word in the haystack, for word-aware matching — raw
+// substring matching (haystack.includes(token)) has a real false-positive
+// problem: "egg" is a literal substring of "veggie", so a search for "egg"
+// was scoring vegetarian/vegan entries as an egg match purely by accident.
+function ideaWords(idea: FoodIdea): string[] {
+  return [...new Set(ideaHaystack(idea).split(/[^a-z0-9]+/).filter(Boolean))];
+}
+
+// A word "matches" a token if either is a prefix of the other — catches
+// simple pluralisation both ways ("egg" query / "eggs" in a description, or
+// "chickens" query / "chicken" tag) without the substring-anywhere failure
+// mode above ("veggie" does not start with "egg", and "egg" does not start
+// with "veggie"). The length guard matters just as much as the prefix logic:
+// splitting "Shepherd's" on punctuation leaves a stray 1-letter "s" word,
+// and without a floor, "spicy".startsWith("s") is trivially true — every
+// possessive apostrophe in the catalog would silently match every token
+// starting with that letter.
+function wordsMatch(word: string, token: string): boolean {
+  if (word.length < 3 || token.length < 3) return false;
+  return word.startsWith(token) || token.startsWith(word);
+}
+
+function hasWordMatch(idea: FoodIdea, token: string): boolean {
+  return ideaWords(idea).some((word) => wordsMatch(word, token));
+}
+
+// A flat "+1 per matched token" lets a common word like "spicy" (tagged on
+// a third of the catalog) drown out a specific dish/ingredient name that
+// only one or two entries mention — e.g. "spaghetti with egg, a bit spicy"
+// was ranking generic spicy dishes above the one entry actually about
+// spaghetti. Weighting each token by how rare it is in the catalog (classic
+// IDF) fixes that: a token nearly every entry contains is worth barely
+// anything, one that appears in a single entry is worth a lot.
+function documentFrequency(token: string): number {
+  return EAT_NOW_CATALOG.reduce((count, idea) => (hasWordMatch(idea, token) ? count + 1 : count), 0);
+}
+
+function tokenWeight(token: string): number {
+  const df = documentFrequency(token);
+  if (df === 0) return 0; // never appears verbatim anywhere — only the fuzzy path can still credit it
+  return Math.log2(EAT_NOW_CATALOG.length / df) + 1;
+}
+
+/** One weight computed per query token, shared across every idea being scored. */
+function weighTokens(queryTokens: string[]): { token: string; weight: number }[] {
+  return queryTokens.map((token) => ({ token, weight: tokenWeight(token) }));
+}
+
+// A word (whole-word/prefix, per wordsMatch) match scores the token's full
+// weight — a real signal. A typo (e.g. "spagetti" for "spaghetti") only
+// gets 60% of that weight via levenshteinWithin, so a correctly-spelled
+// exact match still edges out a near-miss for the same word.
+function scoreIdea(idea: FoodIdea, weightedTokens: { token: string; weight: number }[]): number {
+  const words = ideaWords(idea); // computed once per idea, reused for both the exact and fuzzy passes
+  return weightedTokens.reduce((score, { token, weight }) => {
+    if (words.some((word) => wordsMatch(word, token))) return score + weight;
+    if (token.length < 4) return score; // too short for fuzzy matching to be meaningful
+    const budget = fuzzyDistanceBudget(token);
+    // A misspelled token (e.g. "spagetti") has df=0 for itself — its weight
+    // has to come from the real word it matched ("spaghetti"), not from the
+    // typo, or a typo'd dish name would score as worthless as "spicy".
+    const matchedWord = words.filter((word) => word.length >= 4).find((word) => levenshteinWithin(token, word, budget));
+    return matchedWord ? score + tokenWeight(matchedWord) * 0.6 : score;
+  }, 0);
 }
 
 /**
@@ -97,8 +191,16 @@ export class EatNowService {
   ) {}
 
   async search(dto: SearchEatNowDto, actor: RequestActor): Promise<FoodIdeaResult[]> {
-    const rawTokens = dto.query.toLowerCase().split(/\s+/).filter(Boolean);
+    // Strip punctuation before splitting — "egg," (a trailing comma from
+    // "with egg, a bit spicy") is otherwise a token that can never match the
+    // word "egg" in any catalog entry via substring matching.
+    const rawTokens = dto.query
+      .toLowerCase()
+      .replace(/[^\p{L}\p{N}\s]+/gu, ' ')
+      .split(/\s+/)
+      .filter(Boolean);
     const queryTokens = meaningfulTokens(rawTokens);
+    const weightedTokens = weighTokens(queryTokens);
     const cuisineFilter = dto.cuisine?.trim().toLowerCase();
 
     const { favouriteCuisines, avoidedIngredients } = await this.loadPersonalisation(actor);
@@ -118,7 +220,7 @@ export class EatNowService {
     const results = wantsSurprise
       ? shuffled(filtered).slice(0, MAX_RESULTS)
       : filtered
-          .map((idea) => ({ idea, score: scoreIdea(idea, queryTokens) }))
+          .map((idea) => ({ idea, score: scoreIdea(idea, weightedTokens) }))
           .filter((entry) => entry.score > 0)
           .map((entry) => {
             // Substring, not exact equality — preference cuisines are full

@@ -1,0 +1,46 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-md) 0;
+}
+
+.pinWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.ping {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--primary-soft);
+}
+
+.pin {
+  position: relative;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.signal {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}

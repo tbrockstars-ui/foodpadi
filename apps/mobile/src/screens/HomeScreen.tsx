@@ -1,11 +1,9 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { chipLabel, routeFoodDecision, SITUATION_CHIPS, SituationChip, whyLabel } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
-import { Button } from '../components/Button';
 import { Card } from '../components/Card';
-import { Chip } from '../components/Chip';
+import { DecideFlow } from '../components/DecideFlow';
 import { Tag } from '../components/Tag';
 import { colors, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
@@ -13,8 +11,9 @@ import type { AppStackParamList } from '../navigation/AppStack';
 type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogin: () => void };
 
 // Secondary shortcuts for returning users who already know which tool they
-// want — the unified chip flow above is the primary, first-time experience
-// (docs/IMPLEMENTATION_PLAN.md's "What should I eat?" Home rework).
+// want — DecideFlow above is the primary, first-time experience
+// (docs/IMPLEMENTATION_PLAN.md's "What should I eat?" Home rework, and the
+// decision-engine architecture memory's "single intent-first entry point").
 const TOOL_SHORTCUTS = [
   { key: 'eat-now', label: 'Eat Now', live: true },
   { key: 'cook-today', label: 'Cook Today', live: true },
@@ -25,26 +24,6 @@ const TOOL_SHORTCUTS = [
 export function HomeScreen({ navigation, onRequestLogin }: Props) {
   const { user } = useAuth();
   const isGuest = !user;
-  const [selected, setSelected] = useState<SituationChip[]>([]);
-
-  const toggleChip = (chip: SituationChip) => {
-    setSelected((current) =>
-      current.includes(chip) ? current.filter((c) => c !== chip) : [...current, chip],
-    );
-  };
-
-  const askFoodPadi = () => {
-    const target = routeFoodDecision(selected);
-    if (target.engine === 'cook-today') {
-      navigation.navigate('CookToday');
-    } else {
-      navigation.navigate('EatNow', {
-        initialQuery: target.query,
-        initialMaxPricePence: target.maxPricePence,
-        whyLabel: whyLabel(selected),
-      });
-    }
-  };
 
   const openTool = (key: (typeof TOOL_SHORTCUTS)[number]['key']) => {
     if (key === 'eat-now') navigation.navigate('EatNow');
@@ -64,7 +43,7 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.header}>
         <Text style={styles.brand}>FoodPadi</Text>
         <Text
@@ -77,25 +56,11 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
       </View>
 
       <Text style={styles.heading}>What should I eat?</Text>
-      <Text style={styles.subtitle}>Tell FoodPadi what you need and we'll help you decide.</Text>
+      <Text style={styles.subtitle}>Tell FoodPadi what you have or what you're after, and we'll decide.</Text>
 
-      <View style={styles.chipWrap}>
-        {SITUATION_CHIPS.map((chip) => (
-          <Chip
-            key={chip}
-            label={chipLabel(chip)}
-            selected={selected.includes(chip)}
-            onPress={() => toggleChip(chip)}
-          />
-        ))}
+      <View style={styles.decideWrap}>
+        <DecideFlow />
       </View>
-
-      <Button
-        label="Ask FoodPadi"
-        onPress={askFoodPadi}
-        disabled={selected.length === 0}
-        style={styles.askButton}
-      />
 
       <Text style={styles.toolsHeading}>Or choose a tool</Text>
       <View style={styles.toolsRow}>
@@ -132,12 +97,13 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
           </Text>
         </Card>
       )}
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 64 },
+  container: { flex: 1, backgroundColor: colors.background },
+  scrollContent: { padding: spacing.xl, paddingTop: 64, paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -148,8 +114,7 @@ const styles = StyleSheet.create({
   headerLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   heading: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
-  askButton: { marginBottom: spacing.xl },
+  decideWrap: { marginBottom: spacing.lg },
   toolsHeading: {
     ...typography.label,
     color: colors.textFaint,

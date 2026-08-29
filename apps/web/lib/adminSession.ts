@@ -2,15 +2,18 @@ import crypto from 'crypto';
 
 export const ADMIN_SESSION_COOKIE = 'foodpadi_admin_session';
 
+export interface AdminStaffIdentity {
+  username: string;
+  displayName: string | null;
+}
+
 /**
- * Placeholder admin auth for Phase 1 scaffolding only: a single shared
- * access code (ADMIN_ACCESS_CODE) HMAC-signed into a cookie so it can't be
- * forged by guessing a flag value, but it is NOT real staff authentication.
- *
- * Before any real admin/support data is exposed here, this must be replaced
- * with per-person staff accounts (see docs/TECHNICAL_ARCHITECTURE.md §2.7 —
- * admin auth must stay entirely separate from end-user auth) — tracked as a
- * Phase 1 follow-up, not deferred silently.
+ * Real per-person staff authentication for the admin console: the cookie is
+ * an HMAC-signed `<base64url payload>.<signature>` carrying which staff
+ * member is signed in (apps/api's AdminStaffUser table, checked via
+ * POST /admin/auth/login), replacing the earlier single-shared-code
+ * placeholder. Admin actions are now attributable to a specific staff
+ * member, not just "someone with the code" — see docs/IMPLEMENTATION_PLAN.md.
  */
 function getSigningSecret(): string {
   const secret = process.env.ADMIN_SESSION_SECRET;
@@ -20,24 +23,36 @@ function getSigningSecret(): string {
   return secret;
 }
 
-export function createAdminSessionToken(): string {
-  return crypto.createHmac('sha256', getSigningSecret()).update('admin-authenticated').digest('hex');
+function sign(payload: string): string {
+  return crypto.createHmac('sha256', getSigningSecret()).update(payload).digest('hex');
+}
+
+export function createAdminSessionToken(staff: AdminStaffIdentity): string {
+  const payload = Buffer.from(JSON.stringify(staff)).toString('base64url');
+  return `${payload}.${sign(payload)}`;
+}
+
+export function verifyAdminSessionToken(token: string | undefined): AdminStaffIdentity | null {
+  if (!token) return null;
+  const [payload, signature] = token.split('.');
+  if (!payload || !signature) return null;
+
+  const expected = sign(payload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (signatureBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(signatureBuffer, expectedBuffer)) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (typeof parsed?.username !== 'string') return null;
+    return { username: parsed.username, displayName: parsed.displayName ?? null };
+  } catch {
+    return null;
+  }
 }
 
 export function isValidAdminSessionToken(token: string | undefined): boolean {
-  if (!token) return false;
-  const expected = createAdminSessionToken();
-  const tokenBuffer = Buffer.from(token);
-  const expectedBuffer = Buffer.from(expected);
-  if (tokenBuffer.length !== expectedBuffer.length) return false;
-  return crypto.timingSafeEqual(tokenBuffer, expectedBuffer);
-}
-
-export function verifyAccessCode(candidate: string): boolean {
-  const configured = process.env.ADMIN_ACCESS_CODE;
-  if (!configured) return false;
-  const candidateBuffer = Buffer.from(candidate);
-  const configuredBuffer = Buffer.from(configured);
-  if (candidateBuffer.length !== configuredBuffer.length) return false;
-  return crypto.timingSafeEqual(candidateBuffer, configuredBuffer);
+  return verifyAdminSessionToken(token) !== null;
 }

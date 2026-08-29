@@ -4,6 +4,7 @@ import { Suspense, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../components/Button';
+import { Logo } from '../../components/Logo';
 import styles from '../auth.module.css';
 
 /**
@@ -70,6 +71,9 @@ function LoginForm() {
   return (
     <main className={styles.container}>
       <div className={styles.card}>
+        <div className={styles.brandStage}>
+          <Logo withWordmark={false} size={84} className={styles.brandBadge} />
+        </div>
         <h1 className={styles.title}>FoodPadi</h1>
         <p className={styles.subtitle}>Your food companion that plans with you, not for you.</p>
 

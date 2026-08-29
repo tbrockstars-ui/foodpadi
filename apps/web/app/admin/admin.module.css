@@ -75,3 +75,15 @@
   border-radius: 16px;
   padding: 24px;
 }
+
+.cardLink {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  margin-bottom: 16px;
+  transition: border-color 0.15s ease;
+}
+
+.cardLink:hover {
+  border-color: var(--primary);
+}

@@ -1,0 +1,22 @@
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: var(--space-md) 0;
+}
+
+.icons {
+  display: flex;
+  gap: 4px;
+}
+
+.icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}

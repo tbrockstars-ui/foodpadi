@@ -5,6 +5,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 import { GeneratePlanDto, PlanScope } from './dto/generate-plan.dto';
+import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
 
 const SCOPE_DAYS: Record<Exclude<PlanScope, 'custom'>, number> = {
   today: 1,
@@ -163,6 +164,30 @@ export class PlanAheadService {
     });
 
     await this.analytics.track('plan_ahead_item_regenerated', { userId }, { planId, itemId });
+
+    return this.prisma.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: this.planInclude() });
+  }
+
+  async updateItem(planId: string, itemId: string, userId: string, dto: UpdateMealPlanItemDto) {
+    const plan = await this.ownedPlan(planId, userId);
+    if (!plan.items.some((i) => i.id === itemId)) {
+      throw new NotFoundException('Meal plan item not found.');
+    }
+
+    await this.prisma.mealPlanItem.update({
+      where: { id: itemId },
+      data: {
+        ...(dto.mealChoice !== undefined ? { mealChoice: dto.mealChoice } : {}),
+        ...(dto.plannedTime !== undefined ? { plannedTime: dto.plannedTime } : {}),
+      },
+    });
+
+    await this.analytics.track('plan_ahead_item_updated', { userId }, {
+      planId,
+      itemId,
+      mealChoice: dto.mealChoice,
+      hasTime: dto.plannedTime !== undefined ? dto.plannedTime !== null : undefined,
+    });
 
     return this.prisma.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: this.planInclude() });
   }

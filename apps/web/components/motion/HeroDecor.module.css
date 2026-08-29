@@ -1,0 +1,140 @@
+.layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.piece {
+  position: absolute;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
+  opacity: 1;
+}
+
+/* All six cutouts sit along the banner's base, in two clusters (bottom-left,
+   bottom-right) instead of the top corners — keeps the nav/logo area clean. */
+
+/* Cilantro leaves + chilies + tomato on a wooden board ("the plate") — now
+   the only piece in the bottom-left cluster (the tomato-quarters piece that
+   used to sit outside it was removed), sized up to fill that corner on its
+   own. Turned 90° clockwise so its flat edge runs along the banner's base
+   instead of standing on end; the bottom/left offsets are compensated for
+   the width/height swap the rotation causes so it still sits flush with
+   the bottom edge and keeps the same visual centre as before the resize. */
+.basil {
+  bottom: -53px;
+  left: 118px;
+  width: 224px;
+  height: 300px;
+}
+
+/* Whole + halved red onions with green stems — pulled in to overlap the
+   tomato cluster (bottom-right) instead of sitting beside it as its own
+   block, so the two mix together. */
+.onion {
+  bottom: -6px;
+  right: 60px;
+  width: 200px;
+  height: 145px;
+}
+
+/* Whole tomato + halves — bottom-right, outer piece (most prominent).
+   Dropped further down so it sits right at the banner's bottom edge
+   instead of floating mid-cluster. */
+.tomato {
+  bottom: -110px;
+  right: -24px;
+  width: 210px;
+  height: 232px;
+}
+
+/* Burger — doubled in size and pushed over to the right corner as a big
+   backdrop the tomato/onion/drink sit in front of (it's first in PIECES'
+   DOM order among this group, so it paints behind them). */
+.burger {
+  bottom: -20px;
+  right: 40px;
+  width: 380px;
+  height: 308px;
+}
+
+/* OJ glass + orange — doubled in size, the tallest piece in the bottom-right
+   cluster, rising above the others for a bit of natural depth; overlaps the
+   onion/burger. Anchored on its right edge, so the extra size grows
+   leftward/upward rather than shifting where it meets the corner. */
+.drink {
+  bottom: -10px;
+  right: 200px;
+  width: 300px;
+  height: 356px;
+}
+
+@media (max-width: 980px) {
+  .basil {
+    left: 104px;
+    width: 182px;
+    height: 244px;
+    bottom: -46px;
+  }
+
+  .onion {
+    right: 40px;
+    bottom: -4px;
+    width: 160px;
+    height: 116px;
+  }
+
+  .burger {
+    right: 20px;
+    bottom: -12px;
+    width: 280px;
+    height: 228px;
+  }
+
+  .drink {
+    right: 100px;
+    bottom: -6px;
+    width: 220px;
+    height: 260px;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Below 720px, keep just one piece per corner to avoid crowding a narrow
+     banner base — onion/burger/drink drop off the bottom-right cluster
+     (tomato alone represents it), and basil gets its own compact sizing
+     as the sole bottom-left piece. */
+  .onion,
+  .burger,
+  .drink {
+    display: none;
+  }
+
+  .basil {
+    left: -10px;
+    width: 100px;
+    height: 130px;
+    bottom: -33px;
+  }
+
+  .tomato {
+    width: 140px;
+    height: 156px;
+    bottom: -18px;
+    right: -16px;
+  }
+}
+
+/* Small green leaf confetti, spread across the banner's base strip. */
+.leaf {
+  position: absolute;
+  color: #bfe6a8;
+  pointer-events: none;
+}
+
+@media (max-width: 720px) {
+  .leaf {
+    display: none;
+  }
+}

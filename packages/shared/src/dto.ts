@@ -111,6 +111,14 @@ export interface RecipeView {
 
 export type SaveRecipeRequest = RecipeView;
 
+// GET /cook-today/recipes — same shape as RecipeView plus the two fields
+// that only exist once a recipe is actually persisted (matches the existing
+// `RecipeView & { id: string }` pattern used by MealPlanItemView.recipe).
+export interface SavedRecipeView extends RecipeView {
+  id: string;
+  createdAt: string;
+}
+
 export interface ImportRecipeRequest {
   url: string;
 }
@@ -206,13 +214,23 @@ export interface GeneratePlanRequest {
   budgetPence?: number;
 }
 
+export type MealChoice = 'cook' | 'eat_out';
+
 export interface MealPlanItemView {
   id: string;
   plannedDate: string;
   mealSlot: string;
   servings: number;
   status: string;
+  mealChoice: MealChoice;
+  /** "HH:mm" 24h, or null if no time has been set for this item yet. */
+  plannedTime: string | null;
   recipe: (RecipeView & { id: string }) | null;
+}
+
+export interface UpdateMealPlanItemRequest {
+  mealChoice?: MealChoice;
+  plannedTime?: string | null;
 }
 
 export interface MealPlanView {
@@ -250,6 +268,77 @@ export interface UpdateShoppingListItemRequest {
   checked?: boolean;
   quantity?: string;
   unit?: string;
+}
+
+// Local food discovery ("find this food near me") — a supporting capability
+// of the decision engine, not a restaurant marketplace. See
+// apps/api/src/modules/local-food-search for the real-data-only contract:
+// every field here is either grounded (currently: OpenStreetMap tag data) or
+// null — never a guessed/constructed value.
+export interface LocalFoodSearchRequest {
+  query: string;
+  /** Preferred path — from the browser/device geolocation API. */
+  latitude?: number;
+  longitude?: number;
+  /** Fallback when location permission is denied/unavailable: a postcode, town, or area. */
+  locationText?: string;
+}
+
+export type FoodMatchType = 'EXACT_MATCH' | 'CLOSE_MATCH';
+
+export interface FoodProviderResult {
+  /** Stable within one response only — not a persisted id. */
+  id: string;
+  name: string;
+  address: string | null;
+  phone: string | null;
+  websiteUrl: string | null;
+  orderUrl: string | null;
+  /** A table/reservation booking URL (e.g. an OpenTable/Resy-style link) — distinct from orderUrl (food ordering). */
+  bookingUrl: string | null;
+  mapsUrl: string | null;
+  /** Approximate and grounded (e.g. "0.4 mi away") — never computed/guessed client- or server-side. */
+  distanceText: string | null;
+  requestedFood: string;
+  matchedFood: string;
+  matchType: FoodMatchType;
+}
+
+export interface LocalFoodSearchResponse {
+  query: string;
+  results: FoodProviderResult[];
+  /** Non-null only when results came from a real grounded source that requires attribution when shown. */
+  source: 'openstreetmap' | null;
+}
+
+// The unified intent-first decision engine — see the "FoodPadi is a food-
+// decision engine" architecture memory. Given a free-text description of
+// what the user wants/has plus soft constraints, returns a small set of
+// explained options blending "cook it" (Cook Today's generation) and "get
+// it" (Eat Now's catalog) candidates — never a single-mode result list.
+export interface DecideRequest {
+  description: string;
+  timeMinutes?: number;
+  budgetPence?: number;
+}
+
+export type DecisionOptionType = 'cook' | 'get';
+
+export interface DecisionOptionView {
+  /** Stable within one response only — not a persisted id. */
+  id: string;
+  type: DecisionOptionType;
+  title: string;
+  /** Short, human "why this fits" line — e.g. "Ready in 20 min" or "~0.8 mi · £8-10". */
+  reason: string;
+  /** Present when type === 'cook'. */
+  recipe?: RecipeView;
+  /** Present when type === 'get' — seeds LocalFoodSearch's query when the user picks "Get it". */
+  foodIdea?: FoodIdeaView;
+}
+
+export interface DecideResponse {
+  options: DecisionOptionView[];
 }
 
 export const DISCLAIMER_TEXT = `AI Food Companion provides food discovery, ingredient information, meal planning, recipes, shopping assistance and general food-related recommendations.

@@ -244,6 +244,15 @@ model MealPlanItem {
   plannedDate DateTime @map("planned_date")
   servings    Int      @default(2)
   status      String   @default("planned") // "planned" | "cooked" | "skipped" | "swapped" | "rescued"
+  // "cook" (default — use the attached recipe) or "eat_out" (Get It instead
+  // of Cook It for this slot, mirroring the decision engine's two terminal
+  // actions at plan level). recipe stays attached either way — switching to
+  // eat_out doesn't discard it, in case the user switches back.
+  mealChoice  String   @default("cook") @map("meal_choice")
+  // "HH:mm" 24h, optional — when set, the client (currently mobile only)
+  // schedules a local reminder 30 minutes before this time so the user
+  // doesn't miss the window to start cooking or place an order.
+  plannedTime String?  @map("planned_time")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -300,6 +309,16 @@ model AiMemory {
   @@map("ai_memory")
 }
 
+// Pre-launch web landing page signup — not tied to a User account (the app
+// isn't released yet, so there's nothing to log into). Just an email capture.
+model WaitlistSignup {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("waitlist_signups")
+}
+
 // Scan (Phase 6): a photo of food is analysed (Layer 5, vision) into
 // candidate items, but nothing here is written until the user explicitly
 // confirms the reviewed list — this table only ever holds confirmed rows,
@@ -317,4 +336,23 @@ model PantryItem {
 
   @@index([userId])
   @@map("pantry_items")
+}
+
+// Staff authentication for the admin console (apps/web/app/admin) — deliberately
+// its own table, never sharing rows/sessions with the customer User model
+// (docs/TECHNICAL_ARCHITECTURE.md §2.7: admin auth must stay entirely separate
+// from end-user auth). Replaces the single shared ADMIN_ACCESS_CODE placeholder
+// so admin actions are attributable to an actual staff member, not just "someone
+// with the code". No self-service signup — accounts are created by a script
+// (apps/api/scripts/create-admin-staff-user.ts), run by whoever administers
+// this deployment.
+model AdminStaffUser {
+  id           String    @id @default(uuid())
+  username     String    @unique
+  passwordHash String    @map("password_hash")
+  displayName  String?   @map("display_name")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastLoginAt  DateTime? @map("last_login_at")
+
+  @@map("admin_staff_users")
 }

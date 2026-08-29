@@ -100,3 +100,157 @@
   padding: 3px 10px;
   border-radius: var(--radius-pill);
 }
+
+/* Local food discovery ("find it nearby") */
+
+.nearbySection {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--border);
+}
+
+.nearbyHeading {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-xs);
+}
+
+.nearbySubtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-md);
+  line-height: 1.5;
+}
+
+.secondaryButton {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.locationBox {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-md);
+}
+
+.locationBoxText {
+  font-size: 14px;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0 0 var(--space-md);
+}
+
+.buttonRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.manualLocationRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.manualLocationInput {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.attributionNote {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: var(--space-md) 0;
+}
+
+.providerCard {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+  box-shadow: 0 2px 10px rgba(20, 21, 15, 0.05);
+}
+
+.providerName {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-xs);
+}
+
+.matchBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: var(--space-xs);
+}
+
+.matchBadgeExact {
+  color: var(--success);
+}
+
+.matchBadgeClose {
+  color: var(--secondary);
+}
+
+.providerMeta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-xs);
+}
+
+.providerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+.providerActionLink {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  text-decoration: none;
+  background: var(--primary-soft);
+}
+
+/* Distinct from .providerActionLink on purpose — these are a search query,
+   not a verified detail from the business's own real data, and must never
+   look identical to one (dashed border + muted text does that). */
+.providerSearchLink {
+  display: inline-block;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  background: transparent;
+}

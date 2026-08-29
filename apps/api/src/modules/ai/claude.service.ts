@@ -148,9 +148,123 @@ const CURATED_RECIPES: RawRecipeCandidate[] = [
       { name: 'vegetable stock', quantity: '600', unit: 'ml' },
     ],
     steps: [
+      'Soft-boil the eggs in a separate pan of simmering water for 6-7 minutes, then cool under cold water and peel.',
       'Bring the stock to a simmer and whisk in the miso paste.',
       'Add the mushrooms and cook for 5 minutes, then cook the noodles in the broth.',
-      'Serve topped with a soft-boiled egg and sliced spring onion.',
+      'Serve topped with the halved soft-boiled eggs and sliced spring onion.',
+    ],
+  },
+  {
+    title: 'Chicken & Avocado Salad',
+    cookTimeMinutes: 15,
+    servings: 2,
+    cuisine: 'International',
+    ingredients: [
+      { name: 'chicken breast', quantity: '2', unit: null },
+      { name: 'mixed salad leaves', quantity: '100', unit: 'g' },
+      { name: 'avocado', quantity: '1', unit: null },
+      { name: 'cherry tomatoes', quantity: '150', unit: 'g' },
+      { name: 'cucumber', quantity: '0.5', unit: null },
+      { name: 'olive oil', quantity: '1', unit: 'tbsp' },
+    ],
+    steps: [
+      'Grill or pan-fry the chicken breast until cooked through, then slice.',
+      'Toss the salad leaves, tomatoes and cucumber with olive oil.',
+      'Top with the sliced chicken and avocado.',
+    ],
+  },
+  {
+    title: 'Greek Salad',
+    cookTimeMinutes: 10,
+    servings: 2,
+    cuisine: 'Mediterranean',
+    ingredients: [
+      { name: 'cucumber', quantity: '1', unit: null },
+      { name: 'tomatoes', quantity: '3', unit: null },
+      { name: 'red onion', quantity: '0.5', unit: null },
+      { name: 'feta cheese', quantity: '150', unit: 'g' },
+      { name: 'olives', quantity: '80', unit: 'g' },
+      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
+    ],
+    steps: [
+      'Chop the cucumber, tomatoes and red onion into chunks.',
+      'Toss with the olives and olive oil.',
+      'Top with crumbled feta and serve.',
+    ],
+  },
+  {
+    title: 'Loaded Jacket Potato',
+    cookTimeMinutes: 60,
+    servings: 2,
+    cuisine: 'British',
+    ingredients: [
+      { name: 'baking potatoes', quantity: '2', unit: null },
+      { name: 'baked beans', quantity: '1', unit: 'tin' },
+      { name: 'cheddar cheese', quantity: '80', unit: 'g' },
+      { name: 'butter', quantity: '1', unit: 'tbsp' },
+    ],
+    steps: [
+      'Prick the potatoes and bake at 200°C for about 50-60 minutes until soft.',
+      'Warm the baked beans.',
+      'Split the potatoes open, top with butter, beans and grated cheese.',
+    ],
+  },
+  {
+    title: 'Chicken & Vegetable Stir Fry',
+    cookTimeMinutes: 20,
+    servings: 2,
+    cuisine: 'Chinese',
+    ingredients: [
+      { name: 'chicken breast', quantity: '2', unit: null },
+      { name: 'mixed stir-fry vegetables', quantity: '300', unit: 'g' },
+      { name: 'soy sauce', quantity: '2', unit: 'tbsp' },
+      { name: 'garlic', quantity: '2 cloves', unit: null },
+      { name: 'ginger', quantity: '1 thumb', unit: null },
+      { name: 'rice', quantity: '200', unit: 'g' },
+    ],
+    steps: [
+      'Cook the rice according to packet instructions.',
+      'Slice the chicken and stir-fry in a hot pan or wok until cooked through.',
+      'Add the garlic, ginger and vegetables, stir-fry for 3-4 minutes.',
+      'Stir in the soy sauce and serve over the cooked rice.',
+    ],
+  },
+  {
+    title: 'Veggie Bean Chilli',
+    cookTimeMinutes: 30,
+    servings: 4,
+    cuisine: 'Mexican',
+    ingredients: [
+      { name: 'kidney beans', quantity: '2 tins', unit: null },
+      { name: 'tinned tomatoes', quantity: '400', unit: 'g' },
+      { name: 'onion', quantity: '1', unit: null },
+      { name: 'pepper', quantity: '1', unit: null },
+      { name: 'chilli powder', quantity: '1', unit: 'tbsp' },
+      { name: 'rice', quantity: '250', unit: 'g' },
+    ],
+    steps: [
+      'Cook the rice according to packet instructions.',
+      'Soften the onion and pepper, then stir in the chilli powder.',
+      'Add the kidney beans and tinned tomatoes, simmer for 20 minutes.',
+      'Serve with the cooked rice.',
+    ],
+  },
+  {
+    title: 'Egg Fried Rice',
+    cookTimeMinutes: 15,
+    servings: 2,
+    cuisine: 'Chinese',
+    ingredients: [
+      { name: 'cooked rice', quantity: '300', unit: 'g' },
+      { name: 'egg', quantity: '2', unit: null },
+      { name: 'frozen peas', quantity: '100', unit: 'g' },
+      { name: 'spring onion', quantity: '2', unit: null },
+      { name: 'soy sauce', quantity: '1', unit: 'tbsp' },
+    ],
+    steps: [
+      'Scramble the eggs in a hot pan or wok, then set aside.',
+      'Fry the rice and peas for a few minutes until hot through.',
+      'Stir the egg back in with the soy sauce and spring onion.',
     ],
   },
 ];
@@ -205,14 +319,50 @@ export class ClaudeService {
     return this.client;
   }
 
-  private curatedFallback(count: number): RawRecipeCandidate[] {
+  // `hint` is free text describing what the user actually asked for (their
+  // ingredients/description) — without it, this always returned the same
+  // first few recipes regardless of the request (e.g. "salad" got chicken &
+  // rice). Simple keyword-in-title-or-ingredient matching, same idea as
+  // EatNowService's matcher but far smaller in scope: this is a fallback
+  // demo dataset, not a search engine.
+  private curatedFallback(count: number, hint?: string): RawRecipeCandidate[] {
     this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
-    return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
+
+    if (!hint?.trim()) {
+      return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
+    }
+
+    const words = hint
+      .toLowerCase()
+      .split(/[^a-z0-9]+/)
+      .filter((w) => w.length >= 3);
+
+    const scored = CURATED_RECIPES.map((recipe) => {
+      const haystack = `${recipe.title} ${(recipe.ingredients as { name: string }[]).map((i) => i.name).join(' ')}`.toLowerCase();
+      const score = words.reduce((s, w) => (haystack.includes(w) ? s + 1 : s), 0);
+      return { recipe, score };
+    });
+
+    const matched = scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
+    const results = matched.slice(0, count).map((s) => s.recipe);
+
+    // Not enough (or any) keyword matches — top up from the rest so a
+    // request that matches nothing still gets `count` recipes, same as
+    // before, rather than an empty/short list.
+    if (results.length < count) {
+      const usedTitles = new Set(results.map((r) => r.title));
+      for (const recipe of CURATED_RECIPES) {
+        if (results.length >= count) break;
+        if (!usedTitles.has(recipe.title)) results.push(recipe);
+      }
+    }
+
+    return results;
   }
 
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-      return this.curatedFallback(3);
+      return this.curatedFallback(3, input.ingredients.join(' '));
     }
 
     const userMessage = [

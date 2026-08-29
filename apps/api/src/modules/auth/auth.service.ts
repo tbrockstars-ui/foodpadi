@@ -56,6 +56,15 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password.');
     }
 
+    // Suspended by an admin (AdminUsersService.suspend) — same deletedAt
+    // column self-deletion never uses (that's a real hard delete), reused
+    // here as a reversible block. Checked on login and refresh, not just at
+    // suspend time, since a suspension must also stop a user who wasn't
+    // already logged in from getting back in.
+    if (user.deletedAt) {
+      throw new UnauthorizedException('This account has been suspended.');
+    }
+
     return this.issueTokens(user.id, user.email, user.profile);
   }
 
@@ -71,7 +80,7 @@ export class AuthService {
       where: { id: stored.userId },
       include: { profile: true },
     });
-    if (!user) {
+    if (!user || user.deletedAt) {
       throw new UnauthorizedException('Refresh token is invalid or expired.');
     }
 

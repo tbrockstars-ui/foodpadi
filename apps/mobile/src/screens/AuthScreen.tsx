@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { Button } from '../components/Button';
@@ -54,6 +54,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
   return (
     <View style={styles.container}>
+      <Image source={require('../../assets/logo.png')} style={styles.logo} accessibilityIgnoresInvertColors />
       <Text style={styles.title}>FoodPadi</Text>
       <Text style={styles.subtitle}>Your food companion that plans with you, not for you.</Text>
 
@@ -123,6 +124,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 24, justifyContent: 'center' },
+  logo: { width: 84, height: 84, alignSelf: 'center', marginBottom: 16 },
   title: { fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' },
   subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 32 },
   input: {
