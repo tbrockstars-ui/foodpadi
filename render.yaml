@@ -13,9 +13,11 @@ services:
     # DB co-located (many queries per request) rather than near end users
     # (one hop, and Vercel is global anyway). Change if you move the DB.
     region: ohio
-    # `starter` stays warm. `free` spins down after ~15 min idle (30-60s cold
-    # start on the next request) — fine for a demo, rough for real use.
-    plan: starter
+    # `free` spins down after ~15 min idle (30-60s cold start on the next
+    # request) — chosen deliberately to avoid needing a card on file.
+    # Switch to `starter` later (stays warm, no cold start) once that's
+    # worth paying for.
+    plan: free
     healthCheckPath: /health
     autoDeploy: true
     envVars:
