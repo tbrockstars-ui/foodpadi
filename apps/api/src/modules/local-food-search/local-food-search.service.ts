@@ -18,6 +18,7 @@ const OVERPASS_URLS = [
   'https://overpass-api.de/api/interpreter',
   'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.openstreetmap.ru/api/interpreter',
+  'https://overpass.private.coffee/api/interpreter',
 ];
 
 // Hard client-side ceilings on every outbound call. Without these a single

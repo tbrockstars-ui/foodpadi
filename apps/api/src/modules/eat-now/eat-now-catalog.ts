@@ -5,6 +5,12 @@
 // Cook Today's recipes. Swappable later: EatNowService.search's interface
 // stays the same whether ranking comes from this static list or, once a real
 // data source and ANTHROPIC_API_KEY-backed ranking are in place, from Layer 5.
+//
+// EAT_NOW_CATALOG itself is no longer read at runtime — EatNowService now
+// queries the `FoodIdea` DB table (admin/food-ideas manages it) instead, so a
+// dish can be added/edited/disabled without a code deploy. This array is kept
+// only as the one-time seed source (scripts/seed-food-ideas.ts) and as the
+// FoodIdea/BudgetTier type definitions, which are still used everywhere.
 
 export type BudgetTier = 'low' | 'medium' | 'high';
 
@@ -23,6 +29,11 @@ export const EAT_NOW_CATALOG: FoodIdea[] = [
   { id: 'chow-mein', title: 'Chicken chow mein', description: 'Stir-fried noodles with chicken and vegetables from your local Chinese takeaway.', cuisine: 'Chinese', budgetTier: 'medium', tags: ['noodles', 'takeaway', 'chicken', 'quick'] },
   { id: 'chicken-curry', title: 'Chicken curry and rice', description: 'A warming curry with rice — order in or grab a ready meal.', cuisine: 'Indian', budgetTier: 'medium', tags: ['curry', 'spicy', 'chicken', 'comfort'] },
   { id: 'pizza-slice', title: 'Pizza', description: 'A hot pizza slice or a whole pie delivered — quick and filling.', cuisine: 'Italian', budgetTier: 'medium', tags: ['pizza', 'cheese', 'takeaway', 'quick'] },
+  { id: 'margherita-pizza', title: 'Margherita pizza', description: 'Classic tomato, mozzarella and basil on a wood-fired base — simple and always good.', cuisine: 'Italian', budgetTier: 'medium', tags: ['pizza', 'cheese', 'vegetarian', 'takeaway', 'quick'] },
+  { id: 'pepperoni-pizza', title: 'Pepperoni pizza', description: 'Loaded with spicy pepperoni and melted cheese — a takeaway favourite.', cuisine: 'Italian', budgetTier: 'medium', tags: ['pizza', 'cheese', 'spicy', 'takeaway', 'quick'] },
+  { id: 'veggie-pizza', title: 'Vegetarian pizza', description: 'Peppers, mushrooms, onion and olives on a cheesy base — meat-free and filling.', cuisine: 'Italian', budgetTier: 'medium', tags: ['pizza', 'cheese', 'vegetarian', 'takeaway', 'quick'] },
+  { id: 'meat-feast-pizza', title: 'Meat feast pizza', description: 'Pepperoni, ham, sausage and beef piled onto one pizza — for a proper hunger.', cuisine: 'Italian', budgetTier: 'high', tags: ['pizza', 'cheese', 'meat', 'takeaway', 'filling'] },
+  { id: 'bbq-chicken-pizza', title: 'BBQ chicken pizza', description: 'Smoky barbecue sauce, chicken and red onion on a cheesy base — a sweeter twist on the classic.', cuisine: 'Italian', budgetTier: 'medium', tags: ['pizza', 'cheese', 'chicken', 'takeaway'] },
   { id: 'burger-and-chips', title: 'Burger and chips', description: 'A classic burger with fries from a local grill or takeaway.', cuisine: 'American', budgetTier: 'medium', tags: ['burger', 'quick', 'comfort'] },
   { id: 'ramen-bowl', title: 'Bowl of ramen', description: 'Rich broth, noodles, and toppings — filling and warming.', cuisine: 'Japanese', budgetTier: 'medium', tags: ['noodles', 'soup', 'comfort', 'warm'] },
   { id: 'pho-bowl', title: 'Bowl of pho', description: 'Fragrant Vietnamese noodle soup with herbs and your choice of protein.', cuisine: 'Vietnamese', budgetTier: 'medium', tags: ['noodles', 'soup', 'light', 'fresh'] },
