@@ -1,9 +1,19 @@
-import { RawScannedItem } from '../ai/claude.service';
+import { RawFoodContentResult, RawScannedItem } from '../ai/claude.service';
 
 export interface ScannedItemView {
   name: string;
   quantity: string | null;
   unit: string | null;
+}
+
+export interface FoodContentIngredientView {
+  name: string;
+  note: string | null;
+}
+
+export interface FoodContentView {
+  dishName: string;
+  ingredients: FoodContentIngredientView[];
 }
 
 /**
@@ -29,4 +39,35 @@ export function sanitizeScannedItems(items: RawScannedItem[]): ScannedItemView[]
   }
 
   return result;
+}
+
+const FOOD_CONTENT_INGREDIENT_LIMIT = 12;
+
+/**
+ * Same non-negotiable pattern as sanitizeScannedItems above — nothing the
+ * model returns for the "what's in this dish?" mode reaches the UI unless
+ * it passes these deterministic checks (non-empty name, no duplicates,
+ * capped length).
+ */
+export function sanitizeFoodContent(raw: RawFoodContentResult): FoodContentView {
+  const dishName = typeof raw.dishName === 'string' ? raw.dishName.trim() : '';
+
+  const seen = new Set<string>();
+  const ingredients: FoodContentIngredientView[] = [];
+  const rawIngredients = Array.isArray(raw.ingredients) ? raw.ingredients : [];
+
+  for (const item of rawIngredients) {
+    if (ingredients.length >= FOOD_CONTENT_INGREDIENT_LIMIT) break;
+    if (!item || typeof item !== 'object') continue;
+    const candidate = item as { name?: unknown; note?: unknown };
+    const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+    if (!name) continue;
+    const normalized = name.toLowerCase();
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    const note = typeof candidate.note === 'string' && candidate.note.trim() ? candidate.note.trim() : null;
+    ingredients.push({ name, note });
+  }
+
+  return { dishName, ingredients };
 }

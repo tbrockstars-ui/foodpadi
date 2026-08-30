@@ -29,6 +29,19 @@ export interface RawScannedItem {
   unit?: unknown;
 }
 
+export interface RawFoodContentIngredient {
+  name: unknown;
+  note?: unknown;
+}
+
+export interface RawFoodContentResult {
+  dishName: unknown;
+  // Expected to be RawFoodContentIngredient[], but kept unknown here and
+  // narrowed defensively in sanitizeFoodContent (scan-validation.ts) — same
+  // pattern as RawScannedItem, nothing the model returns is trusted shape.
+  ingredients: unknown;
+}
+
 export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
 const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intolerance, or medical condition, and never state or imply a recipe is medically appropriate. You may only describe what ingredients a recipe contains. Do not repeat the same ingredient twice within one recipe's ingredients list. Every recipe must have at least 2 steps and a positive cookTimeMinutes and servings.`;
@@ -302,6 +315,17 @@ Rules you must follow:
 - Do not estimate expiry dates, freshness, or safety — you are identifying what is present, nothing more.
 - If you cannot identify any food items in the photo, return {"items": []}.`;
 
+const FOOD_CONTENT_SYSTEM_PROMPT = `You are the food-recognition component inside FoodPadi, a UK food companion app. You are shown a photo of a prepared dish — a meal, a plate of food, something ready to eat — and must identify what the dish is and what it is typically made of.
+
+Rules you must follow:
+- Return ONLY valid JSON, no prose before or after it, matching exactly this shape:
+  {"dishName": string, "ingredients": [{"name": string, "note": string | null}]}
+- "dishName" is your best-guess name for the dish (e.g. "Jollof rice with chicken"). If you can't identify a specific dish, use a short general description (e.g. "Grilled meat with vegetables") instead of guessing a specific name.
+- "ingredients" is the TYPICAL composition of this dish, based on how it looks and how it is commonly made — not a claim about exactly what is in this specific plate. List the most prominent/likely items first, at most 12.
+- Set "note" to a short phrase (e.g. "commonly used, not directly visible") for any ingredient you are inferring rather than actually seeing — oils, stock, seasoning, sauces mixed through the dish, etc. Set it to null for anything clearly visible.
+- Never state or imply certainty about hidden ingredients, allergens, or exact quantities — you are estimating, not verifying.
+- If you cannot identify any food in the photo, return {"dishName": "", "ingredients": []}.`;
+
 @Injectable()
 export class ClaudeService {
   private readonly logger = new Logger(ClaudeService.name);
@@ -434,6 +458,46 @@ export class ClaudeService {
     }
 
     return parsed.items as RawScannedItem[];
+  }
+
+  // Same no-curated-fallback rationale as analyzeFoodPhoto above.
+  async analyzeFoodContent(imageBase64: string, mediaType: ScanImageMediaType): Promise<RawFoodContentResult> {
+    const client = this.getClient();
+    const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: 1024,
+      system: FOOD_CONTENT_SYSTEM_PROMPT,
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
+            { type: 'text', text: 'What dish is this, and what is it likely made of?' },
+          ],
+        },
+      ],
+    });
+
+    const textBlock = response.content.find((block) => block.type === 'text');
+    if (!textBlock || textBlock.type !== 'text') {
+      throw new ServiceUnavailableException('The scanner returned an empty response.');
+    }
+
+    let parsed: { dishName?: unknown; ingredients?: unknown };
+    try {
+      parsed = JSON.parse(textBlock.text);
+    } catch {
+      this.logger.error(`Failed to parse food-content output as JSON: ${textBlock.text.slice(0, 500)}`);
+      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
+    }
+
+    if (typeof parsed.dishName !== 'string' || !Array.isArray(parsed.ingredients)) {
+      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
+    }
+
+    return parsed as RawFoodContentResult;
   }
 
   private async callForRecipes(

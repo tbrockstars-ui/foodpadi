@@ -151,6 +151,35 @@ export interface ScanPhotoResponse {
   demo: boolean;
 }
 
+// "What's in this dish?" — a second, distinct Scan mode alongside the
+// pantry one above: given a photo of a prepared dish (not a fridge/cupboard/
+// shopping bag), identify the dish and its likely ingredient composition —
+// "the possible combination" — so a customer can see roughly what's in
+// something before eating it. Guest-accessible (same precedent as Decide/
+// Eat Now/Cook Today) since nothing is persisted here, unlike the pantry
+// scan above which is account-only.
+export interface ScanFoodContentRequest {
+  imageBase64: string;
+  mediaType: ScanImageMediaType;
+}
+
+export interface FoodContentIngredientView {
+  name: string;
+  // Set when the model is inferring an ingredient it can't actually see
+  // (e.g. "oil", "stock", "seasoning") rather than reading it off the plate
+  // — surfaced in the UI so an inferred ingredient never reads as a
+  // confirmed one. Never used to imply certainty either way about allergens.
+  note: string | null;
+}
+
+export interface ScanFoodContentResponse {
+  /** Best-guess name of the dish, e.g. "Jollof rice with chicken". Empty string if unidentifiable. */
+  dishName: string;
+  ingredients: FoodContentIngredientView[];
+  // Same meaning as ScanPhotoResponse.demo.
+  demo: boolean;
+}
+
 export interface PantryItemInput {
   name: string;
   quantity?: string;

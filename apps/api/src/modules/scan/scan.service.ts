@@ -2,14 +2,25 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ClaudeService } from '../ai/claude.service';
+import { RequestActor } from '../auth/guest-or-auth.guard';
 import { demoScenario, demoScenarioForPhoto } from './demo-scan-analyzer';
+import { demoFoodContentForPhoto } from './demo-food-content-analyzer';
 import { AddPantryItemsDto } from './dto/add-pantry-items.dto';
+import { ScanFoodContentDto } from './dto/scan-food-content.dto';
 import { ScanPhotoDto } from './dto/scan-photo.dto';
-import { sanitizeScannedItems, ScannedItemView } from './scan-validation';
+import { FoodContentView, sanitizeFoodContent, sanitizeScannedItems, ScannedItemView } from './scan-validation';
 
 export interface ScanPhotoResult {
   items: ScannedItemView[];
   demo: boolean;
+}
+
+export interface ScanFoodContentResult extends FoodContentView {
+  demo: boolean;
+}
+
+function actorToAnalyticsFields(actor: RequestActor) {
+  return actor.type === 'user' ? { userId: actor.userId } : { guestSessionId: actor.sessionId };
 }
 
 @Injectable()
@@ -57,6 +68,31 @@ export class ScanService {
     await this.analytics.track('scan_analysis_completed', { userId }, { itemCount: items.length, demo });
 
     return { items, demo };
+  }
+
+  /**
+   * "What's in this dish?" — identifies a prepared dish and its likely
+   * ingredient composition from one photo, so a customer can see the
+   * possible combination of what's in it. Read-only (nothing persisted,
+   * unlike scanPhoto above which feeds into addPantryItems) — guest-
+   * accessible for the same reason /decide and /local-food-search are.
+   */
+  async scanFoodContent(dto: ScanFoodContentDto, actor: RequestActor): Promise<ScanFoodContentResult> {
+    const demoModeEnabled = process.env.SCAN_DEMO_MODE === 'true';
+    const raw = demoModeEnabled
+      ? demoFoodContentForPhoto(dto.imageBase64)
+      : await this.claude.analyzeFoodContent(dto.imageBase64, dto.mediaType);
+    const demo = demoModeEnabled;
+
+    const content = sanitizeFoodContent(raw);
+
+    await this.analytics.track('scan_food_content_completed', actorToAnalyticsFields(actor), {
+      ingredientCount: content.ingredients.length,
+      identified: content.dishName.length > 0,
+      demo,
+    });
+
+    return { ...content, demo };
   }
 
   /** The confirm-before-write step — only ever called with a user-reviewed list. */
