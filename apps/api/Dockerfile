@@ -28,8 +28,11 @@ RUN npm ci --workspaces --include-workspace-root || npm install --workspaces --i
 
 # ---- build ---------------------------------------------------------------
 FROM base AS build
+# Only the root node_modules is copied — npm workspaces hoists everything
+# here (no per-package apps/api/node_modules gets created), and Node's
+# module resolution walks up parent directories to find it anyway, so
+# apps/api resolves packages from here fine without its own copy.
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
 COPY . .
 # @foodpadi/shared is consumed as a compiled package (main: dist/index.js).
 RUN npm run shared:build
@@ -50,7 +53,6 @@ COPY --from=build /app/packages/shared/package.json ./packages/shared/package.js
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/prisma ./apps/api/prisma
-COPY --from=build /app/apps/api/node_modules ./apps/api/node_modules
 
 WORKDIR /app/apps/api
 # Render/Fly inject PORT; main.ts reads it (defaults to 3000 otherwise).
