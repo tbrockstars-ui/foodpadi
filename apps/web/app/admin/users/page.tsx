@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { adminServerFetch, requireAdminSession } from '../../../lib/adminApi';
 import { UsersTable } from './UsersTable';
 import type { AdminUserListResponse } from './types';
@@ -13,12 +12,7 @@ export default async function AdminUsersPage() {
 
   return (
     <main className={listStyles.pageMain}>
-      <div className={styles.dashboardHeader}>
-        <h1 className={styles.heading}>Users</h1>
-        <Link href="/admin" className={styles.linkButton}>
-          ‹ Admin home
-        </Link>
-      </div>
+      <h1 className={styles.heading}>Users</h1>
       <UsersTable initial={initial} />
     </main>
   );

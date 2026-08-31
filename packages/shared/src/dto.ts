@@ -28,6 +28,14 @@ export interface LoginRequest {
   password: string;
 }
 
+// Sign up / sign in with a Google account. `idToken` is the JWT credential
+// from Google Identity Services (web) or expo-auth-session (mobile); the API
+// verifies it with Google and finds-or-creates the matching user. A verified
+// Google email that already has a password account logs into that account.
+export interface GoogleAuthRequest {
+  idToken: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;
@@ -200,6 +208,28 @@ export interface SearchEatNowRequest {
   cuisine?: string;
 }
 
+// A recommendation's visual — an externally-sourced, appetising photo that
+// stands in for the dish so the customer can SEE what they're choosing, not
+// just read it. Always a generic representation of that kind of food, never
+// a verified photo of a specific restaurant's actual plate (isRepresentative
+// is therefore always true for now) — see the food-image module. `null`
+// everywhere it appears means "no suitable image was found" and the UI shows
+// a branded placeholder rather than anything misleading.
+export interface FoodImageView {
+  /** Provider CDN URL, hotlinked per the provider's API terms — never re-hosted. */
+  url: string;
+  /** Smaller variant for skeleton-swap / low-bandwidth; falls back to `url`. */
+  thumbnailUrl: string;
+  provider: 'pexels' | 'unsplash';
+  photographer: string;
+  /** Photographer's profile/page URL for attribution, or null if the provider gave none. */
+  photographerUrl: string | null;
+  /** The photo's page on the provider (required visible link for Pexels/Unsplash). */
+  sourceUrl: string;
+  /** Always true for now: a generic representation, not a verified photo of a specific business's dish. */
+  isRepresentative: boolean;
+}
+
 export interface FoodIdeaView {
   id: string;
   title: string;
@@ -207,6 +237,8 @@ export interface FoodIdeaView {
   cuisine: string;
   budgetTier: 'low' | 'medium' | 'high';
   tags: string[];
+  /** Representative food photo, or null when none was found (UI shows a placeholder). */
+  image?: FoodImageView | null;
   // Illustrative estimates only — not real location, live pricing, or a real
   // delivery ETA (no location capability or retailer integration exists yet).
   distanceMiles: number;
@@ -235,12 +267,25 @@ export interface AvoidedIngredientItem {
   note: string | null;
 }
 
-export type PlanScope = 'today' | '3day' | 'week' | 'custom';
+// 'tomorrow' = a single day starting tomorrow (the "just plan the next day"
+// path); 'today' is kept for back-compat but the UI now leads with
+// tomorrow/week and tucks the rest behind "more options".
+export type PlanScope = 'today' | 'tomorrow' | '3day' | 'week' | 'custom';
 
 export interface GeneratePlanRequest {
   scope: PlanScope;
   customDays?: number;
   budgetPence?: number;
+}
+
+export interface GenerateShoppingListRequest {
+  /**
+   * When true and a list already exists for the plan, rebuild it from the
+   * plan's current meals — auto-derived items are replaced, manually-added
+   * items (addedManually) are kept. When false/omitted the existing list is
+   * returned unchanged (the original idempotent behaviour).
+   */
+  regenerate?: boolean;
 }
 
 export type MealChoice = 'cook' | 'eat_out';
@@ -269,6 +314,9 @@ export interface MealPlanView {
   endDate: string;
   budgetPence: number | null;
   status: string;
+  createdAt: string;
+  /** Id of this plan's shopping list once one has been generated, else null. */
+  shoppingListId: string | null;
   items: MealPlanItemView[];
 }
 
@@ -284,6 +332,8 @@ export interface ShoppingListItemView {
 export interface ShoppingListView {
   id: string;
   status: string;
+  /** The plan this list was built from — lets the list screen offer "rebuild from plan". Null for a standalone list. */
+  mealPlanId: string | null;
   items: ShoppingListItemView[];
 }
 
@@ -364,6 +414,12 @@ export interface DecisionOptionView {
   recipe?: RecipeView;
   /** Present when type === 'get' — seeds LocalFoodSearch's query when the user picks "Get it". */
   foodIdea?: FoodIdeaView;
+  /**
+   * Representative photo of this option's dish, or null when none was found.
+   * Resolved server-side (keys stay on the API) and best-effort — a decision
+   * is never delayed or dropped because an image lookup failed.
+   */
+  image?: FoodImageView | null;
 }
 
 export interface DecideResponse {

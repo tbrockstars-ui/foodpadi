@@ -6,6 +6,7 @@ import type {
   UserSummary,
 } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../lib/serverApi';
+import { BackLink } from '../../components/BackLink';
 import shellStyles from '../app-shell.module.css';
 import styles from './profile.module.css';
 import { GoalsSection } from './GoalsSection';
@@ -28,17 +29,18 @@ export default async function ProfilePage() {
 
   return (
     <main className={shellStyles.container}>
-      <Link href="/" className={shellStyles.backLink}>
-        ‹ Home
-      </Link>
+      <BackLink href="/" label="Home" />
 
       <h1 className={styles.title}>Profile</h1>
       <p className={styles.email}>{me.email}</p>
 
-      <h2 className={styles.sectionHeading}>Recipes</h2>
-      <div className={styles.section}>
+      <h2 className={styles.sectionHeading}>Recipes &amp; plans</h2>
+      <div className={styles.section} style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>
         <Link href="/cook-today/saved" className={styles.secondaryButton} style={{ textDecoration: 'none' }}>
           View saved recipes
+        </Link>
+        <Link href="/plan/saved" className={styles.secondaryButton} style={{ textDecoration: 'none' }}>
+          View saved plans
         </Link>
       </div>
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AISLE_ORDER, categorizeIngredient, ShoppingListView } from '@foodpadi/shared';
 import { api } from '../api/client';
+import { BackLink } from '../components/BackLink';
+import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
@@ -15,11 +17,36 @@ export function ShoppingListScreen({ route, navigation }: Props) {
   const { listId } = route.params;
   const [list, setList] = useState<ShoppingListView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [rebuilding, setRebuilding] = useState(false);
   const [newItem, setNewItem] = useState('');
 
   const load = async () => {
     setList(await api.getShoppingList(listId));
     setLoading(false);
+  };
+
+  const rebuildFromPlan = () => {
+    if (!list?.mealPlanId) return;
+    Alert.alert(
+      'Rebuild from plan?',
+      'This replaces the auto-added items with a fresh list from your current plan. Items you added by hand are kept.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Rebuild',
+          style: 'destructive',
+          onPress: async () => {
+            setRebuilding(true);
+            try {
+              const rebuilt = await api.generateShoppingList(list.mealPlanId as string, true);
+              setList(rebuilt);
+            } finally {
+              setRebuilding(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   useEffect(() => {
@@ -58,13 +85,21 @@ export function ShoppingListScreen({ route, navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.navigate('Home')} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.navigate('Home')} />
       <Text style={styles.title}>Shopping list</Text>
       <Text style={styles.subtitle}>
         {remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}
       </Text>
+
+      {list.mealPlanId ? (
+        <Button
+          label={rebuilding ? 'Rebuilding…' : 'Rebuild from plan'}
+          variant="secondary"
+          onPress={rebuildFromPlan}
+          loading={rebuilding}
+          style={{ marginBottom: spacing.lg }}
+        />
+      ) : null}
 
       {list.items.length === 0 ? (
         <EmptyState title="Nothing here yet" body="Add an item below to get started." />
@@ -120,8 +155,6 @@ export function ShoppingListScreen({ route, navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   card: { marginBottom: spacing.lg },

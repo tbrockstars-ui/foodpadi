@@ -34,6 +34,50 @@
   --radius-lg: 16px;
   --radius-xl: 24px;
   --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 10px rgba(20, 21, 15, 0.05);
+  --shadow-md: 0 8px 24px rgba(20, 21, 15, 0.12);
+  --shadow-lg: 0 10px 24px rgba(20, 21, 15, 0.14);
+  --shadow-badge: 0 2px 8px rgba(20, 21, 15, 0.2);
+  --shadow-fab: 0 4px 16px rgba(20, 21, 15, 0.22);
+
+  color-scheme: light;
+}
+
+/* Dark theme — opt in via data-theme="dark" on <html>, set by the settings
+   menu (persisted to localStorage) and applied before first paint by the
+   inline script in layout.tsx so there's no flash. Only the colour tokens
+   flip; every component already reads them, so nothing else needs to change.
+   The green is lightened so it keeps enough contrast on a dark surface. */
+:root[data-theme='dark'] {
+  --background: #14171a;
+  --surface: #1c2025;
+  --surface-sunken: #23282e;
+  --text: #f2f1ec;
+  --text-muted: #a7aea9;
+  --text-faint: #79807b;
+  --primary: #5bbd8f;
+  --primary-dark: #47a97b;
+  --primary-soft: #1e3a2d;
+  --primary-text: #0c1f17;
+  --secondary: #e0a24a;
+  --secondary-soft: #3a2c14;
+  --success: #5fae5f;
+  --success-soft: #1f331f;
+  --warning: #d9a441;
+  --warning-soft: #3a2f16;
+  --border: #333a41;
+  --border-strong: #47505a;
+  --danger: #e2685f;
+  --danger-soft: #3a1f1d;
+
+  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.6);
+  --shadow-badge: 0 2px 8px rgba(0, 0, 0, 0.6);
+  --shadow-fab: 0 4px 16px rgba(0, 0, 0, 0.55);
+
+  color-scheme: dark;
 }
 
 * {
@@ -42,6 +86,37 @@
 
 html {
   scroll-behavior: smooth;
+}
+
+/* A visible, branded scrollbar for any page whose content runs longer than
+   the viewport (saved recipes, plans, shopping lists, ...) — the OS default
+   is easy to miss (thin on Windows, an auto-hiding overlay on macOS), so a
+   long list can read as "nothing more below" when there's really more to
+   scroll to. Firefox via scrollbar-width/color, WebKit/Blink via the
+   pseudo-elements below — same treatment already used for FoodCarousel's
+   horizontal track. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--background);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
 }
 
 body {

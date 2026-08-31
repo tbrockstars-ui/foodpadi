@@ -2,6 +2,7 @@ import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { GoogleAuthDto } from './dto/google-auth.dto';
 import { RefreshDto } from './dto/refresh.dto';
 import { RequestPasswordResetDto } from './dto/request-password-reset.dto';
 import { ConfirmPasswordResetDto } from './dto/confirm-password-reset.dto';
@@ -19,6 +20,13 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
+  }
+
+  // Sign up / sign in with Google. Same AuthResponse shape as register/login.
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  google(@Body() dto: GoogleAuthDto) {
+    return this.authService.loginWithGoogle(dto.idToken);
   }
 
   @Post('refresh')

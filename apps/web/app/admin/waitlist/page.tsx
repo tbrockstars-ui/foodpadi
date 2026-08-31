@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { adminServerFetch, requireAdminSession } from '../../../lib/adminApi';
 import { WaitlistTable } from './WaitlistTable';
 import type { AdminWaitlistListResponse } from './types';
@@ -13,12 +12,7 @@ export default async function AdminWaitlistPage() {
 
   return (
     <main className={listStyles.pageMain}>
-      <div className={styles.dashboardHeader}>
-        <h1 className={styles.heading}>Waitlist</h1>
-        <Link href="/admin" className={styles.linkButton}>
-          ‹ Admin home
-        </Link>
-      </div>
+      <h1 className={styles.heading}>Waitlist</h1>
       <WaitlistTable initial={initial} />
     </main>
   );

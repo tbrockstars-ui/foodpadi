@@ -21,6 +21,12 @@ export interface PlanGenerationInput {
   budgetPence?: number;
   favouriteCuisines?: string[];
   avoidedIngredients?: string[];
+  /**
+   * Free-text steer for a single-day replacement — e.g. "something with fish",
+   * "a quick pasta", "vegetarian". Used by Plan Ahead's per-day "replace with
+   * something specific" action; ignored for a normal multi-day plan.
+   */
+  focus?: string;
 }
 
 export interface RawScannedItem {
@@ -368,20 +374,16 @@ export class ClaudeService {
     });
 
     const matched = scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
-    const results = matched.slice(0, count).map((s) => s.recipe);
 
-    // Not enough (or any) keyword matches — top up from the rest so a
-    // request that matches nothing still gets `count` recipes, same as
-    // before, rather than an empty/short list.
-    if (results.length < count) {
-      const usedTitles = new Set(results.map((r) => r.title));
-      for (const recipe of CURATED_RECIPES) {
-        if (results.length >= count) break;
-        if (!usedTitles.has(recipe.title)) results.push(recipe);
-      }
-    }
-
-    return results;
+    // Deliberately NOT topped up to `count` when matches are thin or absent
+    // — a real hint (e.g. "spicy pizza") with zero curated recipes about
+    // pizza should return nothing here rather than pad with unrelated
+    // filler (this dataset is a dozen fixed dev recipes and was backfilling
+    // with completely unrelated dishes whenever nothing matched). DecideService
+    // already handles a short/empty cook-option list by leaning on Eat Now's
+    // "get it" results instead, so an honest empty result is the safer
+    // failure mode than a confidently wrong one.
+    return matched.slice(0, count).map((s) => s.recipe);
   }
 
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {
@@ -402,11 +404,17 @@ export class ClaudeService {
 
   async generatePlanMeals(input: PlanGenerationInput): Promise<RawRecipeCandidate[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-      return this.curatedFallback(input.days);
+      // A focused single-day replace ("something with fish") keyword-matches
+      // the curated set the same way Cook Today's hint does; a plain plan
+      // request has nothing to match on and takes the round-robin path.
+      return this.curatedFallback(input.days, input.focus);
     }
 
     const userMessage = [
       `Plan dinner for ${input.days} day${input.days === 1 ? '' : 's'}.`,
+      input.focus?.trim()
+        ? `For ${input.days === 1 ? 'this day' : 'these days'} the user specifically wants: "${input.focus.trim()}". Honour that request as closely as you can while still following every rule above.`
+        : null,
       input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,
       input.avoidedIngredients?.length ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.` : null,
       input.budgetPence ? `Weekly food budget is roughly £${(input.budgetPence / 100).toFixed(2)}.` : null,

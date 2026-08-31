@@ -1,4 +1,10 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  ServiceUnavailableException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
@@ -11,8 +17,29 @@ import { LoginDto } from './dto/login.dto';
 const BCRYPT_ROUNDS = 12;
 const PASSWORD_RESET_TTL_MS = 60 * 60 * 1000; // 1 hour
 
+// Google issues a distinct OAuth client id per platform (Web / Android /
+// iOS), and the `aud` claim of an ID token is whichever one it was minted
+// for — so the API accepts a comma-separated allow-list rather than a single
+// value.
+function allowedGoogleAudiences(): string[] {
+  return (process.env.GOOGLE_OAUTH_CLIENT_IDS ?? process.env.GOOGLE_OAUTH_CLIENT_ID ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+interface GoogleTokenInfo {
+  aud?: string;
+  email?: string;
+  email_verified?: string; // tokeninfo returns "true" / "false" as strings
+  name?: string;
+  exp?: string;
+}
+
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
@@ -66,6 +93,75 @@ export class AuthService {
     }
 
     return this.issueTokens(user.id, user.email, user.profile);
+  }
+
+  /**
+   * Sign up / sign in with a Google account. The ID token is verified with
+   * Google, then: an existing account with that (verified) email is signed
+   * into as-is — a verified Google email is treated as proof of ownership —
+   * and a brand-new email creates a passwordless `authProvider: "google"`
+   * account. Never creates or overwrites a password.
+   */
+  async loginWithGoogle(idToken: string) {
+    const { email, name } = await this.verifyGoogleToken(idToken);
+
+    const existing = await this.prisma.user.findUnique({
+      where: { email },
+      include: { profile: true },
+    });
+
+    if (existing) {
+      if (existing.deletedAt) {
+        throw new UnauthorizedException('This account has been suspended.');
+      }
+      return this.issueTokens(existing.id, existing.email, existing.profile);
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        authProvider: 'google',
+        profile: { create: { displayName: name ?? null } },
+      },
+      include: { profile: true },
+    });
+
+    return this.issueTokens(user.id, user.email, user.profile);
+  }
+
+  private async verifyGoogleToken(idToken: string): Promise<{ email: string; name?: string }> {
+    const audiences = allowedGoogleAudiences();
+    if (audiences.length === 0) {
+      throw new ServiceUnavailableException('Google sign-in is not configured on this server.');
+    }
+
+    // tokeninfo is Google's own verification endpoint — fine for MVP volume.
+    // A higher-traffic version would verify the JWT signature locally against
+    // Google's cached JWKS instead of a network call per sign-in.
+    let info: GoogleTokenInfo;
+    try {
+      const res = await fetch(
+        `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`,
+      );
+      if (!res.ok) {
+        throw new UnauthorizedException('Google sign-in failed. Please try again.');
+      }
+      info = (await res.json()) as GoogleTokenInfo;
+    } catch (err) {
+      if (err instanceof UnauthorizedException) throw err;
+      this.logger.warn(`Google tokeninfo lookup failed: ${(err as Error).message}`);
+      throw new ServiceUnavailableException('Could not reach Google to verify your sign-in.');
+    }
+
+    if (!info.aud || !audiences.includes(info.aud)) {
+      this.logger.warn(`Google ID token has unexpected aud "${info.aud ?? ''}"`);
+      throw new UnauthorizedException('Google sign-in failed.');
+    }
+    if (!info.email || info.email_verified !== 'true') {
+      throw new UnauthorizedException('Your Google email is not verified — sign in with a password instead.');
+    }
+
+    return { email: info.email.trim().toLowerCase(), name: info.name };
   }
 
   async refresh(rawRefreshToken: string) {

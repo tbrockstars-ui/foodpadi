@@ -5,25 +5,28 @@ import { useRouter } from 'next/navigation';
 import type { PlanScope } from '@foodpadi/shared';
 import styles from './plan.module.css';
 
+// Two primary choices — plan just the next day, or the whole week. Anything
+// in between lives behind "More options" as a custom day count (1-14).
 const SCOPE_OPTIONS: { label: string; value: PlanScope }[] = [
-  { label: 'Today', value: 'today' },
-  { label: 'Next 3 days', value: '3day' },
+  { label: 'Just tomorrow', value: 'tomorrow' },
   { label: 'This week', value: 'week' },
-  { label: 'Custom', value: 'custom' },
 ];
 
 /** Web counterpart to apps/mobile/src/screens/PlanAheadScreen.tsx's scope step. */
 export function PlanScopeForm() {
   const router = useRouter();
-  const [scope, setScope] = useState<PlanScope>('3day');
+  const [scope, setScope] = useState<PlanScope>('week');
+  const [showCustom, setShowCustom] = useState(false);
   const [customDays, setCustomDays] = useState('3');
   const [budget, setBudget] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const effectiveScope: PlanScope = showCustom ? 'custom' : scope;
+
   const createPlan = async () => {
     setError(null);
-    if (scope === 'custom') {
+    if (effectiveScope === 'custom') {
       const parsed = Number(customDays);
       if (!Number.isInteger(parsed) || parsed < 1 || parsed > 14) {
         setError('Enter a number of days between 1 and 14.');
@@ -37,8 +40,8 @@ export function PlanScopeForm() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          scope,
-          customDays: scope === 'custom' ? Number(customDays) : undefined,
+          scope: effectiveScope,
+          customDays: effectiveScope === 'custom' ? Number(customDays) : undefined,
           budgetPence,
         }),
       });
@@ -47,6 +50,8 @@ export function PlanScopeForm() {
         const message = Array.isArray(data.message) ? data.message.join('. ') : data.message;
         throw new Error(message ?? 'Something went wrong creating your plan.');
       }
+      // Land on the plan (clears any ?new=1) rather than staying on the form.
+      router.push('/plan');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong creating your plan.');
@@ -58,24 +63,34 @@ export function PlanScopeForm() {
   return (
     <div>
       <h1 className={styles.title}>How far ahead?</h1>
-      <p className={styles.subtitle}>Pick what fits — you don&apos;t have to plan a whole week.</p>
+      <p className={styles.subtitle}>Plan just the next day, or the whole week.</p>
 
       <div className={styles.chipWrap}>
         {SCOPE_OPTIONS.map((option) => (
           <button
             key={option.value}
             type="button"
-            className={`${styles.chip} ${scope === option.value ? styles.chipSelected : ''}`}
-            onClick={() => setScope(option.value)}
+            className={`${styles.chip} ${!showCustom && scope === option.value ? styles.chipSelected : ''}`}
+            onClick={() => {
+              setShowCustom(false);
+              setScope(option.value);
+            }}
           >
             {option.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={`${styles.chip} ${showCustom ? styles.chipSelected : ''}`}
+          onClick={() => setShowCustom((v) => !v)}
+        >
+          More options
+        </button>
       </div>
 
-      {scope === 'custom' ? (
+      {showCustom ? (
         <div className={styles.fieldRow}>
-          <label className={styles.fieldLabel}>Days (1-14)</label>
+          <label className={styles.fieldLabel}>Number of days (1-14)</label>
           <input
             className={styles.smallInput}
             type="number"

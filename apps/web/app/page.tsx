@@ -12,6 +12,7 @@ import { ChipRow } from '../components/motion/ChipRow';
 import { FoodCarousel } from '../components/motion/FoodCarousel';
 import { WeekStrip } from '../components/motion/WeekStrip';
 import { IntentCard } from '../components/motion/IntentCard';
+import { Logo } from '../components/Logo';
 import { IMAGE_ASSETS } from '../lib/imageAssets';
 import styles from './page.module.css';
 import homeStyles from './home.module.css';
@@ -38,24 +39,22 @@ interface HubAction {
   key: string;
   label: string;
   subtitle: string;
+  icon?: string;
   href?: string;
   live: boolean;
   disabledTag?: string;
 }
 
-// The three "Understand Intent" branches from the FoodPadi decision-loop
-// architecture (docs — the user's 2026-08-27 core-flow brief): FoodPadi
-// should be one intent-first front door, not four equally-weighted modes
-// the user has to pick between blind. Right now -> Eat Now, Cooking -> Cook
-// Today, Plan ahead -> Plan Ahead.
-//
-// The "Understand Context" / "FoodPadi Decides (3 options)" layer above
-// these now exists too — see <DecideFlow /> below, which calls POST /decide
-// (blending real Cook Today + Eat Now results into explained cook-it/get-it
-// options). These three cards remain as a direct-to-mode alternative for
-// anyone who'd rather skip straight to a specific tool — each rendered as
-// its own visual "journey" (IntentCard: real photo + accent colour + badge)
-// rather than three identical flat cards.
+// "Understand Intent" branches from the FoodPadi decision-loop architecture
+// (docs — the user's 2026-08-27 core-flow brief): FoodPadi should be one
+// intent-first front door, not four equally-weighted modes the user picks
+// between blind. The "Understand Context" / "FoodPadi Decides (3 options)"
+// layer is <DecideFlow /> below (POST /decide, blending real Cook Today + Eat
+// Now results into explained cook-it/get-it options) and now owns the "right
+// now / I'm hungry" intent outright — so only Cooking (-> Cook Today) and
+// Plan ahead (-> Plan Ahead) remain as direct-to-mode cards, for anyone who'd
+// rather skip straight to a specific tool. Each is its own visual "journey"
+// (IntentCard: real photo + accent colour + badge) rather than a flat card.
 
 // Scan is mobile-only by design (docs/TECHNICAL_ARCHITECTURE.md §2.7) — it
 // needs a camera, so it's never coming to web. "App only" says so directly
@@ -63,12 +62,13 @@ interface HubAction {
 // It's not one of the three intent branches, so it's a demoted secondary
 // link below the primary row rather than a fourth equal-weight card.
 const SECONDARY_ACTIONS: HubAction[] = [
-  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
+  { key: 'scan', icon: '/scan-food.png', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
 function HomeHub() {
   return (
     <main className={homeStyles.container}>
+      <Logo href="/" size={36} className={homeStyles.homeLogo} />
       <div className={homeStyles.header}>
         <h1 className={homeStyles.heading}>What should I eat? 🍽️</h1>
         <div className={homeStyles.headerLinks}>
@@ -90,14 +90,11 @@ function HomeHub() {
       <DecideFlow />
 
       <div className={homeStyles.primaryGrid}>
-        <IntentCard
-          href="/eat-now"
-          badge="🍽️"
-          label="Right now"
-          subtitle="I'm hungry — find something to eat"
-          image={IMAGE_ASSETS.rightNow}
-          accent="right-now"
-        />
+        {/* "Right now / I'm hungry" is not a card here — the DecideFlow above
+            already covers it (and routes to Eat Now's "find it nearby" when
+            the user picks a "Get it" option). Home only needs the two intents
+            DecideFlow doesn't fully own: cooking from what you have, and
+            multi-day planning. */}
         <IntentCard
           href="/cook-today"
           badge="🥕"
@@ -119,6 +116,14 @@ function HomeHub() {
       <div className={homeStyles.secondaryRow}>
         {SECONDARY_ACTIONS.map((action) => (
           <span key={action.key} className={homeStyles.secondaryLink}>
+            {action.icon ? (
+              action.icon.startsWith('/') ? (
+                // eslint-disable-next-line @next/next/no-img-element -- tiny inline icon, no layout shift
+                <img src={action.icon} alt="" className={homeStyles.secondaryIcon} />
+              ) : (
+                <span aria-hidden="true">{action.icon} </span>
+              )
+            ) : null}
             {action.label} · {action.subtitle}
             {action.disabledTag ? <span className={homeStyles.soonTag}>{action.disabledTag}</span> : null}
           </span>

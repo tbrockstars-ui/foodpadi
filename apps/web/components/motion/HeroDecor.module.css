@@ -6,135 +6,111 @@
   pointer-events: none;
 }
 
+/* Shared: each piece is an absolutely-positioned box that next/image fills.
+   width + aspect-ratio (per variant) means the box has a definite size
+   before the image loads, so there's no layout shift. A hair of extra
+   brightness/saturation lifts the cut-outs off the deep-green banner
+   without looking processed. */
 .piece {
   position: absolute;
-  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.28));
-  opacity: 1;
+  filter: drop-shadow(0 22px 44px rgba(0, 0, 0, 0.34)) brightness(1.04) saturate(1.06);
 }
 
-/* All six cutouts sit along the banner's base, in two clusters (bottom-left,
-   bottom-right) instead of the top corners — keeps the nav/logo area clean. */
-
-/* Cilantro leaves + chilies + tomato on a wooden board ("the plate") — now
-   the only piece in the bottom-left cluster (the tomato-quarters piece that
-   used to sit outside it was removed), sized up to fill that corner on its
-   own. Turned 90° clockwise so its flat edge runs along the banner's base
-   instead of standing on end; the bottom/left offsets are compensated for
-   the width/height swap the rotation causes so it still sits flush with
-   the bottom edge and keeps the same visual centre as before the resize. */
-.basil {
-  bottom: -53px;
-  left: 118px;
-  width: 224px;
-  height: 300px;
-}
-
-/* Whole + halved red onions with green stems — pulled in to overlap the
-   tomato cluster (bottom-right) instead of sitting beside it as its own
-   block, so the two mix together. */
-.onion {
-  bottom: -6px;
-  right: 60px;
-  width: 200px;
-  height: 145px;
-}
-
-/* Whole tomato + halves — bottom-right, outer piece (most prominent).
-   Dropped further down so it sits right at the banner's bottom edge
-   instead of floating mid-cluster. */
-.tomato {
-  bottom: -110px;
-  right: -24px;
-  width: 210px;
-  height: 232px;
-}
-
-/* Burger — doubled in size and pushed over to the right corner as a big
-   backdrop the tomato/onion/drink sit in front of (it's first in PIECES'
-   DOM order among this group, so it paints behind them). */
-.burger {
-  bottom: -20px;
-  right: 40px;
-  width: 380px;
-  height: 308px;
-}
-
-/* OJ glass + orange — doubled in size, the tallest piece in the bottom-right
-   cluster, rising above the others for a bit of natural depth; overlaps the
-   onion/burger. Anchored on its right edge, so the extra size grows
-   leftward/upward rather than shifting where it meets the corner. */
-.drink {
-  bottom: -10px;
-  right: 200px;
-  width: 300px;
-  height: 356px;
-}
-
-@media (max-width: 980px) {
-  .basil {
-    left: 104px;
-    width: 182px;
-    height: 244px;
-    bottom: -46px;
-  }
-
-  .onion {
-    right: 40px;
-    bottom: -4px;
-    width: 160px;
-    height: 116px;
-  }
-
-  .burger {
-    right: 20px;
-    bottom: -12px;
-    width: 280px;
-    height: 228px;
-  }
-
-  .drink {
-    right: 100px;
-    bottom: -6px;
-    width: 220px;
-    height: 260px;
-  }
-}
-
-@media (max-width: 720px) {
-  /* Below 720px, keep just one piece per corner to avoid crowding a narrow
-     banner base — onion/burger/drink drop off the bottom-right cluster
-     (tomato alone represents it), and basil gets its own compact sizing
-     as the sole bottom-left piece. */
-  .onion,
-  .burger,
-  .drink {
-    display: none;
-  }
-
-  .basil {
-    left: -10px;
-    width: 100px;
-    height: 130px;
-    bottom: -33px;
-  }
-
-  .tomato {
-    width: 140px;
-    height: 156px;
-    bottom: -18px;
-    right: -16px;
-  }
-}
-
-/* Small green leaf confetti, spread across the banner's base strip. */
-.leaf {
+/* Soft warm halo behind the two hero anchors so they separate cleanly from
+   the dark gradient instead of sinking into it. */
+.saladToss::before,
+.juice::before {
+  content: '';
   position: absolute;
-  color: #bfe6a8;
+  inset: -20% -16%;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 46%, rgba(255, 249, 235, 0.18), rgba(255, 249, 235, 0) 68%);
   pointer-events: none;
 }
 
-@media (max-width: 720px) {
-  .leaf {
+/* --- Anchor: the salad toss. Largest mass, lower-left; its colourful
+   flying ingredients read beside/above the logo badge while the bowl base
+   is cropped by the banner edge. --- */
+.saladToss {
+  left: clamp(-72px, -5vw, -34px);
+  bottom: -34px;
+  width: clamp(200px, 25vw, 352px);
+  aspect-ratio: 820 / 1093;
+}
+
+/* --- Warm accent: the juice. Lower-right, smaller, a vivid orange note
+   against the deep-green banner; sits behind the glass idea card. --- */
+.juice {
+  right: clamp(-10px, 2vw, 32px);
+  bottom: -14px;
+  width: clamp(126px, 15vw, 200px);
+  aspect-ratio: 560 / 663;
+}
+
+/* --- Supporting option: grilled-chicken bowl, peeking in from the left
+   edge around the vertical middle — a second "thing you could eat". --- */
+.bowlChicken {
+  left: clamp(-34px, -2vw, -8px);
+  top: 38%;
+  width: clamp(84px, 10vw, 138px);
+  aspect-ratio: 400 / 403;
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.32)) brightness(1.05) saturate(1.08);
+}
+
+/* --- Micro basil accents in the lower band --- */
+.herb {
+  position: absolute;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.2)) brightness(1.05) saturate(1.08);
+}
+
+@media (max-width: 980px) {
+  .saladToss {
+    width: clamp(156px, 32vw, 236px);
+    bottom: -34px;
+    left: -30px;
+  }
+
+  .juice {
+    width: clamp(108px, 21vw, 154px);
+    bottom: -24px;
+    right: -6px;
+  }
+
+  /* Third piece drops out below the desktop grid — two pieces are enough to
+     frame a stacked hero without crowding it. */
+  .bowlChicken {
     display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Compact ambient framing only: a small salad bottom-left, a small juice
+     bottom-right, both pulled to the edges. No herb confetti. Everything is
+     clipped by .layer's overflow:hidden, so nothing can cause horizontal
+     scroll. */
+  .saladToss {
+    width: 132px;
+    bottom: -26px;
+    left: -34px;
+  }
+
+  .juice {
+    width: 92px;
+    bottom: -18px;
+    right: -16px;
+  }
+
+  .herb {
+    display: none;
+  }
+}
+
+/* Belt-and-braces for prefers-reduced-motion: framer-motion already collapses
+   the JS animation to a static frame, this just guarantees no residual
+   transition anywhere in the layer. */
+@media (prefers-reduced-motion: reduce) {
+  .layer * {
+    animation: none !important;
+    transition: none !important;
   }
 }

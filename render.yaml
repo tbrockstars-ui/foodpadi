@@ -48,6 +48,17 @@ services:
         sync: false
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-5
+      # --- Food photos on recommendation cards (food-image module). Optional:
+      #     with neither key set, cards simply render without a photo. Pexels
+      #     is preferred, Unsplash is the fallback. ---
+      - key: PEXELS_API_KEY
+        sync: false
+      - key: UNSPLASH_ACCESS_KEY
+        sync: false
+      # --- "Continue with Google" sign-in. Comma-separated accepted OAuth
+      #     client IDs (Web + Android + iOS). Blank -> /auth/google is 503. ---
+      - key: GOOGLE_OAUTH_CLIENT_IDS
+        sync: false
       # "true" = Scan uses a local mock, no AI spend. Flip to "false" for real
       # photo analysis once you're happy with the cost.
       - key: SCAN_DEMO_MODE

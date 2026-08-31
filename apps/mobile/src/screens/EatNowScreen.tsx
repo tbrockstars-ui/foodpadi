@@ -6,8 +6,10 @@ import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { FoodImage } from '../components/FoodImage';
 import { LoadingState } from '../components/LoadingState';
 import { LocalFoodSearch } from '../components/LocalFoodSearch';
 import { Tag } from '../components/Tag';
@@ -128,9 +130,7 @@ export function EatNowScreen({ navigation, route }: Props) {
   if (step === 'results') {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ {params?.whyLabel ? 'Home' : 'Try another search'}</Text>
-        </TouchableOpacity>
+        <BackLink label={params?.whyLabel ? 'Home' : 'Try another search'} onPress={() => navigation.goBack()} />
         <Text style={styles.title}>A few ideas</Text>
         {params?.whyLabel ? (
           <Text style={styles.whyText}>Because you're after: {params.whyLabel}</Text>
@@ -151,6 +151,7 @@ export function EatNowScreen({ navigation, route }: Props) {
         ) : (
           results.map((idea) => (
             <Card key={idea.id} style={styles.resultCard}>
+              <FoodImage image={idea.image} alt={idea.title} style={styles.resultImage} />
               <Text style={styles.resultTitle}>{idea.title}</Text>
               <Text style={styles.resultBody}>{idea.description}</Text>
               <Text style={styles.estimateText}>
@@ -170,9 +171,7 @@ export function EatNowScreen({ navigation, route }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>What are you after?</Text>
       <Text style={styles.subtitle}>Tell us what you fancy — a dish, a cuisine, anything.</Text>
 
@@ -199,8 +198,6 @@ export function EatNowScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   whyText: { ...typography.body, color: colors.primary, marginBottom: spacing.sm, fontWeight: '600' },
@@ -219,6 +216,7 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
   resultCard: { marginBottom: spacing.md },
+  resultImage: { marginBottom: spacing.md },
   resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
   resultBody: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
   estimateText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },

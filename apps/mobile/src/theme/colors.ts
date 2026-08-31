@@ -1,4 +1,6 @@
-export const colors = {
+export type ThemeScheme = 'default' | 'dark';
+
+export const lightColors = {
   background: '#FBFAF7',
   surface: '#FFFFFF',
   surfaceSunken: '#F4F2EC',
@@ -25,6 +27,44 @@ export const colors = {
   danger: '#B3261E',
   dangerSoft: '#FBEBEA',
 };
+
+export type ThemeColors = typeof lightColors;
+
+// Mirrors apps/web's :root[data-theme="dark"] token override — same intent,
+// same hue shifts (green lightened for contrast on a dark surface).
+export const darkColors: ThemeColors = {
+  background: '#14171A',
+  surface: '#1C2025',
+  surfaceSunken: '#23282E',
+  text: '#F2F1EC',
+  textMuted: '#A7AEA9',
+  textFaint: '#79807B',
+  primary: '#5BBD8F',
+  primaryDark: '#47A97B',
+  primarySoft: '#1E3A2D',
+  primaryText: '#0C1F17',
+  accent: '#E0A24A',
+  accentSoft: '#3A2C14',
+  secondary: '#E0A24A',
+  secondarySoft: '#3A2C14',
+  success: '#5FAE5F',
+  successSoft: '#1F331F',
+  warning: '#D9A441',
+  warningSoft: '#3A2F16',
+  border: '#333A41',
+  borderStrong: '#47505A',
+  danger: '#E2685F',
+  dangerSoft: '#3A1F1D',
+};
+
+export function colorsFor(scheme: ThemeScheme): ThemeColors {
+  return scheme === 'dark' ? darkColors : lightColors;
+}
+
+// Back-compat: the ~30 screens/components that `import { colors }` statically
+// keep the light palette until they're migrated to useTheme(). New/updated
+// code should read colours from useTheme() so it responds to the setting.
+export const colors = lightColors;
 
 // A small, consistent spacing scale — every screen should reach for these
 // rather than one-off pixel values, so rhythm stays consistent as more

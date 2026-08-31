@@ -1,0 +1,276 @@
+.pageMain {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 64px 24px;
+}
+
+.searchRow {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.searchInput {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.searchButton {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.addButton {
+  display: inline-block;
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table th {
+  text-align: left;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  vertical-align: top;
+}
+
+.table tr:last-child td {
+  border-bottom: none;
+}
+
+.inactiveRow {
+  opacity: 0.55;
+}
+
+.emptyRow {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 32px 0;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.pageButton {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.pageButton:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.tagPill {
+  display: inline-block;
+  background: var(--surface-sunken, #f4f2ec);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin: 2px 4px 2px 0;
+}
+
+.statusBadge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+
+.statusActive {
+  background: var(--success-soft, #eaf3ea);
+  color: var(--success, #3b7a3b);
+}
+
+.statusInactive {
+  background: var(--surface-sunken, #f4f2ec);
+  color: var(--text-muted);
+}
+
+.rowActions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.rowActionLink,
+.rowActionButton {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--primary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  text-align: left;
+}
+
+.rowActionButtonDanger {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+/* Create/edit form */
+
+.form {
+  max-width: 640px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+}
+
+.field {
+  margin-bottom: 18px;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.input,
+.textarea,
+.select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text);
+  background: var(--background);
+  box-sizing: border-box;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.hint {
+  font-size: 12px;
+  color: var(--text-faint, #9a9e94);
+  margin: 6px 0 0;
+}
+
+.formActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+.submitButton {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submitButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.cancelLink {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.confirmBox {
+  background: var(--danger-soft, #fbebea);
+  border-radius: 10px;
+  padding: 14px;
+  margin-top: 16px;
+}
+
+.confirmText {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0 0 12px;
+}

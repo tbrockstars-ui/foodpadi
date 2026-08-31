@@ -4,6 +4,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlanAheadService } from './plan-ahead.service';
 import { GeneratePlanDto } from './dto/generate-plan.dto';
 import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
+import { RegeneratePlanItemDto } from './dto/regenerate-plan-item.dto';
+import { GenerateShoppingListDto } from './dto/generate-shopping-list.dto';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 
 // Account-first by design (docs/FOODPADI_ONBOARDING_SPEC.md) — every route
@@ -18,9 +20,20 @@ export class PlanAheadController {
     return this.planAheadService.generate(dto, user.userId);
   }
 
+  // Every plan the user has generated, newest first — the "saved plans" list.
+  @Get()
+  list(@CurrentUser() user: CurrentUserPayload) {
+    return this.planAheadService.list(user.userId);
+  }
+
   @Get('current')
   getCurrent(@CurrentUser() user: CurrentUserPayload) {
     return this.planAheadService.getCurrent(user.userId);
+  }
+
+  @Delete(':planId')
+  remove(@Param('planId') planId: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.planAheadService.remove(planId, user.userId);
   }
 
   @Post(':planId/accept')
@@ -28,13 +41,24 @@ export class PlanAheadController {
     return this.planAheadService.accept(planId, user.userId);
   }
 
+  // Rebuild the whole plan (all days) — same scope/budget — for when the plan
+  // as a whole misses, not just one day.
+  @Post(':planId/regenerate')
+  regeneratePlan(@Param('planId') planId: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.planAheadService.regeneratePlan(planId, user.userId);
+  }
+
+  // Replace a single day. An optional `focus` steers that day specifically
+  // ("something with fish", "a quick pasta") when the generated meal wasn't
+  // what the user wanted.
   @Post(':planId/items/:itemId/regenerate')
   regenerateItem(
     @Param('planId') planId: string,
     @Param('itemId') itemId: string,
+    @Body() dto: RegeneratePlanItemDto,
     @CurrentUser() user: CurrentUserPayload,
   ) {
-    return this.planAheadService.regenerateItem(planId, itemId, user.userId);
+    return this.planAheadService.regenerateItem(planId, itemId, user.userId, dto);
   }
 
   // Sets whether a day is Cook It or Eat Out and/or the planned time for it
@@ -60,9 +84,15 @@ export class PlanAheadController {
     return this.planAheadService.removeItem(planId, itemId, user.userId);
   }
 
+  // Body { regenerate?: boolean } — regenerate:true rebuilds an existing list
+  // from the plan's current meals (keeps manually-added items).
   @Post(':planId/shopping-list')
-  generateShoppingList(@Param('planId') planId: string, @CurrentUser() user: CurrentUserPayload) {
-    return this.planAheadService.generateShoppingList(planId, user.userId);
+  generateShoppingList(
+    @Param('planId') planId: string,
+    @Body() dto: GenerateShoppingListDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.planAheadService.generateShoppingList(planId, user.userId, dto);
   }
 
   @Get('shopping-lists/:listId')

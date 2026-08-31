@@ -48,10 +48,11 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
         <Text style={styles.brand}>FoodPadi</Text>
         <Text
           style={styles.headerLink}
-          onPress={() => (isGuest ? onRequestLogin() : navigation.navigate('Profile'))}
+          onPress={() => (isGuest ? onRequestLogin() : navigation.navigate('Settings'))}
           accessibilityRole="button"
+          accessibilityLabel={isGuest ? 'Log in' : 'Settings'}
         >
-          {isGuest ? 'Log in' : 'Profile'}
+          {isGuest ? 'Log in' : '⚙  Settings'}
         </Text>
       </View>
 

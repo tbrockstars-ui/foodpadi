@@ -4,6 +4,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SavedRecipeView } from '@foodpadi/shared';
 import { api } from '../api/client';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
@@ -51,9 +52,7 @@ export function SavedRecipesScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Back</Text>
-      </TouchableOpacity>
+      <BackLink label="Back" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>Saved recipes</Text>
 
       {recipes.length === 0 ? (
@@ -112,8 +111,6 @@ export function SavedRecipesScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.lg },
   emptyText: { ...typography.body, color: colors.textMuted },
   recipeCard: { marginBottom: spacing.md },

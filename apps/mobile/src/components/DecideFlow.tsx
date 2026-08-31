@@ -7,6 +7,7 @@ import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
 import { Button } from './Button';
 import { Card } from './Card';
+import { FoodImage } from './FoodImage';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './LocalFoodSearch';
 import { colors, radius, spacing, typography } from '../theme/colors';
 
@@ -124,15 +125,16 @@ export function DecideFlow() {
   const pickChip = (text: string) => {
     if (text === description) return;
     setDescription(text);
-    setExpandedId(null);
-    // Switching selection while a result set (or error / empty state) is on
-    // screen means "decide again for this instead" — pull a fresh set for the
-    // new selection rather than leaving the previous one showing.
-    if (hasResultsShowing) {
-      decide(text);
-    } else {
-      clearResults();
-    }
+    // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
+    // any time/budget constraint typed for the previous selection shouldn't
+    // silently carry over and narrow it. Matches web's DecideFlow.
+    setTimeMinutes('');
+    setBudgetPounds('');
+    // Picking a chip clears any results already on screen and re-enables
+    // "Decide for me" rather than auto-firing a new decide() — the user
+    // asked for a chance to add constraints (time/budget) or just review
+    // the new selection before running it, not an immediate re-run.
+    clearResults();
   };
 
   const handleDescriptionChange = (value: string) => {
@@ -186,22 +188,28 @@ export function DecideFlow() {
       </View>
 
       <View style={styles.constraintsRow}>
-        <TextInput
-          style={[styles.input, styles.constraintInput]}
-          placeholder="Minutes (optional)"
-          placeholderTextColor={colors.textFaint}
-          keyboardType="number-pad"
-          value={timeMinutes}
-          onChangeText={(v) => handleConstraintChange(setTimeMinutes, v)}
-        />
-        <TextInput
-          style={[styles.input, styles.constraintInput]}
-          placeholder="Budget £ (optional)"
-          placeholderTextColor={colors.textFaint}
-          keyboardType="decimal-pad"
-          value={budgetPounds}
-          onChangeText={(v) => handleConstraintChange(setBudgetPounds, v)}
-        />
+        <View style={styles.constraintField}>
+          <TextInput
+            style={[styles.input, styles.constraintInput, timeMinutes ? styles.constraintInputHasSuffix : null]}
+            placeholder="Minutes (optional)"
+            placeholderTextColor={colors.textFaint}
+            keyboardType="number-pad"
+            value={timeMinutes}
+            onChangeText={(v) => handleConstraintChange(setTimeMinutes, v)}
+          />
+          {timeMinutes ? <Text style={styles.constraintAffixSuffix}>mins</Text> : null}
+        </View>
+        <View style={styles.constraintField}>
+          {budgetPounds ? <Text style={styles.constraintAffixPrefix}>£</Text> : null}
+          <TextInput
+            style={[styles.input, styles.constraintInput, budgetPounds ? styles.constraintInputHasPrefix : null]}
+            placeholder="Budget £ (optional)"
+            placeholderTextColor={colors.textFaint}
+            keyboardType="decimal-pad"
+            value={budgetPounds}
+            onChangeText={(v) => handleConstraintChange(setBudgetPounds, v)}
+          />
+        </View>
       </View>
 
       <Button
@@ -222,6 +230,7 @@ export function DecideFlow() {
       {stage === 'options'
         ? options.map((option) => (
             <Card key={option.id} style={styles.optionCard}>
+              <FoodImage image={option.image} alt={option.title} style={styles.optionImage} />
               <View style={styles.optionHeader}>
                 <View style={styles.optionHeaderText}>
                   <Text style={styles.optionTitle}>{option.title}</Text>
@@ -321,9 +330,25 @@ const styles = StyleSheet.create({
   promptChipText: { fontSize: 13, color: colors.text },
   promptChipTextSelected: { color: colors.primary, fontWeight: '600' },
   constraintsRow: { flexDirection: 'row', gap: spacing.sm },
+  constraintField: { flex: 1, justifyContent: 'center' },
   constraintInput: { flex: 1 },
+  constraintInputHasPrefix: { paddingLeft: 22 },
+  constraintInputHasSuffix: { paddingRight: 44 },
+  constraintAffixPrefix: {
+    position: 'absolute',
+    left: spacing.lg,
+    fontSize: 15,
+    color: colors.textMuted,
+  },
+  constraintAffixSuffix: {
+    position: 'absolute',
+    right: spacing.lg,
+    fontSize: 15,
+    color: colors.textMuted,
+  },
   decideButton: { marginTop: spacing.xs, marginBottom: spacing.lg },
   optionCard: { marginBottom: spacing.md },
+  optionImage: { marginBottom: spacing.md },
   optionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   optionHeaderText: { flex: 1 },
   optionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },

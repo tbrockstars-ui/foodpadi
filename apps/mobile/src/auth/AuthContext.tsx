@@ -8,6 +8,8 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  /** Exchange a Google ID token for a session (finds-or-creates the account). */
+  loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -49,14 +51,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(result.user);
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const result = await api.googleAuth(idToken);
+    await tokenStore.setTokens(result.accessToken, result.refreshToken);
+    setUser(result.user);
+  }, []);
+
   const logout = useCallback(async () => {
     await tokenStore.clear();
     setUser(null);
   }, []);
 
   const value = useMemo(
-    () => ({ user, isLoading, login, register, logout, refreshUser }),
-    [user, isLoading, login, register, logout, refreshUser],
+    () => ({ user, isLoading, login, register, loginWithGoogle, logout, refreshUser }),
+    [user, isLoading, login, register, loginWithGoogle, logout, refreshUser],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

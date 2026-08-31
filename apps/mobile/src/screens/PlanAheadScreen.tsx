@@ -1,26 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MealChoice, MealPlanItemView, MealPlanView, PlanScope } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
+import { getCuisineImage } from '../constants/cuisineImages';
 import { cancelMealReminder, scheduleMealReminder } from '../lib/mealReminders';
-import { colors, spacing, typography } from '../theme/colors';
+import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 type Props = NativeStackScreenProps<AppStackParamList, 'PlanAhead'>;
 
+// Two primary choices — plan just the next day, or the whole week. Anything
+// in between lives behind "More options" as a custom day count (1-14).
 const SCOPE_OPTIONS: { label: string; value: PlanScope }[] = [
-  { label: 'Today', value: 'today' },
-  { label: 'Next 3 days', value: '3day' },
+  { label: 'Just tomorrow', value: 'tomorrow' },
   { label: 'This week', value: 'week' },
-  { label: 'Custom', value: 'custom' },
 ];
 
 function formatDate(iso: string) {
@@ -38,15 +40,22 @@ function formatReminderTime(plannedTime: string): string {
 
 export function PlanAheadScreen({ navigation }: Props) {
   const [step, setStep] = useState<'scope' | 'loading' | 'plan'>('scope');
-  const [scope, setScope] = useState<PlanScope>('3day');
+  const [scope, setScope] = useState<PlanScope>('week');
+  const [showCustom, setShowCustom] = useState(false);
   const [customDays, setCustomDays] = useState('3');
   const [budget, setBudget] = useState('');
   const [plan, setPlan] = useState<MealPlanView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
   const [accepting, setAccepting] = useState(false);
+  const [regeneratingPlan, setRegeneratingPlan] = useState(false);
   const [creatingList, setCreatingList] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Per-day "replace with something specific" — which day's prompt box is
+  // open, and the drafted text for each, keyed by item id.
+  const [focusOpenId, setFocusOpenId] = useState<string | null>(null);
+  const [focusDrafts, setFocusDrafts] = useState<Record<string, string>>({});
   // Draft text for each item's time field, keyed by item id — separate from
   // the committed plannedTime so typing doesn't fire a request per keystroke.
   const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
@@ -72,9 +81,11 @@ export function PlanAheadScreen({ navigation }: Props) {
     })();
   }, []);
 
+  const effectiveScope: PlanScope = showCustom ? 'custom' : scope;
+
   const createPlan = async () => {
     setError(null);
-    if (scope === 'custom') {
+    if (effectiveScope === 'custom') {
       const parsed = Number(customDays);
       if (!Number.isInteger(parsed) || parsed < 1 || parsed > 14) {
         setError('Enter a number of days between 1 and 14.');
@@ -85,8 +96,8 @@ export function PlanAheadScreen({ navigation }: Props) {
     try {
       const budgetPence = budget.trim() ? Math.round(parseFloat(budget) * 100) : undefined;
       const result = await api.generatePlan({
-        scope,
-        customDays: scope === 'custom' ? Number(customDays) : undefined,
+        scope: effectiveScope,
+        customDays: effectiveScope === 'custom' ? Number(customDays) : undefined,
         budgetPence,
       });
       setPlan(result);
@@ -97,18 +108,50 @@ export function PlanAheadScreen({ navigation }: Props) {
     }
   };
 
-  const regenerate = async (itemId: string) => {
+  // Back to the scope picker to build a fresh plan — the current one stays
+  // saved (it's in the plans list) rather than being replaced.
+  const startNewPlan = () => {
+    setPlan(null);
+    setError(null);
+    setExpandedId(null);
+    setFocusOpenId(null);
+    setStep('scope');
+  };
+
+  const regenerate = async (itemId: string, focus?: string) => {
     if (!plan) return;
     setBusyItemId(itemId);
+    setError(null);
     try {
-      const updated = await api.regeneratePlanItem(plan.id, itemId);
+      const updated = await api.regeneratePlanItem(plan.id, itemId, focus);
       setPlan(updated);
+      setFocusOpenId(null);
       // The recipe changed but mealChoice/plannedTime didn't — re-schedule
       // so the reminder's body text reflects the new meal, not the old one.
       const item = updated.items.find((i) => i.id === itemId);
       if (item?.plannedTime) scheduleMealReminder(item);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not replace that day. Please try again.');
     } finally {
       setBusyItemId(null);
+    }
+  };
+
+  const regenerateWholePlan = async () => {
+    if (!plan) return;
+    setRegeneratingPlan(true);
+    setError(null);
+    try {
+      const updated = await api.regeneratePlan(plan.id);
+      setPlan(updated);
+      setExpandedId(null);
+      for (const item of updated.items) {
+        if (item.plannedTime) scheduleMealReminder(item);
+      }
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not rebuild the plan. Please try again.');
+    } finally {
+      setRegeneratingPlan(false);
     }
   };
 
@@ -172,11 +215,11 @@ export function PlanAheadScreen({ navigation }: Props) {
     }
   };
 
-  const goToShoppingList = async () => {
+  const goToShoppingList = async (regenerate = false) => {
     if (!plan) return;
     setCreatingList(true);
     try {
-      const list = await api.generateShoppingList(plan.id);
+      const list = await api.generateShoppingList(plan.id, regenerate);
       navigation.navigate('ShoppingList', { listId: list.id });
     } finally {
       setCreatingList(false);
@@ -194,9 +237,7 @@ export function PlanAheadScreen({ navigation }: Props) {
   if (step === 'plan' && plan) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Home</Text>
-        </TouchableOpacity>
+        <BackLink label="Home" onPress={() => navigation.goBack()} />
         <Text style={styles.title}>Your plan</Text>
         <Text style={styles.subtitle}>
           {plan.status === 'accepted' ? 'Accepted — ready for shopping.' : "Review it, then accept when you're happy."}
@@ -205,19 +246,54 @@ export function PlanAheadScreen({ navigation }: Props) {
 
         {plan.items.map((item) => (
           <Card key={item.id} style={styles.mealCard}>
-            <Text style={styles.mealDate}>{formatDate(item.plannedDate)}</Text>
-            {item.recipe ? (
-              <>
-                <Text style={styles.mealTitle}>{item.recipe.title}</Text>
-                <View style={styles.tagRow}>
-                  <Tag label={`${item.recipe.cookTimeMinutes} min`} />
-                  <Tag label={`${item.recipe.servings} servings`} />
-                  {item.recipe.cuisine ? <Tag label={item.recipe.cuisine} /> : null}
-                </View>
-              </>
-            ) : (
-              <Text style={styles.mealTitle}>Nothing planned for this day</Text>
-            )}
+            <View style={styles.mealHeaderRow}>
+              {item.recipe ? (
+                <Image source={{ uri: getCuisineImage(item.recipe.cuisine).url }} style={styles.mealImage} />
+              ) : null}
+              <View style={styles.mealHeaderContent}>
+                <Text style={styles.mealDate}>{formatDate(item.plannedDate)}</Text>
+                {item.recipe ? (
+                  <TouchableOpacity
+                    onPress={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${expandedId === item.id ? 'Hide' : 'Show'} ingredients for ${item.recipe.title}`}
+                  >
+                    <Text style={styles.mealTitle}>{item.recipe.title}</Text>
+                    <View style={styles.tagRow}>
+                      <Tag label={`${item.recipe.cookTimeMinutes} min`} />
+                      <Tag label={`${item.recipe.servings} servings`} />
+                      {item.recipe.cuisine ? <Tag label={item.recipe.cuisine} /> : null}
+                    </View>
+                    <Text style={styles.detailsLink}>
+                      {expandedId === item.id ? 'Hide ingredients ▲' : 'Show ingredients ▼'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={styles.mealTitle}>Nothing planned for this day</Text>
+                )}
+              </View>
+            </View>
+
+            {item.recipe && expandedId === item.id ? (
+              <View style={styles.recipeDetail}>
+                <Text style={styles.sectionHeading}>Ingredients</Text>
+                {item.recipe.ingredients.map((ingredient, i) => (
+                  <Text key={i} style={styles.ingredientLine}>
+                    {ingredient.quantity ? `${ingredient.quantity} ` : ''}
+                    {ingredient.unit ? `${ingredient.unit} ` : ''}
+                    {ingredient.name}
+                  </Text>
+                ))}
+
+                <Text style={styles.sectionHeading}>Steps</Text>
+                {item.recipe.steps.map((s, i) => (
+                  <View key={i} style={styles.stepRow}>
+                    <Text style={styles.stepNumber}>{i + 1}</Text>
+                    <Text style={styles.stepText}>{s}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
 
             <View style={styles.chipWrap}>
               <Chip
@@ -256,25 +332,85 @@ export function PlanAheadScreen({ navigation }: Props) {
               </Text>
             ) : null}
 
-            {plan.status === 'draft' ? (
-              <View style={styles.itemActions}>
-                <TouchableOpacity onPress={() => regenerate(item.id)} disabled={busyItemId === item.id}>
-                  <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Regenerate'}</Text>
-                </TouchableOpacity>
+            <View style={styles.itemActions}>
+              <TouchableOpacity onPress={() => regenerate(item.id)} disabled={busyItemId === item.id}>
+                <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Replace this day'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setFocusOpenId(focusOpenId === item.id ? null : item.id)}
+                disabled={busyItemId === item.id}
+              >
+                <Text style={styles.itemActionText}>
+                  {focusOpenId === item.id ? 'Cancel' : 'Replace with something specific'}
+                </Text>
+              </TouchableOpacity>
+              {/* Removing a day (vs. swapping it) only makes sense before the
+                  plan is accepted — an accepted plan's shopping list is built
+                  from the full day list, so cutting a day at that point is a
+                  bigger, more disruptive edit than the brief asked for here. */}
+              {plan.status === 'draft' ? (
                 <TouchableOpacity onPress={() => remove(item.id)} disabled={busyItemId === item.id}>
                   <Text style={styles.itemActionTextDanger}>Remove</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
+            {focusOpenId === item.id ? (
+              <View style={styles.focusRow}>
+                <TextInput
+                  style={styles.focusInput}
+                  placeholder="e.g. something with fish, a quick pasta"
+                  placeholderTextColor={colors.textFaint}
+                  value={focusDrafts[item.id] ?? ''}
+                  onChangeText={(text) => setFocusDrafts((current) => ({ ...current, [item.id]: text }))}
+                  onSubmitEditing={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
+                  autoComplete="off"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  onPress={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
+                  disabled={busyItemId === item.id || !(focusDrafts[item.id] ?? '').trim()}
+                >
+                  <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Replace'}</Text>
                 </TouchableOpacity>
               </View>
             ) : null}
           </Card>
         ))}
 
+        <View style={styles.planActionsRow}>
+          <TouchableOpacity onPress={regenerateWholePlan} disabled={regeneratingPlan}>
+            <Text style={styles.itemActionText}>
+              {regeneratingPlan ? 'Rebuilding…' : plan.scope === 'tomorrow' ? 'Replace this day-plan' : 'Replace whole plan'}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={startNewPlan}>
+            <Text style={styles.itemActionText}>Start a new plan</Text>
+          </TouchableOpacity>
+        </View>
+
         {plan.status === 'draft' ? (
           <Button label="Accept plan" onPress={accept} loading={accepting} style={styles.actionSpacing} />
+        ) : plan.shoppingListId ? (
+          <>
+            <Button
+              label="View shopping list"
+              onPress={() => goToShoppingList(false)}
+              loading={creatingList}
+              style={styles.actionSpacing}
+            />
+            <Button
+              label="Rebuild list from plan"
+              variant="secondary"
+              onPress={() => goToShoppingList(true)}
+              loading={creatingList}
+              style={styles.actionSpacing}
+            />
+          </>
         ) : (
           <Button
             label="Create shopping list"
-            onPress={goToShoppingList}
+            onPress={() => goToShoppingList(false)}
             loading={creatingList}
             style={styles.actionSpacing}
           />
@@ -286,9 +422,7 @@ export function PlanAheadScreen({ navigation }: Props) {
   // step === 'scope'
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>How far ahead?</Text>
       <Text style={styles.subtitle}>Pick what fits — you don't have to plan a whole week.</Text>
 
@@ -297,15 +431,19 @@ export function PlanAheadScreen({ navigation }: Props) {
           <Chip
             key={option.value}
             label={option.label}
-            selected={scope === option.value}
-            onPress={() => setScope(option.value)}
+            selected={!showCustom && scope === option.value}
+            onPress={() => {
+              setShowCustom(false);
+              setScope(option.value);
+            }}
           />
         ))}
+        <Chip label="More options" selected={showCustom} onPress={() => setShowCustom((v) => !v)} />
       </View>
 
-      {scope === 'custom' ? (
+      {showCustom ? (
         <View style={styles.fieldRow}>
-          <Text style={styles.fieldLabel}>Days (1-14)</Text>
+          <Text style={styles.fieldLabel}>Number of days (1-14)</Text>
           <TextInput
             style={styles.smallInput}
             keyboardType="number-pad"
@@ -338,8 +476,6 @@ export function PlanAheadScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
@@ -359,10 +495,52 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, marginBottom: spacing.md, fontSize: 14 },
   actionSpacing: { marginTop: spacing.lg },
   mealCard: { marginBottom: spacing.md },
+  mealHeaderRow: { flexDirection: 'row', gap: spacing.md },
+  mealImage: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.surfaceSunken },
+  mealHeaderContent: { flex: 1 },
   mealDate: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
   mealTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  itemActions: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.xs },
+  detailsLink: { color: colors.primary, fontSize: 13, fontWeight: '600', marginBottom: spacing.sm },
+  recipeDetail: { marginBottom: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
+  sectionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
+  ingredientLine: { ...typography.body, color: colors.text, marginBottom: 4 },
+  stepRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
+  stepNumber: {
+    flexShrink: 0,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    backgroundColor: colors.primarySoft,
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: '600',
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  stepText: { ...typography.body, color: colors.text, flex: 1, lineHeight: 20 },
+  itemActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginTop: spacing.xs },
+  focusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  focusInput: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+    color: colors.text,
+    flex: 1,
+  },
+  planActionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.lg,
+    marginTop: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
   itemActionText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
   itemActionTextDanger: { color: colors.danger, fontSize: 13, fontWeight: '600' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },

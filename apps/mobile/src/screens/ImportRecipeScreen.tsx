@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RecipeView } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
@@ -56,9 +57,7 @@ export function ImportRecipeScreen({ navigation }: Props) {
   if (step === 'preview' && recipe) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={() => setStep('input')} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Try another link</Text>
-        </TouchableOpacity>
+        <BackLink label="Try another link" onPress={() => setStep('input')} />
         <Text style={styles.title}>{recipe.title}</Text>
         <View style={styles.tagRow}>
           <Tag label={`${recipe.cookTimeMinutes} min`} />
@@ -98,9 +97,7 @@ export function ImportRecipeScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Back</Text>
-      </TouchableOpacity>
+      <BackLink label="Back" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>Import a recipe</Text>
       <Text style={styles.subtitle}>Paste a link to a recipe page and we'll pull it in.</Text>
 
@@ -127,8 +124,6 @@ export function ImportRecipeScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   urlInput: {

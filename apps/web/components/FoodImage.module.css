@@ -1,0 +1,98 @@
+.wrap {
+  display: block;
+}
+
+/* Small, supporting food thumbnail — brief §12/§17. A compact fixed-height
+   band, not a full-bleed hero: the image helps the customer recognise the
+   dish without dominating the card. The photo itself is object-fit: cover so
+   a portrait/landscape source can't distort it. */
+.frame {
+  position: relative;
+  width: 100%;
+  height: 132px;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+}
+
+/* No photo available — a shorter, lighter strip with just a food icon, so it
+   reads as "no picture" rather than a failed photo (brief §15). */
+.frameFallback {
+  height: 84px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-soft), var(--surface-sunken));
+}
+
+.fallbackIcon {
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.55;
+}
+
+.img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0;
+  transform: scale(1.03);
+  transition: opacity 220ms ease-out, transform 320ms ease-out;
+}
+
+.imgLoaded {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Skeleton shimmer while the photo loads — brief §24, "attractive skeleton",
+   not an empty box. */
+.skeleton {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    var(--surface-sunken) 30%,
+    rgba(255, 255, 255, 0.55) 50%,
+    var(--surface-sunken) 70%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* Subtle attribution beneath the image, never over it — brief §25. */
+.credit {
+  margin: 6px 2px 0;
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--text-faint);
+}
+
+.credit a {
+  color: var(--text-faint);
+  text-decoration: underline;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .img {
+    transition: opacity 120ms linear;
+    transform: none;
+  }
+  .imgLoaded {
+    transform: none;
+  }
+  .skeleton {
+    animation: none;
+  }
+}

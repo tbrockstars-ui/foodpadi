@@ -72,6 +72,10 @@
   box-shadow: 0 2px 10px rgba(20, 21, 15, 0.05);
 }
 
+.resultImage {
+  margin-bottom: var(--space-md);
+}
+
 .resultTitle {
   font-size: 17px;
   font-weight: 700;

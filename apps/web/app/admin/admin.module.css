@@ -52,6 +52,33 @@
   cursor: pointer;
 }
 
+.passwordWrap {
+  position: relative;
+}
+
+.passwordWrap .input {
+  width: 100%;
+  padding-right: 56px;
+}
+
+.passwordToggle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 0 12px;
+}
+
+.passwordToggle:hover {
+  color: var(--text);
+}
+
 .dashboardHeader {
   display: flex;
   align-items: center;
@@ -86,4 +113,246 @@
 
 .cardLink:hover {
   border-color: var(--primary);
+}
+
+/* --- Dashboard shell: sidebar + topbar, wraps every /admin/* page --- */
+
+.shell {
+  display: flex;
+  height: 100vh;
+  background: var(--background);
+}
+
+.sidebar {
+  flex-shrink: 0;
+  width: 232px;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-lg);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.sidebarBrand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-weight: 700;
+  font-size: 14px;
+  padding: 0 var(--space-sm);
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.sidebarLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebarLink:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.sidebarLinkActive,
+.sidebarLinkActive:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.shellMain {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-xxl);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbarStaff {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.shellContent {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    height: auto;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    height: auto;
+    overflow-y: visible;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .sidebarNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .shellMain {
+    height: auto;
+    overflow: visible;
+  }
+
+  .shellContent {
+    overflow: visible;
+  }
+
+  .topbar {
+    padding: var(--space-md) var(--space-lg);
+  }
+}
+
+/* --- Overview dashboard: stat cards + trend chart --- */
+
+.pageMain {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: var(--space-xxl) var(--space-xl);
+}
+
+.sectionHeading {
+  font-size: 15px;
+  font-weight: 700;
+  margin: var(--space-xxl) 0 var(--space-lg);
+}
+
+.sectionHeading:first-child {
+  margin-top: 0;
+}
+
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: var(--space-lg);
+}
+
+.statCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg) var(--space-xl);
+}
+
+.statLabel {
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.statValue {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.statSub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 6px 0 0;
+}
+
+.statSubPositive {
+  color: var(--success);
+  font-weight: 600;
+}
+
+.trendCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+}
+
+.trendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.trendTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.trendLegend {
+  display: flex;
+  gap: var(--space-lg);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.trendChart {
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.quickLinksGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-lg);
+}
+
+.quickLinksGrid .cardLink {
+  margin-bottom: 0;
 }

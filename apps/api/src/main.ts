@@ -1,10 +1,22 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  // Express's default JSON body limit is 100kb — fine for every other
+  // endpoint, but Scan sends a real phone photo as a base64 string in the
+  // JSON body (POST /scan/photo). A single uncompressed-ish photo at
+  // ImagePicker's quality: 0.7 can be several MB before base64's ~33%
+  // inflation, so the default limit was silently rejecting every real photo
+  // with "request entity too large" — surfaced to the user as a generic
+  // "Something went wrong analysing that photo." Raised well above any
+  // realistic phone photo; every other endpoint's payloads are tiny by
+  // comparison, so this is a ceiling, not a change in normal behaviour.
+  app.use(json({ limit: '25mb' }));
+  app.use(urlencoded({ extended: true, limit: '25mb' }));
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

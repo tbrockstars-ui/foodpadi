@@ -16,6 +16,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
@@ -33,10 +34,15 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
   const emailLooksValid = /^\S+@\S+\.\S+$/.test(email.trim());
   const passwordLongEnough = password.length >= 8;
-  const canSubmit = emailLooksValid && passwordLongEnough;
+  const passwordsMatch = mode === 'login' || (confirmPassword.length > 0 && confirmPassword === password);
+  const canSubmit = emailLooksValid && passwordLongEnough && passwordsMatch;
 
   const submit = async () => {
-    if (!canSubmit) return;
+    if (!emailLooksValid || !passwordLongEnough) return;
+    if (mode === 'register' && password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
     setError(null);
     setSubmitting(true);
     try {
@@ -83,6 +89,23 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
         <Text style={styles.hint}>At least 8 characters</Text>
       ) : null}
 
+      {mode === 'register' ? (
+        <>
+          <TextInput
+            style={styles.input}
+            placeholder="Confirm password"
+            placeholderTextColor={colors.textMuted}
+            secureTextEntry
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            accessibilityLabel="Confirm password"
+          />
+          {confirmPassword.length > 0 && confirmPassword !== password ? (
+            <Text style={styles.hint}>Passwords don&apos;t match</Text>
+          ) : null}
+        </>
+      ) : null}
+
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <Button
@@ -99,9 +122,15 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
         </TouchableOpacity>
       ) : null}
 
-      <TouchableOpacity onPress={() => setMode(mode === 'login' ? 'register' : 'login')}>
+      <TouchableOpacity
+        onPress={() => {
+          setMode(mode === 'login' ? 'register' : 'login');
+          setConfirmPassword('');
+          setError(null);
+        }}
+      >
         <Text style={styles.switchModeText}>
-          {mode === 'login' ? "New here? Create an account" : 'Already have an account? Log in'}
+          {mode === 'login' ? 'New here? Create an account' : 'Already have an account? Log in'}
         </Text>
       </TouchableOpacity>
 

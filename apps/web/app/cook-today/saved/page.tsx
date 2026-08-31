@@ -1,7 +1,8 @@
-import Link from 'next/link';
 import type { SavedRecipeView } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../../lib/serverApi';
 import { SavedRecipesList } from './SavedRecipesList';
+import { BackLink } from '../../../components/BackLink';
+import { Logo } from '../../../components/Logo';
 import shellStyles from '../../app-shell.module.css';
 import styles from '../cook-today.module.css';
 
@@ -16,9 +17,7 @@ export default async function SavedRecipesPage() {
 
   return (
     <main className={shellStyles.container}>
-      <Link href="/cook-today" className={shellStyles.backLink}>
-        ‹ Cook Today
-      </Link>
+      <BackLink href="/cook-today" label="Cook Today" />
       <h1 className={styles.title}>Saved recipes</h1>
       <SavedRecipesList initialRecipes={recipes} />
     </main>

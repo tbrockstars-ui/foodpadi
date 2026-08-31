@@ -6,107 +6,121 @@ import styles from './HeroDecor.module.css';
 
 interface Piece {
   src: string;
-  alt: string;
   className: string;
+  /** Peak upward drift, px, for the idle float loop. */
+  floatOffset: number;
+  /** Idle float loop duration, s — varied per piece so they don't move in lockstep. */
+  floatDuration: number;
+  /** Entrance stagger, s. */
   delay: number;
-  rotate?: number;
+  /** Resting tilt, deg. */
+  rotate: number;
+  /** Resting opacity (these sit behind the headline, so slightly held back). */
+  opacity: number;
 }
 
-// Real cutout PNGs — tomatoes/onions/leaves from images/fruits/, burger +
-// OJ glass from images/drink/ (drink.png shipped with a solid background;
-// see scripts note below — chroma-keyed out before saving to decor/). All
-// already transparent, trimmed + resized — see apps/web/public/decor/.
-// Clustered along the banner's base (bottom-left + bottom-right) — keeps
-// the nav/logo area at the top clean. The board ("the plate") is turned 90°
-// so its flat edge runs along the base — the rotation lives here (in
-// framer-motion's animate/initial) rather than as CSS `transform` on
-// .basil, because framer-motion writes its own inline `transform` on
-// animate and would otherwise silently clobber a CSS one. Burger + drink
-// are folded into the bottom-right cluster (overlapping onion/tomato)
-// rather than given their own separate corner, so they read as one mixed
-// spread instead of a bolted-on addition. The burger sits as a large,
-// blown-up backdrop tucked behind the corner — it's listed before
-// onion/drink/tomato here (paint order follows DOM order for these
-// unlayered absolutely-positioned siblings) so all three paint on top of
-// it instead of covering them.
+// Real, isolated food photography (cutout PNGs, transparent) curated from the
+// project's image/drink set — resized into apps/web/public/decor/. This is a
+// deliberate three-piece composition, not scattered decoration: one large
+// anchor (the salad toss — "decide what to eat", with its own built-in
+// ingredient motion), one warm vibrant accent (the juice, an orange pop
+// against the green banner), and one smaller supporting option (the grilled
+// chicken bowl) peeking in from the edge. Different scales, tilts and float
+// rhythms give the group depth. The old burger / tomato / onion / board
+// cutouts are gone — their assets remain in public/decor/ but are no longer
+// referenced here.
 const PIECES: Piece[] = [
-  { src: '/decor/basil.png', alt: '', className: styles.basil, delay: 0.08, rotate: 90 },
-  { src: '/decor/burger.png', alt: '', className: styles.burger, delay: 0.12 },
-  { src: '/decor/onion.png', alt: '', className: styles.onion, delay: 0.2 },
-  { src: '/decor/drink.png', alt: '', className: styles.drink, delay: 0.28 },
-  { src: '/decor/tomato.png', alt: '', className: styles.tomato, delay: 0.32 },
+  { src: '/decor/salad-toss.png', className: styles.saladToss, floatOffset: 14, floatDuration: 7.5, delay: 0.1, rotate: -3, opacity: 1 },
+  { src: '/decor/juice.png', className: styles.juice, floatOffset: 11, floatDuration: 6.2, delay: 0.24, rotate: 4, opacity: 0.98 },
+  { src: '/decor/bowl-chicken.png', className: styles.bowlChicken, floatOffset: 9, floatDuration: 8.4, delay: 0.38, rotate: 7, opacity: 0.94 },
 ];
 
-interface LeafSpec {
+interface HerbSpec {
   top: string;
   left: string;
   size: number;
   rotate: number;
   opacity: number;
+  floatOffset: number;
+  floatDuration: number;
+  delay: number;
 }
 
-// Small leaf confetti spread along the banner's base strip (not the whole
-// hero) — sits with the ingredient clusters down there instead of
-// competing with the headline higher up. Fixed, hand-placed positions —
-// not Math.random() — so server and client render the same markup.
-const LEAVES: LeafSpec[] = [
-  { top: '70%', left: '8%', size: 18, rotate: 15, opacity: 0.22 },
-  { top: '76%', left: '22%', size: 13, rotate: -30, opacity: 0.18 },
-  { top: '68%', left: '38%', size: 20, rotate: 60, opacity: 0.16 },
-  { top: '82%', left: '50%', size: 15, rotate: -10, opacity: 0.2 },
-  { top: '72%', left: '62%', size: 21, rotate: 100, opacity: 0.15 },
-  { top: '88%', left: '15%', size: 15, rotate: 45, opacity: 0.2 },
-  { top: '90%', left: '35%', size: 17, rotate: -60, opacity: 0.14 },
-  { top: '78%', left: '72%', size: 13, rotate: 20, opacity: 0.18 },
-  { top: '94%', left: '58%', size: 19, rotate: -45, opacity: 0.16 },
-  { top: '84%', left: '85%', size: 15, rotate: 80, opacity: 0.2 },
-  { top: '96%', left: '5%', size: 21, rotate: -20, opacity: 0.15 },
-  { top: '74%', left: '92%', size: 13, rotate: 130, opacity: 0.18 },
-  { top: '86%', left: '44%', size: 17, rotate: -90, opacity: 0.16 },
-  { top: '92%', left: '78%', size: 19, rotate: 35, opacity: 0.2 },
-  { top: '66%', left: '28%', size: 14, rotate: -15, opacity: 0.18 },
-  { top: '98%', left: '20%', size: 22, rotate: 50, opacity: 0.14 },
-  { top: '80%', left: '96%', size: 15, rotate: -70, opacity: 0.19 },
-  { top: '70%', left: '65%', size: 16, rotate: 10, opacity: 0.17 },
+// A few real basil sprigs as micro depth accents in the lower band — replaces
+// the old flat SVG leaf confetti. Kept deliberately sparse (clutter is a
+// failure mode here) and low-opacity so they never compete with the text.
+// Fixed hand-placed positions so SSR and client markup match.
+const HERBS: HerbSpec[] = [
+  { top: '30%', left: '2%', size: 44, rotate: -18, opacity: 0.62, floatOffset: 7, floatDuration: 6.5, delay: 0.5 },
+  { top: '82%', left: '34%', size: 34, rotate: 24, opacity: 0.5, floatOffset: 6, floatDuration: 7.8, delay: 0.62 },
+  { top: '68%', left: '62%', size: 30, rotate: 40, opacity: 0.5, floatOffset: 7, floatDuration: 7, delay: 0.7 },
+  { top: '20%', left: '90%', size: 38, rotate: -30, opacity: 0.55, floatOffset: 6, floatDuration: 8.2, delay: 0.82 },
 ];
 
-function Leaf({ top, left, size, rotate, opacity }: LeafSpec) {
-  return (
-    <svg
-      className={styles.leaf}
-      style={{ top, left, width: size, height: size, opacity, transform: `rotate(${rotate}deg)` }}
-      viewBox="0 0 32 32"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path d="M16 2C8 2 3 10 3 18C3 24 9 29 16 29C23 29 29 24 29 18C29 10 24 2 16 2Z" fill="currentColor" />
-      <path d="M16 5V27" stroke="rgba(14, 81, 53, 0.35)" strokeWidth="1" />
-    </svg>
-  );
-}
-
 export function HeroDecor() {
-  const prefersReducedMotion = useReducedMotion();
+  const reduce = useReducedMotion();
 
   return (
     <div className={styles.layer} aria-hidden="true">
-      {LEAVES.map((leaf, i) => (
-        <Leaf key={i} {...leaf} />
-      ))}
-
       {PIECES.map((piece) => (
         <motion.div
           key={piece.src}
           className={`${styles.piece} ${piece.className}`}
-          initial={{ opacity: 0, scale: 0.85, rotate: piece.rotate ?? 0 }}
-          animate={{ opacity: 0.92, scale: 1, rotate: piece.rotate ?? 0 }}
-          transition={{
-            duration: prefersReducedMotion ? 0.01 : 0.6,
-            delay: prefersReducedMotion ? 0 : piece.delay,
-            ease: [0.21, 0.47, 0.32, 0.98],
-          }}
+          initial={reduce ? false : { opacity: 0, y: 26, scale: 0.9, rotate: piece.rotate }}
+          animate={
+            reduce
+              ? { opacity: piece.opacity, rotate: piece.rotate }
+              : { opacity: piece.opacity, scale: 1, rotate: piece.rotate, y: [26, 0, -piece.floatOffset, 0] }
+          }
+          transition={
+            reduce
+              ? { duration: 0.01 }
+              : {
+                  opacity: { duration: 0.7, delay: piece.delay, ease: 'easeOut' },
+                  scale: { duration: 0.7, delay: piece.delay, ease: [0.21, 0.47, 0.32, 0.98] },
+                  rotate: { duration: 0.7, delay: piece.delay, ease: 'easeOut' },
+                  y: {
+                    duration: piece.floatDuration,
+                    delay: piece.delay,
+                    repeat: Infinity,
+                    repeatType: 'mirror',
+                    ease: 'easeInOut',
+                  },
+                }
+          }
         >
-          <Image src={piece.src} alt={piece.alt} fill sizes="400px" style={{ objectFit: 'contain' }} priority />
+          <Image src={piece.src} alt="" fill sizes="(max-width: 720px) 40vw, 360px" style={{ objectFit: 'contain' }} priority />
+        </motion.div>
+      ))}
+
+      {HERBS.map((herb, i) => (
+        <motion.div
+          key={i}
+          className={styles.herb}
+          style={{ top: herb.top, left: herb.left, width: herb.size, height: herb.size }}
+          initial={reduce ? false : { opacity: 0, y: 14, rotate: herb.rotate }}
+          animate={
+            reduce
+              ? { opacity: herb.opacity, rotate: herb.rotate }
+              : { opacity: herb.opacity, rotate: herb.rotate, y: [14, 0, -herb.floatOffset, 0] }
+          }
+          transition={
+            reduce
+              ? { duration: 0.01 }
+              : {
+                  opacity: { duration: 0.8, delay: herb.delay },
+                  rotate: { duration: 0.8, delay: herb.delay },
+                  y: {
+                    duration: herb.floatDuration,
+                    delay: herb.delay,
+                    repeat: Infinity,
+                    repeatType: 'mirror',
+                    ease: 'easeInOut',
+                  },
+                }
+          }
+        >
+          <Image src="/decor/herb-basil.png" alt="" fill sizes="48px" style={{ objectFit: 'contain' }} />
         </motion.div>
       ))}
     </div>
