@@ -44,11 +44,14 @@ function RegisterForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const passwordLongEnough = password.length >= 8;
+  const passwordsMatch = confirmPassword.length === 0 || confirmPassword === password;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -57,6 +60,10 @@ function RegisterForm() {
     const trimmedEmail = email.trim();
     if (!/^\S+@\S+\.\S+$/.test(trimmedEmail) || password.length < 8) {
       setError('Enter a valid email and a password of at least 8 characters.');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
     setSubmitting(true);
@@ -120,6 +127,28 @@ function RegisterForm() {
             </button>
           </div>
           {password.length > 0 && !passwordLongEnough ? <p className={styles.hint}>At least 8 characters</p> : null}
+
+          <div className={styles.inputWrap}>
+            <input
+              className={styles.input}
+              type={showConfirm ? 'text' : 'password'}
+              placeholder="Confirm password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className={styles.passwordToggle}
+              aria-pressed={showConfirm}
+              aria-label={showConfirm ? 'Hide password' : 'Show password'}
+              onClick={() => setShowConfirm((s) => !s)}
+            >
+              <EyeIcon off={showConfirm} />
+            </button>
+          </div>
+          {!passwordsMatch ? <p className={styles.hint}>Passwords don&apos;t match</p> : null}
+
           {error ? <p className={styles.error}>{error}</p> : null}
 
           <Button type="submit" loading={submitting} className={styles.primaryButton}>
