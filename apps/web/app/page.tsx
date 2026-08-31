@@ -39,6 +39,7 @@ interface HubAction {
   key: string;
   label: string;
   subtitle: string;
+  icon?: string;
   href?: string;
   live: boolean;
   disabledTag?: string;
@@ -61,7 +62,7 @@ interface HubAction {
 // It's not one of the three intent branches, so it's a demoted secondary
 // link below the primary row rather than a fourth equal-weight card.
 const SECONDARY_ACTIONS: HubAction[] = [
-  { key: 'scan', label: 'Scan', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
+  { key: 'scan', icon: '📷', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
 function HomeHub() {
@@ -115,6 +116,7 @@ function HomeHub() {
       <div className={homeStyles.secondaryRow}>
         {SECONDARY_ACTIONS.map((action) => (
           <span key={action.key} className={homeStyles.secondaryLink}>
+            {action.icon ? <span aria-hidden="true">{action.icon} </span> : null}
             {action.label} · {action.subtitle}
             {action.disabledTag ? <span className={homeStyles.soonTag}>{action.disabledTag}</span> : null}
           </span>
