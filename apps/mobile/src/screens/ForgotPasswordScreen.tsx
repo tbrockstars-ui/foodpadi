@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { api, ApiError } from '../api/client';
-import { colors } from '../theme/colors';
+import { type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   onBackToLogin: () => void;
@@ -9,6 +10,8 @@ interface Props {
 }
 
 export function ForgotPasswordScreen({ onBackToLogin, onHaveResetCode }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -93,35 +96,37 @@ export function ForgotPasswordScreen({ onBackToLogin, onHaveResetCode }: Props) 
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, justifyContent: 'center' },
-  title: { fontSize: 26, fontWeight: '700', color: colors.text, textAlign: 'center', marginBottom: 12 },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, justifyContent: 'center' },
+  title: { fontSize: 26, fontWeight: '700', color: c.text, textAlign: 'center', marginBottom: 12 },
   subtitle: {
     fontSize: 15,
-    color: colors.textMuted,
+    color: c.textMuted,
     textAlign: 'center',
     marginBottom: 28,
     lineHeight: 21,
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 12,
-    color: colors.text,
+    color: c.text,
   },
   primaryButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: c.primary,
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: 'center',
     marginTop: 8,
   },
-  primaryButtonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
-  linkText: { color: colors.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
-  error: { color: colors.danger, marginBottom: 12, fontSize: 14 },
-});
+  primaryButtonText: { color: c.primaryText, fontSize: 17, fontWeight: '600' },
+  linkText: { color: c.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
+  error: { color: c.danger, marginBottom: 12, fontSize: 14 },
+  });
+}

@@ -13,7 +13,8 @@ import { Chip } from '../components/Chip';
 import { LoadingState } from '../components/LoadingState';
 import { SignupPromptModal } from '../components/SignupPromptModal';
 import { Tag } from '../components/Tag';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'CookToday'> & { onRequestLogin: () => void };
@@ -42,6 +43,8 @@ const TIME_OPTIONS = [
 type Step = 'disclaimer' | 'input' | 'loading' | 'results' | 'detail';
 
 export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { user } = useAuth();
   const guestSession = useGuestSession();
   const needsGuestDisclaimer = !user && !guestSession.disclaimerAcknowledged;
@@ -310,60 +313,62 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
-  sectionHeading: { ...typography.label, color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
+  sectionHeading: { ...typography.label, color: c.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
   section: { marginBottom: spacing.sm },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
   addInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
   },
   addButton: {
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
-  addButtonText: { color: colors.text, fontWeight: '600' },
-  errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
-  emptyText: { ...typography.body, color: colors.textMuted },
+  addButtonText: { color: c.text, fontWeight: '600' },
+  errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
+  emptyText: { ...typography.body, color: c.textMuted },
   actionSpacing: { marginTop: spacing.xl },
   importLink: { marginTop: spacing.lg, alignItems: 'center' },
-  importLinkText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  importLinkText: { color: c.primary, fontSize: 14, fontWeight: '600' },
   resultCard: { marginBottom: spacing.md },
-  resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  resultTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: spacing.xs },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
   stepNumber: {
     ...typography.label,
-    color: colors.primary,
-    backgroundColor: colors.primarySoft,
+    color: c.primary,
+    backgroundColor: c.primarySoft,
     width: 24,
     height: 24,
     borderRadius: radius.pill,
     textAlign: 'center',
     lineHeight: 24,
   },
-  stepText: { ...typography.body, color: colors.text, flex: 1 },
-  safetyNotice: { ...typography.caption, color: colors.textFaint, marginTop: spacing.lg, lineHeight: 18 },
+  stepText: { ...typography.body, color: c.text, flex: 1 },
+  safetyNotice: { ...typography.caption, color: c.textFaint, marginTop: spacing.lg, lineHeight: 18 },
   disclaimerBox: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.lg,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
   },
-  disclaimerText: { fontSize: 14, lineHeight: 21, color: colors.text },
-});
+  disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
+  });
+}

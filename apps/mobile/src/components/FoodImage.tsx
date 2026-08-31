@@ -1,7 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Animated, Linking, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import type { FoodImageView } from '@foodpadi/shared';
-import { colors, radius } from '../theme/colors';
+import { radius, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 const PROVIDER_LABEL: Record<FoodImageView['provider'], string> = {
   pexels: 'Pexels',
@@ -26,6 +27,8 @@ interface Props {
  * Pexels/Unsplash API terms. Web counterpart: apps/web/components/FoodImage.tsx.
  */
 export function FoodImage({ image, alt, style }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
   const opacity = useRef(new Animated.Value(0)).current;
 
@@ -73,27 +76,29 @@ export function FoodImage({ image, alt, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  frame: {
-    width: '100%',
-    height: 124,
-    borderRadius: radius.md,
-    overflow: 'hidden',
-    backgroundColor: colors.surfaceSunken,
-  },
-  frameFallback: {
-    height: 80,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primarySoft,
-  },
-  fallbackIcon: {
-    fontSize: 24,
-    opacity: 0.55,
-  },
-  skeleton: {
-    backgroundColor: colors.surfaceSunken,
-  },
-  credit: { marginTop: 6, marginHorizontal: 2, fontSize: 10, lineHeight: 13, color: colors.textFaint },
-  creditLink: { textDecorationLine: 'underline', color: colors.textFaint },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    frame: {
+      width: '100%',
+      height: 124,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+      backgroundColor: c.surfaceSunken,
+    },
+    frameFallback: {
+      height: 80,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.primarySoft,
+    },
+    fallbackIcon: {
+      fontSize: 24,
+      opacity: 0.55,
+    },
+    skeleton: {
+      backgroundColor: c.surfaceSunken,
+    },
+    credit: { marginTop: 6, marginHorizontal: 2, fontSize: 10, lineHeight: 13, color: c.textFaint },
+    creditLink: { textDecorationLine: 'underline', color: c.textFaint },
+  });
+}

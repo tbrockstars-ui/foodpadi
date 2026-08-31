@@ -1,7 +1,8 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
 import { GoalsEditor } from '../components/goals/GoalsEditor';
-import { colors } from '../theme/colors';
+import { type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /**
  * Onboarding entry point for Food & Lifestyle Goals — goal selection is
@@ -11,6 +12,8 @@ import { colors } from '../theme/colors';
  * logic lives in GoalsEditor, shared with Profile > Edit Goals.
  */
 export function GoalScreen({ onNext }: { onNext: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.container}>
       <GoalsEditor onDone={onNext} onSkip={onNext} />
@@ -18,6 +21,8 @@ export function GoalScreen({ onNext }: { onNext: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, paddingTop: 64 },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+  });
+}

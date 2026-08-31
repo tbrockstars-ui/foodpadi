@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity } from 'react-native';
-import { colors, radius, spacing } from '../theme/colors';
+import { radius, spacing, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   label: string;
@@ -18,6 +19,8 @@ interface Props {
  * of the normal selected state, for the "which is your main priority" step.
  */
 export function GoalCard({ label, selected, primary, disabled, onPress, role = 'checkbox' }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <TouchableOpacity
       style={[
@@ -41,25 +44,27 @@ export function GoalCard({ label, selected, primary, disabled, onPress, role = '
   );
 }
 
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: spacing.lg,
-    marginBottom: spacing.sm,
-    minHeight: 48,
-  },
-  rowSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  rowPrimary: { borderColor: colors.primary, backgroundColor: colors.primary },
-  rowDisabled: { opacity: 0.5 },
-  text: { fontSize: 15, color: colors.text, flexShrink: 1 },
-  textSelected: { color: colors.primary, fontWeight: '600' },
-  textPrimary: { color: colors.primaryText },
-  check: { fontSize: 16, color: colors.primary, fontWeight: '700', marginLeft: spacing.sm },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingVertical: 14,
+      paddingHorizontal: spacing.lg,
+      marginBottom: spacing.sm,
+      minHeight: 48,
+    },
+    rowSelected: { borderColor: c.primary, backgroundColor: c.primarySoft },
+    rowPrimary: { borderColor: c.primary, backgroundColor: c.primary },
+    rowDisabled: { opacity: 0.5 },
+    text: { fontSize: 15, color: c.text, flexShrink: 1 },
+    textSelected: { color: c.primary, fontWeight: '600' },
+    textPrimary: { color: c.primaryText },
+    check: { fontSize: 16, color: c.primary, fontWeight: '700', marginLeft: spacing.sm },
+  });
+}

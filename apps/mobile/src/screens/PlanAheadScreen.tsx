@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { MealChoice, MealPlanItemView, MealPlanView, PlanScope } from '@foodpadi/shared';
@@ -11,10 +11,12 @@ import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
 import { getCuisineImage } from '../constants/cuisineImages';
 import { cancelMealReminder, scheduleMealReminder } from '../lib/mealReminders';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+const SUGGESTION_DEBOUNCE_MS = 300;
 
 type Props = NativeStackScreenProps<AppStackParamList, 'PlanAhead'>;
 
@@ -39,6 +41,8 @@ function formatReminderTime(plannedTime: string): string {
 }
 
 export function PlanAheadScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [step, setStep] = useState<'scope' | 'loading' | 'plan'>('scope');
   const [scope, setScope] = useState<PlanScope>('week');
   const [showCustom, setShowCustom] = useState(false);
@@ -56,10 +60,39 @@ export function PlanAheadScreen({ navigation }: Props) {
   // open, and the drafted text for each, keyed by item id.
   const [focusOpenId, setFocusOpenId] = useState<string | null>(null);
   const [focusDrafts, setFocusDrafts] = useState<Record<string, string>>({});
+  // Typeahead for the currently-open box only — a dish-name picker instead
+  // of free-typing a hint and finding out only after submitting whether
+  // anything matched. Scoped to one box at a time (only one is ever open),
+  // so this doesn't need to be keyed by item id like focusDrafts is.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const suggestionsSeqRef = useRef(0);
   // Draft text for each item's time field, keyed by item id — separate from
   // the committed plannedTime so typing doesn't fire a request per keystroke.
   const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
   const [timeError, setTimeError] = useState<string | null>(null);
+
+  const focusDraft = focusOpenId ? (focusDrafts[focusOpenId] ?? '') : '';
+
+  // Debounced fetch of suggestions as the user types in the open box.
+  useEffect(() => {
+    if (!focusOpenId || !focusDraft.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      const seq = (suggestionsSeqRef.current += 1);
+      try {
+        const results = await api.searchMealIdeas(focusDraft.trim());
+        if (seq !== suggestionsSeqRef.current) return; // superseded by a newer keystroke
+        setSuggestions(results);
+      } catch {
+        // Leave whatever suggestions are already showing rather than
+        // surfacing an error for a background typeahead.
+      }
+    }, SUGGESTION_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOpenId, focusDraft]);
 
   // A user returning to Plan Ahead should see the plan they already have,
   // not be asked to create a new one every time (docs/USER_JOURNEYS.md's
@@ -337,7 +370,10 @@ export function PlanAheadScreen({ navigation }: Props) {
                 <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Replace this day'}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setFocusOpenId(focusOpenId === item.id ? null : item.id)}
+                onPress={() => {
+                  setSuggestions([]);
+                  setFocusOpenId(focusOpenId === item.id ? null : item.id);
+                }}
                 disabled={busyItemId === item.id}
               >
                 <Text style={styles.itemActionText}>
@@ -356,23 +392,42 @@ export function PlanAheadScreen({ navigation }: Props) {
             </View>
 
             {focusOpenId === item.id ? (
-              <View style={styles.focusRow}>
-                <TextInput
-                  style={styles.focusInput}
-                  placeholder="e.g. something with fish, a quick pasta"
-                  placeholderTextColor={colors.textFaint}
-                  value={focusDrafts[item.id] ?? ''}
-                  onChangeText={(text) => setFocusDrafts((current) => ({ ...current, [item.id]: text }))}
-                  onSubmitEditing={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
-                  autoComplete="off"
-                  autoFocus
-                />
-                <TouchableOpacity
-                  onPress={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
-                  disabled={busyItemId === item.id || !(focusDrafts[item.id] ?? '').trim()}
-                >
-                  <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Replace'}</Text>
-                </TouchableOpacity>
+              <View style={styles.focusContainer}>
+                <View style={styles.focusRow}>
+                  <TextInput
+                    style={styles.focusInput}
+                    placeholder="e.g. pizza, a quick pasta"
+                    placeholderTextColor={colors.textFaint}
+                    value={focusDrafts[item.id] ?? ''}
+                    onChangeText={(text) => setFocusDrafts((current) => ({ ...current, [item.id]: text }))}
+                    onSubmitEditing={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
+                    autoComplete="off"
+                    autoFocus
+                  />
+                  <TouchableOpacity
+                    onPress={() => regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined)}
+                    disabled={busyItemId === item.id || !(focusDrafts[item.id] ?? '').trim()}
+                  >
+                    <Text style={styles.itemActionText}>{busyItemId === item.id ? 'Working…' : 'Replace'}</Text>
+                  </TouchableOpacity>
+                </View>
+                {suggestions.length > 0 ? (
+                  <View style={styles.suggestionsList}>
+                    {suggestions.map((title) => (
+                      <TouchableOpacity
+                        key={title}
+                        style={styles.suggestionItem}
+                        onPress={() => {
+                          setFocusDrafts((current) => ({ ...current, [item.id]: title }));
+                          setSuggestions([]);
+                          regenerate(item.id, title);
+                        }}
+                      >
+                        <Text style={styles.suggestionItemText}>{title}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                ) : null}
               </View>
             ) : null}
           </Card>
@@ -474,64 +529,84 @@ export function PlanAheadScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.lg },
   fieldRow: { marginBottom: spacing.lg },
-  fieldLabel: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm },
+  fieldLabel: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm },
   smallInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
     maxWidth: 160,
   },
-  errorText: { color: colors.danger, marginBottom: spacing.md, fontSize: 14 },
+  errorText: { color: c.danger, marginBottom: spacing.md, fontSize: 14 },
   actionSpacing: { marginTop: spacing.lg },
   mealCard: { marginBottom: spacing.md },
   mealHeaderRow: { flexDirection: 'row', gap: spacing.md },
-  mealImage: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: colors.surfaceSunken },
+  mealImage: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: c.surfaceSunken },
   mealHeaderContent: { flex: 1 },
-  mealDate: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
-  mealTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.sm },
+  mealDate: { ...typography.label, color: c.textMuted, marginBottom: spacing.xs },
+  mealTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  detailsLink: { color: colors.primary, fontSize: 13, fontWeight: '600', marginBottom: spacing.sm },
-  recipeDetail: { marginBottom: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: colors.border },
-  sectionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: 4 },
+  detailsLink: { color: c.primary, fontSize: 13, fontWeight: '600', marginBottom: spacing.sm },
+  recipeDetail: { marginBottom: spacing.md, paddingTop: spacing.sm, borderTopWidth: 1, borderTopColor: c.border },
+  sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: 4 },
   stepRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   stepNumber: {
     flexShrink: 0,
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.primarySoft,
-    color: colors.primary,
+    backgroundColor: c.primarySoft,
+    color: c.primary,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,
   },
-  stepText: { ...typography.body, color: colors.text, flex: 1, lineHeight: 20 },
+  stepText: { ...typography.body, color: c.text, flex: 1, lineHeight: 20 },
   itemActions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg, marginTop: spacing.xs },
-  focusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
+  focusContainer: { marginTop: spacing.sm },
+  focusRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   focusInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 10,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 14,
-    color: colors.text,
+    color: c.text,
     flex: 1,
   },
+  // Typeahead results — a plain stacked list below the input rather than an
+  // absolutely-positioned overlay, so it never needs to worry about z-index
+  // or covering other content; it just pushes the rest of the card down.
+  suggestionsList: {
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: c.border,
+    borderRadius: radius.md,
+    backgroundColor: c.surface,
+    overflow: 'hidden',
+  },
+  suggestionItem: {
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: c.border,
+  },
+  suggestionItemText: { fontSize: 14, color: c.text },
   planActionsRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -539,22 +614,23 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: c.border,
   },
-  itemActionText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  itemActionTextDanger: { color: colors.danger, fontSize: 13, fontWeight: '600' },
+  itemActionText: { color: c.primary, fontSize: 13, fontWeight: '600' },
+  itemActionTextDanger: { color: c.danger, fontSize: 13, fontWeight: '600' },
   timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.sm },
   timeInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 10,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 14,
-    color: colors.text,
+    color: c.text,
     maxWidth: 160,
     flex: 1,
   },
-  reminderNote: { ...typography.caption, color: colors.textMuted, marginTop: spacing.xs },
-});
+  reminderNote: { ...typography.caption, color: c.textMuted, marginTop: spacing.xs },
+  });
+}

@@ -13,7 +13,8 @@ import { FoodImage } from '../components/FoodImage';
 import { LoadingState } from '../components/LoadingState';
 import { LocalFoodSearch } from '../components/LocalFoodSearch';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'EatNow'>;
@@ -36,6 +37,8 @@ function formatPence(pence: number): string {
 const UNIFIED_FLOW_RESULT_LIMIT = 3;
 
 export function EatNowScreen({ navigation, route }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { user } = useAuth();
   const guestSession = useGuestSession();
   const needsGuestDisclaimer = !user && !guestSession.disclaimerAcknowledged;
@@ -196,37 +199,39 @@ export function EatNowScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
-  whyText: { ...typography.body, color: colors.primary, marginBottom: spacing.sm, fontWeight: '600' },
-  disclaimerNote: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
-  emptyText: { ...typography.body, color: colors.textMuted, marginBottom: spacing.md },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
+  whyText: { ...typography.body, color: c.primary, marginBottom: spacing.sm, fontWeight: '600' },
+  disclaimerNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+  emptyText: { ...typography.body, color: c.textMuted, marginBottom: spacing.md },
   searchInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
   },
-  errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
+  errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
   resultCard: { marginBottom: spacing.md },
   resultImage: { marginBottom: spacing.md },
-  resultTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  resultBody: { ...typography.body, color: colors.textMuted, marginBottom: spacing.sm },
-  estimateText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.sm },
+  resultTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  resultBody: { ...typography.body, color: c.textMuted, marginBottom: spacing.sm },
+  estimateText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   disclaimerBox: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: 16,
-    backgroundColor: colors.surface,
+    backgroundColor: c.surface,
   },
-  disclaimerText: { fontSize: 14, lineHeight: 21, color: colors.text },
-});
+  disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
+  });
+}

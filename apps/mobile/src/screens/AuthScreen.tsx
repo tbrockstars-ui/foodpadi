@@ -3,7 +3,8 @@ import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity
 import { useAuth } from '../auth/AuthContext';
 import { ApiError } from '../api/client';
 import { Button } from '../components/Button';
-import { colors } from '../theme/colors';
+import { type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   onForgotPassword: () => void;
@@ -12,6 +13,8 @@ interface Props {
 }
 
 export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
@@ -151,30 +154,32 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, justifyContent: 'center' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, justifyContent: 'center' },
   logo: { width: 84, height: 84, alignSelf: 'center', marginBottom: 16 },
-  title: { fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' },
-  subtitle: { fontSize: 15, color: colors.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 32 },
+  title: { fontSize: 32, fontWeight: '700', color: c.text, textAlign: 'center' },
+  subtitle: { fontSize: 15, color: c.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 32 },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
     fontSize: 16,
     marginBottom: 12,
-    color: colors.text,
+    color: c.text,
   },
   primaryButton: { marginTop: 8 },
-  hint: { color: colors.textMuted, fontSize: 13, marginTop: -6, marginBottom: 12 },
-  forgotPasswordText: { color: colors.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
-  switchModeText: { color: colors.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
-  error: { color: colors.danger, marginBottom: 12, fontSize: 14 },
-  success: { color: colors.primary, marginBottom: 16, fontSize: 14, textAlign: 'center' },
+  hint: { color: c.textMuted, fontSize: 13, marginTop: -6, marginBottom: 12 },
+  forgotPasswordText: { color: c.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
+  switchModeText: { color: c.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },
+  error: { color: c.danger, marginBottom: 12, fontSize: 14 },
+  success: { color: c.primary, marginBottom: 16, fontSize: 14, textAlign: 'center' },
   divider: { flexDirection: 'row', alignItems: 'center', marginTop: 28, marginBottom: 20, gap: 12 },
-  dividerLine: { flex: 1, height: 1, backgroundColor: colors.border },
-  dividerText: { color: colors.textMuted, fontSize: 13 },
-  guestText: { color: colors.textMuted, textAlign: 'center', fontSize: 14, textDecorationLine: 'underline' },
-});
+  dividerLine: { flex: 1, height: 1, backgroundColor: c.border },
+  dividerText: { color: c.textMuted, fontSize: 13 },
+  guestText: { color: c.textMuted, textAlign: 'center', fontSize: 14, textDecorationLine: 'underline' },
+  });
+}

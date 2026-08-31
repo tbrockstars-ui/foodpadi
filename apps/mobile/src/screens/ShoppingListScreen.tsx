@@ -8,12 +8,15 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ShoppingList'>;
 
 export function ShoppingListScreen({ route, navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { listId } = route.params;
   const [list, setList] = useState<ShoppingListView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -153,13 +156,14 @@ export function ShoppingListScreen({ route, navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   card: { marginBottom: spacing.lg },
   group: { marginBottom: spacing.sm },
-  groupHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.xs },
+  groupHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.xs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -172,32 +176,33 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: radius.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkmark: { color: colors.primaryText, fontSize: 13, fontWeight: '700' },
-  itemText: { ...typography.body, color: colors.text, flex: 1 },
-  itemTextChecked: { color: colors.textFaint, textDecorationLine: 'line-through' },
-  removeIcon: { color: colors.textFaint, fontSize: 14, paddingHorizontal: spacing.sm },
+  checkboxChecked: { backgroundColor: c.primary, borderColor: c.primary },
+  checkmark: { color: c.primaryText, fontSize: 13, fontWeight: '700' },
+  itemText: { ...typography.body, color: c.text, flex: 1 },
+  itemTextChecked: { color: c.textFaint, textDecorationLine: 'line-through' },
+  removeIcon: { color: c.textFaint, fontSize: 14, paddingHorizontal: spacing.sm },
   addRow: { flexDirection: 'row', gap: spacing.sm },
   addInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
   },
   addButton: {
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
-  addButtonText: { color: colors.text, fontWeight: '600' },
-});
+  addButtonText: { color: c.text, fontWeight: '600' },
+  });
+}

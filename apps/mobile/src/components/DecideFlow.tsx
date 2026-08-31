@@ -9,7 +9,8 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { FoodImage } from './FoodImage';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './LocalFoodSearch';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
 
@@ -35,6 +36,8 @@ const PROMPT_CHIPS = [
  */
 export function DecideFlow() {
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const guestSession = useGuestSession();
   // Same precedent as EatNowScreen: guests get a lazy, inline disclaimer
   // gate the first time they touch a feature that needs it, rather than the
@@ -191,7 +194,7 @@ export function DecideFlow() {
         <View style={styles.constraintField}>
           <TextInput
             style={[styles.input, styles.constraintInput, timeMinutes ? styles.constraintInputHasSuffix : null]}
-            placeholder="Minutes (optional)"
+            placeholder="Minutes"
             placeholderTextColor={colors.textFaint}
             keyboardType="number-pad"
             value={timeMinutes}
@@ -203,7 +206,7 @@ export function DecideFlow() {
           {budgetPounds ? <Text style={styles.constraintAffixPrefix}>£</Text> : null}
           <TextInput
             style={[styles.input, styles.constraintInput, budgetPounds ? styles.constraintInputHasPrefix : null]}
-            placeholder="Budget £ (optional)"
+            placeholder="Budget £"
             placeholderTextColor={colors.textFaint}
             keyboardType="decimal-pad"
             value={budgetPounds}
@@ -220,11 +223,20 @@ export function DecideFlow() {
         style={styles.decideButton}
       />
 
-      {stage === 'error' ? <Text style={styles.optionReason}>{errorMessage}</Text> : null}
+      {stage === 'error' ? (
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateIcon}>😕</Text>
+          <Text style={styles.stateMessage}>{errorMessage}</Text>
+          <Button label="Try again" variant="secondary" onPress={() => decide()} style={styles.stateRetry} />
+        </View>
+      ) : null}
       {stage === 'no-options' ? (
-        <Text style={styles.optionReason}>
-          FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
-        </Text>
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateIcon}>🤔</Text>
+          <Text style={styles.stateMessage}>
+            FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
+          </Text>
+        </View>
       ) : null}
 
       {stage === 'options'
@@ -293,42 +305,43 @@ export function DecideFlow() {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
   disclaimerCard: { marginBottom: spacing.lg },
-  disclaimerTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  disclaimerTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.md },
   disclaimerBox: {
     maxHeight: 220,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     marginBottom: spacing.md,
   },
   disclaimerBoxContent: { padding: spacing.md },
-  disclaimerText: { fontSize: 13, lineHeight: 20, color: colors.text },
+  disclaimerText: { fontSize: 13, lineHeight: 20, color: c.text },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
     marginBottom: spacing.md,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   promptChip: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.pill,
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
   },
-  promptChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  promptChipText: { fontSize: 13, color: colors.text },
-  promptChipTextSelected: { color: colors.primary, fontWeight: '600' },
+  promptChipSelected: { borderColor: c.primary, backgroundColor: c.primarySoft },
+  promptChipText: { fontSize: 13, color: c.text },
+  promptChipTextSelected: { color: c.primary, fontWeight: '600' },
   constraintsRow: { flexDirection: 'row', gap: spacing.sm },
   constraintField: { flex: 1, justifyContent: 'center' },
   constraintInput: { flex: 1 },
@@ -338,32 +351,37 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: spacing.lg,
     fontSize: 15,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
   constraintAffixSuffix: {
     position: 'absolute',
     right: spacing.lg,
     fontSize: 15,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
   decideButton: { marginTop: spacing.xs, marginBottom: spacing.lg },
+  stateBlock: { alignItems: 'center', paddingVertical: spacing.lg, paddingHorizontal: spacing.md },
+  stateIcon: { fontSize: 32, lineHeight: 36, marginBottom: spacing.sm },
+  stateMessage: { ...typography.body, color: c.textMuted, textAlign: 'center', marginBottom: spacing.md },
+  stateRetry: { alignSelf: 'center', minWidth: 140, paddingVertical: spacing.sm },
   optionCard: { marginBottom: spacing.md },
   optionImage: { marginBottom: spacing.md },
   optionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   optionHeaderText: { flex: 1 },
-  optionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  optionReason: { ...typography.body, color: colors.textMuted },
+  optionTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  optionReason: { ...typography.body, color: c.textMuted },
   optionTypeBadge: { borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: spacing.md },
-  optionTypeCook: { backgroundColor: colors.primarySoft },
-  optionTypeGet: { backgroundColor: colors.accentSoft },
+  optionTypeCook: { backgroundColor: c.primarySoft },
+  optionTypeGet: { backgroundColor: c.accentSoft },
   optionTypeBadgeText: { fontSize: 12, fontWeight: '700' },
-  optionTypeCookText: { color: colors.primary },
-  optionTypeGetText: { color: colors.accent },
+  optionTypeCookText: { color: c.primary },
+  optionTypeGetText: { color: c.accent },
   optionAction: { marginTop: spacing.md },
-  optionActionText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  optionActionText: { color: c.primary, fontSize: 14, fontWeight: '600' },
   optionDetail: { marginTop: spacing.md },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: spacing.xs },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  stepNumber: { fontSize: 13, fontWeight: '700', color: colors.primary, width: 18 },
-  stepText: { ...typography.body, color: colors.text, flex: 1 },
-});
+  stepNumber: { fontSize: 13, fontWeight: '700', color: c.primary, width: 18 },
+  stepText: { ...typography.body, color: c.text, flex: 1 },
+  });
+}

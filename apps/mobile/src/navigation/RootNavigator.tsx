@@ -6,7 +6,7 @@ import { AuthFlow } from './AuthFlow';
 import { DisclaimerScreen } from '../screens/DisclaimerScreen';
 import { OnboardingFlow } from './OnboardingFlow';
 import { AppStack } from './AppStack';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /**
  * A simple state-driven switch rather than a stack navigator with named
@@ -27,6 +27,7 @@ import { colors } from '../theme/colors';
 export function RootNavigator() {
   const { user, isLoading: authLoading, refreshUser } = useAuth();
   const { isLoading: guestLoading, hasGuestSession, ensureSession } = useGuestSession();
+  const { colors } = useTheme();
   const [wantsToLogIn, setWantsToLogIn] = useState(false);
 
   if (authLoading || guestLoading) {

@@ -5,7 +5,8 @@ import { useAuth } from '../auth/AuthContext';
 import { Card } from '../components/Card';
 import { DecideFlow } from '../components/DecideFlow';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogin: () => void };
@@ -22,6 +23,8 @@ const TOOL_SHORTCUTS = [
 ] as const;
 
 export function HomeScreen({ navigation, onRequestLogin }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { user } = useAuth();
   const isGuest = !user;
 
@@ -102,8 +105,9 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background },
   scrollContent: { padding: spacing.xl, paddingTop: 64, paddingBottom: spacing.xxl },
   header: {
     flexDirection: 'row',
@@ -111,14 +115,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: spacing.lg,
   },
-  brand: { ...typography.label, color: colors.textMuted, letterSpacing: 1 },
-  headerLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
-  heading: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+  brand: { ...typography.label, color: c.textMuted, letterSpacing: 1 },
+  headerLink: { color: c.primary, fontSize: 14, fontWeight: '600' },
+  heading: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   decideWrap: { marginBottom: spacing.lg },
   toolsHeading: {
     ...typography.label,
-    color: colors.textFaint,
+    color: c.textFaint,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },
@@ -130,10 +134,11 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginBottom: spacing.xl,
   },
-  toolsDivider: { color: colors.textFaint },
+  toolsDivider: { color: c.textFaint },
   toolShortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  toolLabel: { fontSize: 14, fontWeight: '600', color: colors.primary },
-  toolLabelDisabled: { color: colors.textFaint },
-  companionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm },
-  companionBody: { ...typography.body, color: colors.text },
-});
+  toolLabel: { fontSize: 14, fontWeight: '600', color: c.primary },
+  toolLabelDisabled: { color: c.textFaint },
+  companionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm },
+  companionBody: { ...typography.body, color: c.text },
+  });
+}
