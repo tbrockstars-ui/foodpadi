@@ -62,7 +62,7 @@ interface HubAction {
 // It's not one of the three intent branches, so it's a demoted secondary
 // link below the primary row rather than a fourth equal-weight card.
 const SECONDARY_ACTIONS: HubAction[] = [
-  { key: 'scan', icon: '/scan-food.svg', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
+  { key: 'scan', icon: '/scan-food.png', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
 function HomeHub() {
