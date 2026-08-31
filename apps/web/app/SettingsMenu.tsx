@@ -64,6 +64,7 @@ export function SettingsMenu() {
         onClick={() => setOpen((v) => !v)}
       >
         <GearIcon />
+        <span className={styles.triggerLabel}>Settings</span>
       </button>
 
       {open ? (
@@ -85,19 +86,19 @@ export function SettingsMenu() {
           <div className={styles.segmented} role="group" aria-label="Theme">
             <button
               type="button"
-              className={`${styles.segment} ${theme === 'default' ? styles.segmentActive : ''}`}
-              aria-pressed={theme === 'default'}
-              onClick={() => setTheme('default')}
-            >
-              Default
-            </button>
-            <button
-              type="button"
               className={`${styles.segment} ${theme === 'dark' ? styles.segmentActive : ''}`}
               aria-pressed={theme === 'dark'}
               onClick={() => setTheme('dark')}
             >
-              Dark
+              Black
+            </button>
+            <button
+              type="button"
+              className={`${styles.segment} ${theme === 'default' ? styles.segmentActive : ''}`}
+              aria-pressed={theme === 'default'}
+              onClick={() => setTheme('default')}
+            >
+              White
             </button>
           </div>
 

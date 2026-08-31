@@ -6,13 +6,16 @@
 .trigger {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 40px;
+  gap: 8px;
   height: 40px;
+  padding: 0 16px 0 12px;
   border-radius: var(--radius-pill);
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text-muted);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
   transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
@@ -24,8 +27,25 @@
 }
 
 .gearIcon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.triggerLabel {
+  white-space: nowrap;
+}
+
+@media (max-width: 420px) {
+  /* Tight screens: back to an icon-only round button. */
+  .trigger {
+    width: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+  .triggerLabel {
+    display: none;
+  }
 }
 
 .panel {

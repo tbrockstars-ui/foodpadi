@@ -21,8 +21,8 @@ interface LogoProps {
  * hero top bar and the login page so both use the same asset consistently.
  */
 export function Logo({ size = 44, withWordmark = true, onDark = false, href, className }: LogoProps) {
-  const content = (
-    <span className={`${styles.logo} ${onDark ? styles.onDark : ''} ${className ?? ''}`}>
+  const inner = (
+    <>
       <Image
         src="/decor/logo.png"
         alt="FoodPadi"
@@ -33,16 +33,24 @@ export function Logo({ size = 44, withWordmark = true, onDark = false, href, cla
         priority
       />
       {withWordmark ? <span className={styles.wordmark}>FoodPadi</span> : null}
-    </span>
+    </>
   );
 
+  // The linked form is a block-level flex row (not an inline <a>), so when a
+  // page renders <Logo> above a <BackLink> they stack on separate lines
+  // instead of colliding side by side. `className` (e.g. shellStyles.pageLogo,
+  // which adds the gap below) therefore goes on the link itself.
   if (href) {
     return (
-      <Link href={href} aria-label="FoodPadi home">
-        {content}
+      <Link
+        href={href}
+        aria-label="FoodPadi home"
+        className={`${styles.logoLink} ${onDark ? styles.onDark : ''} ${className ?? ''}`}
+      >
+        {inner}
       </Link>
     );
   }
 
-  return content;
+  return <span className={`${styles.logo} ${onDark ? styles.onDark : ''} ${className ?? ''}`}>{inner}</span>;
 }
