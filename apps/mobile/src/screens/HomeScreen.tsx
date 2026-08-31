@@ -15,11 +15,13 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogi
 // want — DecideFlow above is the primary, first-time experience
 // (docs/IMPLEMENTATION_PLAN.md's "What should I eat?" Home rework, and the
 // decision-engine architecture memory's "single intent-first entry point").
+// "Eat Now" isn't a shortcut here — same call as the web Home: DecideFlow
+// already covers "find something to eat now" and routes to Eat Now's
+// "find it nearby" when the user picks a "Get it" option.
 const TOOL_SHORTCUTS = [
-  { key: 'eat-now', label: 'Eat Now', live: true },
   { key: 'cook-today', label: 'Cook Today', live: true },
   { key: 'plan-ahead', label: 'Plan Ahead', live: true },
-  { key: 'scan', label: 'Scan', live: true },
+  { key: 'scan', label: '📷  Scan Food', live: true },
 ] as const;
 
 export function HomeScreen({ navigation, onRequestLogin }: Props) {
@@ -29,7 +31,6 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
   const isGuest = !user;
 
   const openTool = (key: (typeof TOOL_SHORTCUTS)[number]['key']) => {
-    if (key === 'eat-now') navigation.navigate('EatNow');
     if (key === 'cook-today') navigation.navigate('CookToday');
     // Plan Ahead is account-first (docs/FOODPADI_ONBOARDING_SPEC.md) — a
     // guest tapping it goes to signup, not a 401 screen.
@@ -89,8 +90,8 @@ export function HomeScreen({ navigation, onRequestLogin }: Props) {
         <Card>
           <Text style={styles.companionHeading}>Browsing as a guest</Text>
           <Text style={styles.companionBody}>
-            Eat Now and Cook Today work without an account. Create one anytime you want to save a
-            recipe, plan ahead, or get reminders.
+            &quot;What should I eat?&quot; and Cook Today work without an account. Create one anytime
+            you want to save a recipe, plan ahead, or get reminders.
           </Text>
         </Card>
       ) : (
