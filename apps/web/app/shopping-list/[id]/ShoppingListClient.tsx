@@ -8,6 +8,26 @@ import styles from '../shopping-list.module.css';
 export function ShoppingListClient({ initialList }: { initialList: ShoppingListView }) {
   const [list, setList] = useState(initialList);
   const [newItem, setNewItem] = useState('');
+  const [rebuilding, setRebuilding] = useState(false);
+
+  const rebuildFromPlan = async () => {
+    if (!list.mealPlanId) return;
+    if (!window.confirm('Rebuild from plan? Auto-added items are replaced with a fresh list from your current plan. Items you added by hand are kept.')) {
+      return;
+    }
+    setRebuilding(true);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${list.mealPlanId}/shopping-list`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ regenerate: true }),
+      });
+      const rebuilt = (await res.json()) as ShoppingListView;
+      setList(rebuilt);
+    } finally {
+      setRebuilding(false);
+    }
+  };
 
   const toggle = async (itemId: string, checked: boolean) => {
     setList((current) => ({ ...current, items: current.items.map((i) => (i.id === itemId ? { ...i, checked } : i)) }));
@@ -49,6 +69,28 @@ export function ShoppingListClient({ initialList }: { initialList: ShoppingListV
     <div>
       <h1 className={styles.title}>Shopping list</h1>
       <p className={styles.subtitle}>{remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}</p>
+
+      {list.mealPlanId ? (
+        <button
+          type="button"
+          onClick={rebuildFromPlan}
+          disabled={rebuilding}
+          style={{
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-md)',
+            background: 'transparent',
+            color: 'var(--text)',
+            padding: '10px 18px',
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            marginBottom: 'var(--space-lg)',
+          }}
+        >
+          {rebuilding ? 'Rebuilding…' : 'Rebuild from plan'}
+        </button>
+      ) : null}
 
       {list.items.length === 0 ? (
         <p className={styles.emptyText}>Nothing here yet. Add an item below to get started.</p>

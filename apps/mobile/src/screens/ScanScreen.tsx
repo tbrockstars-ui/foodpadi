@@ -2,18 +2,27 @@ import React, { useState } from 'react';
 import { Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { DemoScenarioKey, ScanImageMediaType, ScannedItemView } from '@foodpadi/shared';
+import { DemoScenarioKey, FoodContentIngredientView, ScanImageMediaType, ScannedItemView } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
+import { tokenStore } from '../api/tokenStore';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { colors, radius, spacing, typography } from '../theme/colors';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Scan'>;
 
-type Step = 'intro' | 'loading' | 'review' | 'saving' | 'done';
+// Two distinct things Scan can do (picked on the intro screen):
+//  - 'pantry': what's already existed — a fridge/cupboard/shopping photo ->
+//    multiple candidate grocery items -> reviewed -> saved to your pantry.
+//  - 'dish': new — a photo of one prepared dish -> its likely ingredient
+//    composition, read-only, nothing saved. Lets a customer see roughly
+//    what's combined in a dish before eating it.
+type Mode = 'pantry' | 'dish';
+type Step = 'intro' | 'loading' | 'review' | 'saving' | 'done' | 'dish-result';
 
 const SAMPLE_KITCHENS: { key: DemoScenarioKey; label: string }[] = [
   { key: 'fridge', label: 'Sample fridge' },
@@ -54,6 +63,7 @@ function toRows(items: ScannedItemView[]): ReviewRow[] {
 }
 
 export function ScanScreen({ navigation }: Props) {
+  const [mode, setMode] = useState<Mode>('pantry');
   const [step, setStep] = useState<Step>('intro');
   const [rows, setRows] = useState<ReviewRow[]>([]);
   const [newItemName, setNewItemName] = useState('');
@@ -61,6 +71,8 @@ export function ScanScreen({ navigation }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [addedCount, setAddedCount] = useState(0);
   const [confirmedNames, setConfirmedNames] = useState<string[]>([]);
+  const [dishName, setDishName] = useState('');
+  const [dishIngredients, setDishIngredients] = useState<FoodContentIngredientView[]>([]);
 
   const handleResult = (result: { items: ScannedItemView[]; demo: boolean }) => {
     if (result.items.length === 0) {
@@ -74,6 +86,19 @@ export function ScanScreen({ navigation }: Props) {
     setStep('review');
   };
 
+  const handleDishResult = (result: { dishName: string; ingredients: FoodContentIngredientView[]; demo: boolean }) => {
+    if (!result.dishName && result.ingredients.length === 0) {
+      setError("We couldn't identify a dish in that photo. Try another photo.");
+      setStep('intro');
+      return;
+    }
+    setError(null);
+    setDishName(result.dishName || "This dish");
+    setDishIngredients(result.ingredients);
+    setIsDemoResult(result.demo);
+    setStep('dish-result');
+  };
+
   const analyzePhoto = async (asset: ImagePicker.ImagePickerAsset) => {
     if (!asset.base64) {
       setError('Could not read that photo. Please try again.');
@@ -82,8 +107,17 @@ export function ScanScreen({ navigation }: Props) {
     setError(null);
     setStep('loading');
     try {
-      const result = await api.scanPhoto({ imageBase64: asset.base64, mediaType: guessMediaType(asset) });
-      handleResult(result);
+      if (mode === 'dish') {
+        const token = (await tokenStore.getAccessToken()) ?? '';
+        const result = await api.scanFoodContent(
+          { imageBase64: asset.base64, mediaType: guessMediaType(asset) },
+          token,
+        );
+        handleDishResult(result);
+      } else {
+        const result = await api.scanPhoto({ imageBase64: asset.base64, mediaType: guessMediaType(asset) });
+        handleResult(result);
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
         setError("Scan isn't ready yet — the photo analyser isn't configured. Check back soon.");
@@ -176,13 +210,15 @@ export function ScanScreen({ navigation }: Props) {
 
   const startOver = () => {
     setRows([]);
+    setDishName('');
+    setDishIngredients([]);
     setError(null);
     setIsDemoResult(false);
     setStep('intro');
   };
 
   if (step === 'loading') {
-    return <LoadingState message="Looking at your photo…" />;
+    return <LoadingState message={mode === 'dish' ? 'Looking at your dish…' : 'Looking at your photo…'} />;
   }
 
   if (step === 'saving') {
@@ -207,13 +243,54 @@ export function ScanScreen({ navigation }: Props) {
     );
   }
 
+  if (step === 'dish-result') {
+    return (
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+        <BackLink label="Scan a different photo" onPress={startOver} />
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>{dishName}</Text>
+          {isDemoResult ? <Tag label="Demo mode" tone="neutral" /> : null}
+        </View>
+        <Text style={styles.subtitle}>Here's the likely combination of what's in this dish.</Text>
+        <Text style={styles.dishDisclaimer}>
+          Estimated from how the dish typically looks and is made — not a verified ingredient list. If you
+          have an allergy or a medical condition, check with whoever made or sold the food before eating.
+        </Text>
+
+        {dishIngredients.length === 0 ? (
+          <Text style={styles.subtitle}>No specific ingredients identified.</Text>
+        ) : (
+          dishIngredients.map((ingredient, i) => (
+            <Card key={i} style={styles.itemCard}>
+              <Text style={styles.ingredientName}>{ingredient.name}</Text>
+              {ingredient.note ? <Text style={styles.ingredientNote}>{ingredient.note}</Text> : null}
+            </Card>
+          ))
+        )}
+
+        <Button
+          label="Find recipes with these ingredients"
+          onPress={() =>
+            navigation.navigate('CookToday', { initialIngredients: dishIngredients.map((i) => i.name) })
+          }
+          style={styles.actionSpacing}
+        />
+        <Button label="Scan another dish" variant="secondary" onPress={startOver} style={styles.actionSpacing} />
+        <Button
+          label="Back to Home"
+          variant="secondary"
+          onPress={() => navigation.goBack()}
+          style={styles.actionSpacing}
+        />
+      </ScrollView>
+    );
+  }
+
   if (step === 'review') {
     const confirmedCount = rows.filter((row) => row.included).length;
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={startOver} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Scan a different photo</Text>
-        </TouchableOpacity>
+        <BackLink label="Scan a different photo" onPress={startOver} />
         <View style={styles.titleRow}>
           <Text style={styles.title}>We found these foods</Text>
           {isDemoResult ? <Tag label="Demo mode" tone="neutral" /> : null}
@@ -274,14 +351,43 @@ export function ScanScreen({ navigation }: Props) {
   // step === 'intro'
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>Scan your food</Text>
-      <Text style={styles.subtitle}>
-        Take or choose a photo of your fridge, cupboard, or shopping — we'll suggest what to add to your
-        pantry. You'll review the list before anything is saved.
-      </Text>
+
+      <View style={styles.modeRow}>
+        <TouchableOpacity
+          style={[styles.modeTab, mode === 'pantry' && styles.modeTabSelected]}
+          onPress={() => {
+            setMode('pantry');
+            setError(null);
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.modeTabText, mode === 'pantry' && styles.modeTabTextSelected]}>My kitchen</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.modeTab, mode === 'dish' && styles.modeTabSelected]}
+          onPress={() => {
+            setMode('dish');
+            setError(null);
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={[styles.modeTabText, mode === 'dish' && styles.modeTabTextSelected]}>A dish</Text>
+        </TouchableOpacity>
+      </View>
+
+      {mode === 'pantry' ? (
+        <Text style={styles.subtitle}>
+          Take or choose a photo of your fridge, cupboard, or shopping — we'll suggest what to add to your
+          pantry. You'll review the list before anything is saved.
+        </Text>
+      ) : (
+        <Text style={styles.subtitle}>
+          Take or choose a photo of a prepared dish — we'll identify it and list its likely ingredients, so
+          you can see the possible combination of what's in it.
+        </Text>
+      )}
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
@@ -290,24 +396,42 @@ export function ScanScreen({ navigation }: Props) {
       ) : null}
       <Button label="Choose a photo" variant="secondary" onPress={choosePhoto} style={styles.actionSpacing} />
 
-      <Text style={styles.sampleHeading}>Don't have a photo?</Text>
-      <View style={styles.sampleWrap}>
-        {SAMPLE_KITCHENS.map((sample) => (
-          <TouchableOpacity key={sample.key} onPress={() => useSampleKitchen(sample.key)} style={styles.sampleChip}>
-            <Text style={styles.sampleChipText}>{sample.label}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      {mode === 'pantry' ? (
+        <>
+          <Text style={styles.sampleHeading}>Don't have a photo?</Text>
+          <View style={styles.sampleWrap}>
+            {SAMPLE_KITCHENS.map((sample) => (
+              <TouchableOpacity key={sample.key} onPress={() => useSampleKitchen(sample.key)} style={styles.sampleChip}>
+                <Text style={styles.sampleChipText}>{sample.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </>
+      ) : null}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
   title: { ...typography.display, color: colors.text },
+  modeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.md },
+  modeTab: {
+    flex: 1,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    borderRadius: radius.pill,
+    paddingVertical: 10,
+  },
+  modeTabSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
+  modeTabText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
+  modeTabTextSelected: { color: colors.primary },
+  dishDisclaimer: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+  ingredientName: { fontSize: 16, fontWeight: '600', color: colors.text },
+  ingredientNote: { ...typography.caption, color: colors.textFaint, marginTop: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   errorText: { color: colors.danger, marginBottom: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.lg },

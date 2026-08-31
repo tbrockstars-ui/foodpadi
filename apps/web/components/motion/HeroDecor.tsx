@@ -12,28 +12,25 @@ interface Piece {
   rotate?: number;
 }
 
-// Real cutout PNGs — tomatoes/onions/leaves from images/fruits/, burger +
-// OJ glass from images/drink/ (drink.png shipped with a solid background;
-// see scripts note below — chroma-keyed out before saving to decor/). All
-// already transparent, trimmed + resized — see apps/web/public/decor/.
-// Clustered along the banner's base (bottom-left + bottom-right) — keeps
-// the nav/logo area at the top clean. The board ("the plate") is turned 90°
-// so its flat edge runs along the base — the rotation lives here (in
-// framer-motion's animate/initial) rather than as CSS `transform` on
-// .basil, because framer-motion writes its own inline `transform` on
-// animate and would otherwise silently clobber a CSS one. Burger + drink
-// are folded into the bottom-right cluster (overlapping onion/tomato)
-// rather than given their own separate corner, so they read as one mixed
-// spread instead of a bolted-on addition. The burger sits as a large,
-// blown-up backdrop tucked behind the corner — it's listed before
-// onion/drink/tomato here (paint order follows DOM order for these
-// unlayered absolutely-positioned siblings) so all three paint on top of
-// it instead of covering them.
+// Real cutout PNGs — tomatoes/onions/leaves from images/fruits/, burger from
+// images/drink/. All already transparent, trimmed + resized — see
+// apps/web/public/decor/. Clustered along the banner's base (bottom-left +
+// bottom-right) — keeps the nav/logo area at the top clean. The board ("the
+// plate") is turned 90° so its flat edge runs along the base — the rotation
+// lives here (in framer-motion's animate/initial) rather than as CSS
+// `transform` on .basil, because framer-motion writes its own inline
+// `transform` on animate and would otherwise silently clobber a CSS one.
+// Burger is folded into the bottom-right cluster (overlapping onion/tomato)
+// rather than given its own separate corner, so it reads as one mixed
+// spread instead of a bolted-on addition. It sits as a large, blown-up
+// backdrop tucked behind the corner — it's listed before onion/tomato here
+// (paint order follows DOM order for these unlayered absolutely-positioned
+// siblings) so both paint on top of it instead of covering them. The drink
+// (OJ glass) piece that used to sit here was removed per request.
 const PIECES: Piece[] = [
   { src: '/decor/basil.png', alt: '', className: styles.basil, delay: 0.08, rotate: 90 },
   { src: '/decor/burger.png', alt: '', className: styles.burger, delay: 0.12 },
   { src: '/decor/onion.png', alt: '', className: styles.onion, delay: 0.2 },
-  { src: '/decor/drink.png', alt: '', className: styles.drink, delay: 0.28 },
   { src: '/decor/tomato.png', alt: '', className: styles.tomato, delay: 0.32 },
 ];
 

@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
@@ -157,9 +158,7 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   if (step === 'detail' && selectedRecipe) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <TouchableOpacity onPress={() => setStep('results')} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Back to results</Text>
-        </TouchableOpacity>
+        <BackLink label="Back to results" onPress={() => setStep('results')} />
 
         <Text style={styles.title}>{selectedRecipe.title}</Text>
         <View style={styles.tagRow}>
@@ -216,9 +215,7 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   if (step === 'results') {
     return (
       <View style={styles.container}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-          <Text style={styles.backLinkText}>‹ Home</Text>
-        </TouchableOpacity>
+        <BackLink label="Home" onPress={() => navigation.goBack()} />
         <Text style={styles.title}>A few things you could cook</Text>
         {recipes.length === 0 ? (
           <Text style={styles.emptyText}>
@@ -246,9 +243,7 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   // step === 'input'
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.goBack()} />
       <Text style={styles.title}>What have you got?</Text>
       <Text style={styles.subtitle}>Tap what you have, or add something else.</Text>
 
@@ -317,8 +312,6 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
   subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
   sectionHeading: { ...typography.label, color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },

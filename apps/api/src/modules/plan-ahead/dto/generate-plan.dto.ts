@@ -1,9 +1,9 @@
 import { IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
 
-export type PlanScope = 'today' | '3day' | 'week' | 'custom';
+export type PlanScope = 'today' | 'tomorrow' | '3day' | 'week' | 'custom';
 
 export class GeneratePlanDto {
-  @IsIn(['today', '3day', 'week', 'custom'])
+  @IsIn(['today', 'tomorrow', '3day', 'week', 'custom'])
   scope!: PlanScope;
 
   // Required only when scope === 'custom'; validated in the service rather

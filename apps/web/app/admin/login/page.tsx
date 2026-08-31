@@ -1,4 +1,8 @@
+import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
+import { ADMIN_SESSION_COOKIE, isValidAdminSessionToken } from '../../../lib/adminSession';
 import styles from '../admin.module.css';
+import { PasswordField } from './PasswordField';
 
 export const metadata = { title: 'Admin sign in — FoodPadi' };
 
@@ -7,6 +11,13 @@ export default function AdminLoginPage({
 }: {
   searchParams: { error?: string };
 }) {
+  // Already signed in (e.g. navigated back here manually) — go straight to
+  // the dashboard instead of showing a redundant sign-in form under the
+  // dashboard chrome.
+  if (isValidAdminSessionToken(cookies().get(ADMIN_SESSION_COOKIE)?.value)) {
+    redirect('/admin');
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.card}>
@@ -23,14 +34,7 @@ export default function AdminLoginPage({
             autoFocus
             autoComplete="username"
           />
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            required
-            className={styles.input}
-            autoComplete="current-password"
-          />
+          <PasswordField />
           <button type="submit" className={styles.button}>
             Sign in
           </button>

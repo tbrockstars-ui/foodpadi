@@ -43,19 +43,16 @@ interface HubAction {
   disabledTag?: string;
 }
 
-// The three "Understand Intent" branches from the FoodPadi decision-loop
-// architecture (docs — the user's 2026-08-27 core-flow brief): FoodPadi
-// should be one intent-first front door, not four equally-weighted modes
-// the user has to pick between blind. Right now -> Eat Now, Cooking -> Cook
-// Today, Plan ahead -> Plan Ahead.
-//
-// The "Understand Context" / "FoodPadi Decides (3 options)" layer above
-// these now exists too — see <DecideFlow /> below, which calls POST /decide
-// (blending real Cook Today + Eat Now results into explained cook-it/get-it
-// options). These three cards remain as a direct-to-mode alternative for
-// anyone who'd rather skip straight to a specific tool — each rendered as
-// its own visual "journey" (IntentCard: real photo + accent colour + badge)
-// rather than three identical flat cards.
+// "Understand Intent" branches from the FoodPadi decision-loop architecture
+// (docs — the user's 2026-08-27 core-flow brief): FoodPadi should be one
+// intent-first front door, not four equally-weighted modes the user picks
+// between blind. The "Understand Context" / "FoodPadi Decides (3 options)"
+// layer is <DecideFlow /> below (POST /decide, blending real Cook Today + Eat
+// Now results into explained cook-it/get-it options) and now owns the "right
+// now / I'm hungry" intent outright — so only Cooking (-> Cook Today) and
+// Plan ahead (-> Plan Ahead) remain as direct-to-mode cards, for anyone who'd
+// rather skip straight to a specific tool. Each is its own visual "journey"
+// (IntentCard: real photo + accent colour + badge) rather than a flat card.
 
 // Scan is mobile-only by design (docs/TECHNICAL_ARCHITECTURE.md §2.7) — it
 // needs a camera, so it's never coming to web. "App only" says so directly
@@ -90,14 +87,11 @@ function HomeHub() {
       <DecideFlow />
 
       <div className={homeStyles.primaryGrid}>
-        <IntentCard
-          href="/eat-now"
-          badge="🍽️"
-          label="Right now"
-          subtitle="I'm hungry — find something to eat"
-          image={IMAGE_ASSETS.rightNow}
-          accent="right-now"
-        />
+        {/* "Right now / I'm hungry" is not a card here — the DecideFlow above
+            already covers it (and routes to Eat Now's "find it nearby" when
+            the user picks a "Get it" option). Home only needs the two intents
+            DecideFlow doesn't fully own: cooking from what you have, and
+            multi-day planning. */}
         <IntentCard
           href="/cook-today"
           badge="🥕"

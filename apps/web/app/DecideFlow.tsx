@@ -5,6 +5,7 @@ import { motion, useReducedMotion } from 'framer-motion';
 import type { DecideResponse, DecisionOptionView } from '@foodpadi/shared';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './eat-now/LocalFoodSearch';
 import { AiThinking } from '../components/motion/AiThinking';
+import { FoodImage } from '../components/FoodImage';
 import styles from './home.module.css';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
@@ -117,15 +118,16 @@ export function DecideFlow() {
   const pickChip = (text: string) => {
     if (text === description) return;
     setDescription(text);
-    setExpandedId(null);
-    // Switching selection while a result set (or error / empty state) is on
-    // screen means "decide again for this instead" — pull a fresh set for the
-    // new selection rather than leaving the previous one showing.
-    if (hasResultsShowing) {
-      decide(text);
-    } else {
-      clearResults();
-    }
+    // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
+    // any time/budget constraint typed for the previous selection shouldn't
+    // silently carry over and narrow it.
+    setTimeMinutes('');
+    setBudgetPounds('');
+    // Picking a chip clears any results already on screen and re-enables
+    // "Decide for me" rather than auto-firing a new decide() — the user
+    // asked for a chance to add constraints (time/budget) or just review
+    // the new selection before running it, not an immediate re-run.
+    clearResults();
   };
 
   // Editing the free-text or the constraints invalidates whatever was decided
@@ -133,6 +135,11 @@ export function DecideFlow() {
   // keystroke; the user hits "Decide for me" when ready.
   const handleDescriptionChange = (value: string) => {
     setDescription(value);
+    // Same reasoning as pickChip: typing a new description is a fresh
+    // prompt, so a constraint left over from a previous one shouldn't
+    // silently narrow it.
+    setTimeMinutes('');
+    setBudgetPounds('');
     if (hasResultsShowing) clearResults();
   };
   const handleConstraintChange = (setter: (v: string) => void, value: string) => {
@@ -167,24 +174,30 @@ export function DecideFlow() {
       </div>
 
       <div className={styles.constraintsRow}>
-        <input
-          className={styles.constraintInput}
-          type="number"
-          min={5}
-          max={240}
-          placeholder="Minutes (optional)"
-          value={timeMinutes}
-          onChange={(e) => handleConstraintChange(setTimeMinutes, e.target.value)}
-        />
-        <input
-          className={styles.constraintInput}
-          type="number"
-          min={0}
-          step={0.5}
-          placeholder="Budget £ (optional)"
-          value={budgetPounds}
-          onChange={(e) => handleConstraintChange(setBudgetPounds, e.target.value)}
-        />
+        <div className={styles.constraintField}>
+          <input
+            className={`${styles.constraintInput} ${timeMinutes ? styles.constraintInputHasSuffix : ''}`}
+            type="number"
+            min={5}
+            max={240}
+            placeholder="Minutes (optional)"
+            value={timeMinutes}
+            onChange={(e) => handleConstraintChange(setTimeMinutes, e.target.value)}
+          />
+          {timeMinutes ? <span className={styles.constraintAffixSuffix}>mins</span> : null}
+        </div>
+        <div className={styles.constraintField}>
+          {budgetPounds ? <span className={styles.constraintAffixPrefix}>£</span> : null}
+          <input
+            className={`${styles.constraintInput} ${budgetPounds ? styles.constraintInputHasPrefix : ''}`}
+            type="number"
+            min={0}
+            step={0.5}
+            placeholder="Budget £ (optional)"
+            value={budgetPounds}
+            onChange={(e) => handleConstraintChange(setBudgetPounds, e.target.value)}
+          />
+        </div>
       </div>
       <motion.button
         type="button"
@@ -217,6 +230,8 @@ export function DecideFlow() {
               animate="visible"
               variants={OPTION_VARIANTS}
             >
+              <FoodImage image={option.image} alt={option.title} className={styles.optionImage} eager={index === 0} />
+
               <div className={styles.optionHeader}>
                 <div>
                   <p className={styles.optionTitle}>{option.title}</p>

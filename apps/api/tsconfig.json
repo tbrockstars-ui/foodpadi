@@ -3,8 +3,8 @@
     "module": "commonjs",
     "target": "ES2021",
     "declaration": false,
+    "rootDir": "./src",
     "outDir": "./dist",
-    "baseUrl": "./",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "sourceMap": true,
@@ -12,7 +12,8 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "moduleResolution": "node",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "ignoreDeprecations": "5.0"
   },
   "include": ["src"]
 }

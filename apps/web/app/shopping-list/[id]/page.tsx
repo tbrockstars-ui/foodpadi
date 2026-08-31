@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import type { ShoppingListView } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../../lib/serverApi';
 import { ShoppingListClient } from './ShoppingListClient';
+import { BackLink } from '../../../components/BackLink';
 import shellStyles from '../../app-shell.module.css';
 
 export default async function ShoppingListPage({ params }: { params: { id: string } }) {
@@ -10,9 +10,7 @@ export default async function ShoppingListPage({ params }: { params: { id: strin
 
   return (
     <main className={shellStyles.container}>
-      <Link href="/" className={shellStyles.backLink}>
-        ‹ Home
-      </Link>
+      <BackLink href="/" label="Home" />
       <ShoppingListClient initialList={list} />
     </main>
   );

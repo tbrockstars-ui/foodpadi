@@ -5,7 +5,9 @@
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,
@@ -16,7 +18,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0E5135"
-      }
+      },
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "plugins": [
       [
@@ -36,7 +42,11 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "http://192.168.0.205:4310"
-    }
+      "apiBaseUrl": "https://foodpadi-api.onrender.com",
+      "eas": {
+        "projectId": "95068528-5f02-41d4-b96f-b588c365ba5b"
+      }
+    },
+    "owner": "kcnwamary"
   }
 }

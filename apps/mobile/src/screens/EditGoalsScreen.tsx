@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { FoodGoal } from '@foodpadi/shared';
 import { api } from '../api/client';
+import { BackLink } from '../components/BackLink';
 import { GoalsEditor } from '../components/goals/GoalsEditor';
 import { LoadingState } from '../components/LoadingState';
 import { colors } from '../theme/colors';
@@ -36,9 +37,7 @@ export function EditGoalsScreen({ navigation }: Props) {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Profile</Text>
-      </TouchableOpacity>
+      <BackLink label="Profile" onPress={() => navigation.goBack()} />
       <GoalsEditor
         initialGoals={initialGoals}
         initialPrimary={initialPrimary}
@@ -53,6 +52,4 @@ export function EditGoalsScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 24, paddingTop: 56 },
-  backLink: { marginBottom: 12 },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
 });

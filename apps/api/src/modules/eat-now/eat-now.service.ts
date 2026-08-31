@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { FoodImageView } from '@foodpadi/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { RequestActor } from '../auth/guest-or-auth.guard';
-import { EAT_NOW_CATALOG, FoodIdea } from './eat-now-catalog';
+import { FoodImageService } from '../food-image/food-image.service';
+import { BudgetTier, FoodIdea } from './eat-now-catalog';
 import { estimateFor } from './eat-now-estimates';
 import { SearchEatNowDto } from './dto/search-eat-now.dto';
 
@@ -12,7 +14,18 @@ export type FoodIdeaResult = FoodIdea & {
   deliveryMinutesMax: number;
   pricePenceMin: number;
   pricePenceMax: number;
+  /** Representative photo, or null when none was found. Omitted when the caller opts out. */
+  image?: FoodImageView | null;
 };
+
+interface SearchOptions {
+  /**
+   * Attach a representative photo to each result (default true). DecideService
+   * passes false — it resolves images once over the final blended option set
+   * instead, so a 12-result Eat Now search isn't run on the decide path.
+   */
+  resolveImages?: boolean;
+}
 
 // Raised alongside the catalog widening (eat-now-catalog.ts, 31 -> 68
 // entries) — 5 was leaving plenty of relevant matches on the table for a
@@ -84,15 +97,6 @@ function shuffled<T>(items: T[]): T[] {
   return copy;
 }
 
-// Rough pence ceilings per tier — a soft heuristic (like Plan Ahead's budget
-// hint), not a real price. Kept alongside the catalog until we have real
-// pricing to sort by.
-const BUDGET_TIER_CEILING_PENCE: Record<FoodIdea['budgetTier'], number> = {
-  low: 800,
-  medium: 1500,
-  high: Infinity,
-};
-
 function actorToAnalyticsFields(actor: RequestActor) {
   return actor.type === 'user' ? { userId: actor.userId } : { guestSessionId: actor.sessionId };
 }
@@ -134,26 +138,35 @@ function hasWordMatch(idea: FoodIdea, token: string): boolean {
 // spaghetti. Weighting each token by how rare it is in the catalog (classic
 // IDF) fixes that: a token nearly every entry contains is worth barely
 // anything, one that appears in a single entry is worth a lot.
-function documentFrequency(token: string): number {
-  return EAT_NOW_CATALOG.reduce((count, idea) => (hasWordMatch(idea, token) ? count + 1 : count), 0);
+//
+// Catalog is now DB-backed (admin/food-ideas, see docs/IMPLEMENTATION_PLAN.md)
+// rather than the old EAT_NOW_CATALOG constant, so these take the active
+// catalog as a parameter (fetched once per search() call) instead of closing
+// over a module-level array.
+function documentFrequency(token: string, catalog: FoodIdea[]): number {
+  return catalog.reduce((count, idea) => (hasWordMatch(idea, token) ? count + 1 : count), 0);
 }
 
-function tokenWeight(token: string): number {
-  const df = documentFrequency(token);
+function tokenWeight(token: string, catalog: FoodIdea[]): number {
+  const df = documentFrequency(token, catalog);
   if (df === 0) return 0; // never appears verbatim anywhere — only the fuzzy path can still credit it
-  return Math.log2(EAT_NOW_CATALOG.length / df) + 1;
+  return Math.log2(catalog.length / df) + 1;
 }
 
 /** One weight computed per query token, shared across every idea being scored. */
-function weighTokens(queryTokens: string[]): { token: string; weight: number }[] {
-  return queryTokens.map((token) => ({ token, weight: tokenWeight(token) }));
+function weighTokens(queryTokens: string[], catalog: FoodIdea[]): { token: string; weight: number }[] {
+  return queryTokens.map((token) => ({ token, weight: tokenWeight(token, catalog) }));
 }
 
 // A word (whole-word/prefix, per wordsMatch) match scores the token's full
 // weight — a real signal. A typo (e.g. "spagetti" for "spaghetti") only
 // gets 60% of that weight via levenshteinWithin, so a correctly-spelled
 // exact match still edges out a near-miss for the same word.
-function scoreIdea(idea: FoodIdea, weightedTokens: { token: string; weight: number }[]): number {
+function scoreIdea(
+  idea: FoodIdea,
+  weightedTokens: { token: string; weight: number }[],
+  catalog: FoodIdea[],
+): number {
   const words = ideaWords(idea); // computed once per idea, reused for both the exact and fuzzy passes
   return weightedTokens.reduce((score, { token, weight }) => {
     if (words.some((word) => wordsMatch(word, token))) return score + weight;
@@ -163,7 +176,7 @@ function scoreIdea(idea: FoodIdea, weightedTokens: { token: string; weight: numb
     // has to come from the real word it matched ("spaghetti"), not from the
     // typo, or a typo'd dish name would score as worthless as "spicy".
     const matchedWord = words.filter((word) => word.length >= 4).find((word) => levenshteinWithin(token, word, budget));
-    return matchedWord ? score + tokenWeight(matchedWord) * 0.6 : score;
+    return matchedWord ? score + tokenWeight(matchedWord, catalog) * 0.6 : score;
   }, 0);
 }
 
@@ -188,9 +201,14 @@ export class EatNowService {
   constructor(
     private readonly analytics: AnalyticsService,
     private readonly prisma: PrismaService,
+    private readonly foodImage: FoodImageService,
   ) {}
 
-  async search(dto: SearchEatNowDto, actor: RequestActor): Promise<FoodIdeaResult[]> {
+  async search(
+    dto: SearchEatNowDto,
+    actor: RequestActor,
+    options: SearchOptions = {},
+  ): Promise<FoodIdeaResult[]> {
     // Strip punctuation before splitting — "egg," (a trailing comma from
     // "with egg, a bit spicy") is otherwise a token that can never match the
     // word "egg" in any catalog entry via substring matching.
@@ -200,16 +218,31 @@ export class EatNowService {
       .split(/\s+/)
       .filter(Boolean);
     const queryTokens = meaningfulTokens(rawTokens);
-    const weightedTokens = weighTokens(queryTokens);
     const cuisineFilter = dto.cuisine?.trim().toLowerCase();
 
-    const { favouriteCuisines, avoidedIngredients } = await this.loadPersonalisation(actor);
+    const [catalog, { favouriteCuisines, avoidedIngredients }] = await Promise.all([
+      this.loadCatalog(),
+      this.loadPersonalisation(actor),
+    ]);
+    const weightedTokens = weighTokens(queryTokens, catalog);
 
     const wantsSurprise = rawTokens.some((token) => SURPRISE_ME_TRIGGERS.includes(token));
 
-    const filtered = EAT_NOW_CATALOG.filter((idea) => {
+    // Computed once per idea, up front, so the budget filter below can check
+    // this specific dish's own estimated price band rather than a whole
+    // tier's ceiling (see the filter comment).
+    const withEstimates = catalog.map((idea) => ({ idea, estimate: estimateFor(idea) }));
+
+    const filtered = withEstimates.filter(({ idea, estimate }) => {
       if (cuisineFilter && !idea.cuisine.toLowerCase().includes(cuisineFilter)) return false;
-      if (dto.maxPricePence && BUDGET_TIER_CEILING_PENCE[idea.budgetTier] > dto.maxPricePence) return false;
+      // Was comparing the user's budget against the whole tier's ceiling
+      // (e.g. "medium" topping out at £13.50), which excluded EVERY
+      // medium-tier dish under a modest budget even when a given dish's own
+      // estimate fit comfortably — a £12 budget was silently ruling out
+      // every pizza in the catalog (all "medium" tier) even ones estimated
+      // at £9-£11. Comparing against this dish's own estimated minimum
+      // instead only excludes it when it actually can't fit.
+      if (dto.maxPricePence && estimate.pricePenceMin > dto.maxPricePence) return false;
       if (avoidedIngredients.length > 0) {
         const haystack = ideaHaystack(idea);
         if (avoidedIngredients.some((ingredient) => haystack.includes(ingredient))) return false;
@@ -220,7 +253,7 @@ export class EatNowService {
     const results = wantsSurprise
       ? shuffled(filtered).slice(0, MAX_RESULTS)
       : filtered
-          .map((idea) => ({ idea, score: scoreIdea(idea, weightedTokens) }))
+          .map((entry) => ({ ...entry, score: scoreIdea(entry.idea, weightedTokens, catalog) }))
           .filter((entry) => entry.score > 0)
           .map((entry) => {
             // Substring, not exact equality — preference cuisines are full
@@ -234,14 +267,41 @@ export class EatNowService {
             return { ...entry, score: entry.score + (isFavourite ? FAVOURITE_CUISINE_BONUS : 0) };
           })
           .sort((a, b) => b.score - a.score)
-          .slice(0, MAX_RESULTS)
-          .map((entry) => entry.idea);
+          .slice(0, MAX_RESULTS);
 
     await this.analytics.track('eat_now_searched', actorToAnalyticsFields(actor), {
       resultCount: results.length,
     });
 
-    return results.map((idea) => ({ ...idea, ...estimateFor(idea) }));
+    const enriched: FoodIdeaResult[] = results.map(({ idea, estimate }) => ({ ...idea, ...estimate }));
+
+    if (options.resolveImages === false) return enriched;
+
+    // A representative photo per result so the customer SEES what they're
+    // choosing (visual-redesign brief). Best-effort and cached — a miss just
+    // leaves image null and the card renders a placeholder.
+    const images = await this.foodImage.resolveMany(
+      enriched.map((idea) => ({ name: idea.title, cuisine: idea.cuisine })),
+    );
+    return enriched.map((idea) => ({ ...idea, image: images.get(idea.title) ?? null }));
+  }
+
+  // DB-backed catalog (admin/food-ideas) — `slug` becomes the public `id`
+  // every other part of the app already keys on (FoodIdeaView.id, sent to
+  // clients; eat-now-estimates.ts's stable per-dish hash), so estimates and
+  // client behaviour are unchanged by the move off the old hardcoded array.
+  // Small table (dozens of rows) — loading all active rows and scoring in
+  // JS, same as the old in-memory array, needs no DB-side search/indexing.
+  private async loadCatalog(): Promise<FoodIdea[]> {
+    const rows = await this.prisma.foodIdea.findMany({ where: { isActive: true } });
+    return rows.map((row) => ({
+      id: row.slug,
+      title: row.title,
+      description: row.description,
+      cuisine: row.cuisine,
+      budgetTier: row.budgetTier as BudgetTier,
+      tags: row.tags,
+    }));
   }
 
   private async loadPersonalisation(

@@ -4,6 +4,7 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { RequestActor } from '../auth/guest-or-auth.guard';
 import { CookTodayService } from '../cook-today/cook-today.service';
 import { EatNowService } from '../eat-now/eat-now.service';
+import { FoodImageService } from '../food-image/food-image.service';
 import { DecideDto } from './dto/decide.dto';
 
 // Worked example from the architecture brief: 2 cook options + 1 get option.
@@ -35,6 +36,7 @@ export class DecideService {
     private readonly cookToday: CookTodayService,
     private readonly eatNow: EatNowService,
     private readonly analytics: AnalyticsService,
+    private readonly foodImage: FoodImageService,
   ) {}
 
   async decide(dto: DecideDto, actor: RequestActor): Promise<DecideResponse> {
@@ -42,7 +44,11 @@ export class DecideService {
       this.cookToday
         .generate({ ingredients: [dto.description], timeConstraintMinutes: dto.timeMinutes }, actor)
         .catch(() => []),
-      this.eatNow.search({ query: dto.description, maxPricePence: dto.budgetPence }, actor).catch(() => []),
+      // resolveImages: false — images are attached below over just the final
+      // blended set (~3), not every one of Eat Now's up-to-12 matches.
+      this.eatNow
+        .search({ query: dto.description, maxPricePence: dto.budgetPence }, actor, { resolveImages: false })
+        .catch(() => []),
     ]);
 
     const cookOptions: DecisionOptionView[] = recipes.map((recipe, i) => ({
@@ -75,12 +81,23 @@ export class DecideService {
       options = [...options, ...getOptions.slice(getCount, getCount + remaining)];
     }
 
+    // Attach a representative photo to each shown option so "what should I
+    // eat" is a visual decision, not a wall of text (visual-redesign brief).
+    // Runs only over the final ~3, is cached, and never blocks the answer —
+    // an image that can't be found just stays null and the card shows a
+    // placeholder.
+    const images = await this.foodImage.resolveMany(
+      options.map((o) => ({ name: o.title, cuisine: o.recipe?.cuisine ?? o.foodIdea?.cuisine ?? undefined })),
+    );
+    const optionsWithImages = options.map((o) => ({ ...o, image: images.get(o.title) ?? null }));
+
     await this.analytics.track('decide_options_generated', actorToAnalyticsFields(actor), {
-      optionCount: options.length,
-      cookCount: options.filter((o) => o.type === 'cook').length,
-      getCount: options.filter((o) => o.type === 'get').length,
+      optionCount: optionsWithImages.length,
+      cookCount: optionsWithImages.filter((o) => o.type === 'cook').length,
+      getCount: optionsWithImages.filter((o) => o.type === 'get').length,
+      withImage: optionsWithImages.filter((o) => o.image).length,
     });
 
-    return { options };
+    return { options: optionsWithImages };
   }
 }

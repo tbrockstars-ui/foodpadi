@@ -4,6 +4,7 @@ import { useState } from 'react';
 import type { FoodIdeaView } from '@foodpadi/shared';
 import styles from './eat-now.module.css';
 import { LocalFoodSearch } from './LocalFoodSearch';
+import { FoodImage } from '../../components/FoodImage';
 
 const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
   low: '£',
@@ -80,6 +81,7 @@ export function EatNowSearchForm() {
           ) : (
             results.map((idea) => (
               <div key={idea.id} className={styles.resultCard}>
+                <FoodImage image={idea.image} alt={idea.title} className={styles.resultImage} />
                 <p className={styles.resultTitle}>{idea.title}</p>
                 <p className={styles.resultBody}>{idea.description}</p>
                 <p className={styles.estimateText}>

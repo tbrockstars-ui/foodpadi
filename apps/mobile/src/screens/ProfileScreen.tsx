@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AvoidedIngredientItem, DISCLAIMER_TEXT, FoodGoalItem, FoodPreferenceItem, UserSummary } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { api } from '../api/client';
+import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { DisclaimerBanner } from '../components/DisclaimerBanner';
@@ -99,16 +100,20 @@ export function ProfileScreen({ navigation }: Props) {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backLink}>
-        <Text style={styles.backLinkText}>‹ Home</Text>
-      </TouchableOpacity>
+      <BackLink label="Home" onPress={() => navigation.goBack()} />
 
       <Text style={styles.title}>Profile</Text>
       <Text style={styles.email}>{profile.email}</Text>
 
-      <Text style={styles.sectionHeading}>Recipes</Text>
+      <Text style={styles.sectionHeading}>Recipes & plans</Text>
       <Card style={styles.section}>
         <Button label="View saved recipes" variant="secondary" onPress={() => navigation.navigate('SavedRecipes')} />
+        <Button
+          label="View saved plans"
+          variant="secondary"
+          onPress={() => navigation.navigate('SavedPlans')}
+          style={{ marginTop: spacing.sm }}
+        />
       </Card>
 
       <Text style={styles.sectionHeading}>Food & lifestyle goals</Text>
@@ -252,8 +257,6 @@ export function ProfileScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  backLink: { marginBottom: spacing.md },
-  backLinkText: { color: colors.textMuted, fontSize: 14 },
   title: { ...typography.display, color: colors.text },
   email: { ...typography.body, color: colors.textMuted, marginBottom: spacing.xl },
   sectionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },

@@ -356,3 +356,56 @@ model AdminStaffUser {
 
   @@map("admin_staff_users")
 }
+
+// Eat Now's catalog (docs/IMPLEMENTATION_PLAN.md Phase 4) — was a hardcoded
+// array in eat-now-catalog.ts requiring a code deploy to change a single
+// dish; moved here so admin/food-ideas can manage it directly. `slug` keeps
+// the original human-readable ids (e.g. "shawarma-wrap") stable across the
+// migration — EatNowService's matching logic is unchanged, just reads these
+// rows (isActive: true) instead of the static array. `isActive` is a soft
+// toggle (same "suspend, don't destroy" precedent as User.deletedAt) so a
+// dish can be hidden without losing it; the admin UI also allows a real
+// hard delete for a genuine mistake entry.
+model FoodIdea {
+  id          String   @id @default(uuid())
+  slug        String   @unique
+  title       String
+  description String
+  cuisine     String
+  budgetTier  String   @map("budget_tier") // 'low' | 'medium' | 'high'
+  tags        String[]
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("food_ideas")
+}
+
+// Cache for the representative food photos shown on recommendation cards
+// (the visual "what should I eat" experience). One row per normalised food
+// name, so an image provider (Pexels, with Unsplash as fallback) is called
+// at most once per distinct dish, ever — repeat recommendations reuse the
+// row. Photos are hotlinked from the provider CDN as their API terms
+// require; nothing is downloaded or re-hosted here. A lookup that found
+// nothing is cached too (`status = "none"`) with a short TTL, so a miss
+// doesn't re-hit the provider on every page load. See FoodImageService.
+model FoodImageCache {
+  id               String   @id @default(uuid())
+  key              String   @unique // normalised food name (lowercased, punctuation-stripped)
+  foodName         String   @map("food_name")
+  searchQuery      String   @map("search_query")
+  status           String   @default("ok") // "ok" | "none"
+  provider         String? // "pexels" | "unsplash"
+  imageUrl         String?  @map("image_url")
+  thumbnailUrl     String?  @map("thumbnail_url")
+  photographerName String?  @map("photographer_name")
+  photographerUrl  String?  @map("photographer_url")
+  sourceUrl        String?  @map("source_url")
+  // Unsplash requires a GET to this endpoint when a photo is actually
+  // displayed; null for Pexels (no such requirement).
+  downloadLocation String?  @map("download_location")
+  isRepresentative Boolean  @default(true) @map("is_representative")
+  retrievedAt      DateTime @default(now()) @map("retrieved_at")
+
+  @@map("food_image_cache")
+}

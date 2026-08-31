@@ -44,6 +44,37 @@ html {
   scroll-behavior: smooth;
 }
 
+/* A visible, branded scrollbar for any page whose content runs longer than
+   the viewport (saved recipes, plans, shopping lists, ...) — the OS default
+   is easy to miss (thin on Windows, an auto-hiding overlay on macOS), so a
+   long list can read as "nothing more below" when there's really more to
+   scroll to. Firefox via scrollbar-width/color, WebKit/Blink via the
+   pseudo-elements below — same treatment already used for FoodCarousel's
+   horizontal track. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--background);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
 body {
   margin: 0;
   background: var(--background);

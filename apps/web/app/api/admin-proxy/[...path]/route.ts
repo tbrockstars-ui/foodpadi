@@ -52,6 +52,9 @@ export async function GET(request: NextRequest, { params }: { params: { path: st
 export async function POST(request: NextRequest, { params }: { params: { path: string[] } }) {
   return forward(request, params.path);
 }
+export async function PATCH(request: NextRequest, { params }: { params: { path: string[] } }) {
+  return forward(request, params.path);
+}
 export async function DELETE(request: NextRequest, { params }: { params: { path: string[] } }) {
   return forward(request, params.path);
 }

@@ -67,6 +67,7 @@
 }
 
 .primaryButton {
+  display: inline-block;
   border: none;
   border-radius: var(--radius-md);
   background: var(--primary);
@@ -76,6 +77,8 @@
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+  text-decoration: none;
+  text-align: center;
 }
 
 .primaryButton:disabled {
@@ -83,12 +86,102 @@
   cursor: not-allowed;
 }
 
+.secondaryButton {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  padding: 12px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  text-align: center;
+}
+
+.secondaryButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.listActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: center;
+}
+
+/* Plan-level actions ("Replace whole plan" / "Start a new plan") sit below
+   the day list, separated by a rule so they don't read as another day. */
+.planActionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  margin: var(--space-md) 0 var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.focusRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+
+.focusInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.focusButton {
+  flex-shrink: 0;
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  background: var(--primary-soft);
+  color: var(--primary);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.focusButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .mealCard {
+  display: flex;
+  gap: var(--space-lg);
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
   margin-bottom: var(--space-md);
   box-shadow: 0 2px 10px rgba(20, 21, 15, 0.05);
+}
+
+.mealImage {
+  flex-shrink: 0;
+  width: 88px;
+  height: 88px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  background: var(--surface-sunken);
+}
+
+.mealContent {
+  flex: 1;
+  min-width: 0;
 }
 
 .mealDate {
@@ -125,7 +218,8 @@
 
 .itemActions {
   display: flex;
-  gap: var(--space-lg);
+  flex-wrap: wrap;
+  gap: var(--space-md) var(--space-lg);
   margin-top: var(--space-xs);
 }
 
@@ -138,6 +232,7 @@
   cursor: pointer;
   padding: 0;
   font-family: inherit;
+  text-decoration: none;
 }
 
 .itemActionTextDanger {
@@ -153,6 +248,83 @@
 
 .itemActionText:disabled,
 .itemActionTextDanger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --- Saved plans list (apps/web/app/plan/saved) --- */
+.emptyText {
+  font-size: 15px;
+  color: var(--text-muted);
+}
+
+.savedCard {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-md);
+}
+
+.savedHeader {
+  background: none;
+  border: none;
+  padding: 0;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.savedTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-xs);
+}
+
+.savedDetail {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.savedDayRow {
+  display: flex;
+  gap: var(--space-md);
+  margin-bottom: var(--space-xs);
+  font-size: 14px;
+}
+
+.savedDayDate {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  width: 84px;
+}
+
+.savedDayMeal {
+  color: var(--text);
+}
+
+.savedActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+.dangerButton {
+  background: none;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.dangerButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
