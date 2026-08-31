@@ -8,6 +8,10 @@
     "assetBundlePatterns": [
       "**/*"
     ],
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
     "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": false,

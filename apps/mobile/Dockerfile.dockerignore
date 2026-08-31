@@ -1,0 +1,22 @@
+# Build-context filter for `docker build -f apps/mobile/Dockerfile .`
+# (BuildKit honours <dockerfile>.dockerignore over the root .dockerignore,
+# which excludes apps/mobile — we obviously need it here).
+**/node_modules
+**/dist
+**/.next
+**/.turbo
+**/.expo
+
+# The mobile web export doesn't need the API app or the Next.js web app.
+apps/api
+apps/web
+
+.git
+.gitignore
+.github
+.vercel
+.claude
+**/.env
+**/.env.*
+!**/.env.example
+**/*.log
