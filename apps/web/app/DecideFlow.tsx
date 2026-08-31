@@ -23,14 +23,20 @@ const PROMPT_CHIPS = [
   { label: 'Surprise me', text: 'Surprise me with something different' },
 ];
 
-const OPTION_VARIANTS = {
-  hidden: { opacity: 0, y: 16 },
+// A function (not a static object) so it can drop the translateY move and
+// the stagger delay under prefers-reduced-motion — an opacity-only,
+// all-at-once fade instead of cards visibly travelling up the screen one
+// after another (brief §20: "avoid repeated movement").
+const optionVariants = (prefersReducedMotion: boolean) => ({
+  hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 16 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, delay: i * 0.12, ease: 'easeOut' as const },
+    transition: prefersReducedMotion
+      ? { duration: 0.15 }
+      : { duration: 0.4, delay: i * 0.12, ease: 'easeOut' as const },
   }),
-};
+});
 
 /**
  * "FoodPadi decides" — the Understand Context -> Decide layer of the
@@ -166,7 +172,7 @@ export function DecideFlow() {
             className={`${styles.promptChip} ${description === chip.text ? styles.promptChipSelected : ''}`}
             onClick={() => pickChip(chip.text)}
             whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.03 }}
+            whileHover={prefersReducedMotion ? undefined : { scale: 1.03 }}
           >
             {chip.label}
           </motion.button>
@@ -180,7 +186,7 @@ export function DecideFlow() {
             type="number"
             min={5}
             max={240}
-            placeholder="Minutes (optional)"
+            placeholder="Minutes"
             value={timeMinutes}
             onChange={(e) => handleConstraintChange(setTimeMinutes, e.target.value)}
           />
@@ -193,7 +199,7 @@ export function DecideFlow() {
             type="number"
             min={0}
             step={0.5}
-            placeholder="Budget £ (optional)"
+            placeholder="Budget £"
             value={budgetPounds}
             onChange={(e) => handleConstraintChange(setBudgetPounds, e.target.value)}
           />
@@ -213,11 +219,34 @@ export function DecideFlow() {
 
       {stage === 'deciding' ? <AiThinking /> : null}
 
-      {stage === 'error' ? <p className={styles.optionReason}>{errorMessage}</p> : null}
+      {stage === 'error' ? (
+        <motion.div
+          className={styles.stateBlock}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className={styles.stateIcon} aria-hidden="true">
+            😕
+          </span>
+          <p className={styles.stateMessage}>{errorMessage}</p>
+          <button type="button" className={styles.stateRetry} onClick={() => decide()}>
+            Try again
+          </button>
+        </motion.div>
+      ) : null}
       {stage === 'no-options' ? (
-        <p className={styles.optionReason}>
-          FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
-        </p>
+        <motion.div
+          className={styles.stateBlock}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className={styles.stateIcon} aria-hidden="true">
+            🤔
+          </span>
+          <p className={styles.stateMessage}>
+            FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
+          </p>
+        </motion.div>
       ) : null}
 
       {stage === 'options'
@@ -228,7 +257,7 @@ export function DecideFlow() {
               custom={index}
               initial="hidden"
               animate="visible"
-              variants={OPTION_VARIANTS}
+              variants={optionVariants(!!prefersReducedMotion)}
             >
               <FoodImage image={option.image} alt={option.title} className={styles.optionImage} eager={index === 0} />
 

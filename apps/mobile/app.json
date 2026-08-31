@@ -51,6 +51,12 @@
         "projectId": "95068528-5f02-41d4-b96f-b588c365ba5b"
       }
     },
-    "owner": "kcnwamary"
+    "owner": "kcnwamary",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/95068528-5f02-41d4-b96f-b588c365ba5b"
+    }
   }
 }

@@ -4,6 +4,10 @@
   padding: 48px 24px;
 }
 
+.logo {
+  margin-bottom: var(--space-lg);
+}
+
 .body {
   font-size: 15px;
   line-height: 1.6;

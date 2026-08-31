@@ -7,6 +7,7 @@ import type {
 } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../lib/serverApi';
 import { BackLink } from '../../components/BackLink';
+import { Logo } from '../../components/Logo';
 import shellStyles from '../app-shell.module.css';
 import styles from './profile.module.css';
 import { GoalsSection } from './GoalsSection';
@@ -29,6 +30,7 @@ export default async function ProfilePage() {
 
   return (
     <main className={shellStyles.container}>
+      <Logo href="/" size={32} className={shellStyles.pageLogo} />
       <BackLink href="/" label="Home" />
 
       <h1 className={styles.title}>Profile</h1>

@@ -8,7 +8,7 @@
 .questionCard {
   position: absolute;
   bottom: 6%;
-  right: 4%;
+  right: 8%;
   display: flex;
   flex-direction: column;
   align-items: center;

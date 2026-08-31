@@ -11,8 +11,9 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Settings'>;
 
 /**
  * Settings — the mobile counterpart to apps/web/app/SettingsMenu.tsx. Tucks
- * the account links, the light/dark theme choice, and read-only subscription
- * / payment placeholders behind one screen reached from the Home gear.
+ * the account links, the black (default) / white theme choice, and
+ * read-only subscription / payment placeholders behind one screen reached
+ * from the Home gear.
  */
 export function SettingsScreen({ navigation }: Props) {
   const { logout } = useAuth();
@@ -34,20 +35,20 @@ export function SettingsScreen({ navigation }: Props) {
       <Text style={s.sectionLabel}>Appearance</Text>
       <View style={s.segmented}>
         <TouchableOpacity
-          style={[s.segment, scheme === 'default' && s.segmentActive]}
-          onPress={() => setScheme('default')}
-          accessibilityRole="radio"
-          accessibilityState={{ selected: scheme === 'default' }}
-        >
-          <Text style={[s.segmentText, scheme === 'default' && s.segmentTextActive]}>Default</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={[s.segment, scheme === 'dark' && s.segmentActive]}
           onPress={() => setScheme('dark')}
           accessibilityRole="radio"
           accessibilityState={{ selected: scheme === 'dark' }}
         >
-          <Text style={[s.segmentText, scheme === 'dark' && s.segmentTextActive]}>Dark</Text>
+          <Text style={[s.segmentText, scheme === 'dark' && s.segmentTextActive]}>Black</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[s.segment, scheme === 'default' && s.segmentActive]}
+          onPress={() => setScheme('default')}
+          accessibilityRole="radio"
+          accessibilityState={{ selected: scheme === 'default' }}
+        >
+          <Text style={[s.segmentText, scheme === 'default' && s.segmentTextActive]}>White</Text>
         </TouchableOpacity>
       </View>
 

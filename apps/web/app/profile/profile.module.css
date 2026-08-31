@@ -24,7 +24,7 @@
   background: var(--surface);
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
-  box-shadow: 0 2px 10px rgba(20, 21, 15, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .emptyText {
@@ -70,6 +70,9 @@
 
 .addInput {
   flex: 1;
+  /* Lets the input shrink below its placeholder's intrinsic width instead
+     of pushing the button beside it off-screen on narrow viewports. */
+  min-width: 0;
   border: 1px solid var(--border);
   background: var(--background);
   border-radius: var(--radius-md);
@@ -112,6 +115,7 @@
   color: var(--text);
   cursor: pointer;
   font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
 .chipSelected {

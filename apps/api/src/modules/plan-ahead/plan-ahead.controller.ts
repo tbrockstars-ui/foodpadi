@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { CurrentUser, CurrentUserPayload } from '../../common/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlanAheadService } from './plan-ahead.service';
@@ -29,6 +29,15 @@ export class PlanAheadController {
   @Get('current')
   getCurrent(@CurrentUser() user: CurrentUserPayload) {
     return this.planAheadService.getCurrent(user.userId);
+  }
+
+  // Typeahead for "Replace with something specific" — titles the user can
+  // pick from instead of free-typing a hint and finding out only after
+  // submitting whether anything matched. Declared before the `:planId`
+  // routes below so "meal-ideas" is never captured as a planId param.
+  @Get('meal-ideas')
+  searchMealIdeas(@Query('q') q: string | undefined) {
+    return this.planAheadService.searchMealIdeas(q ?? '');
   }
 
   @Delete(':planId')

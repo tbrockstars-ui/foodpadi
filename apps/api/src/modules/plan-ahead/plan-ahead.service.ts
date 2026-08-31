@@ -163,6 +163,32 @@ export class PlanAheadService {
     await this.analytics.track('plan_ahead_deleted', { userId }, { planId });
   }
 
+  // Powers the "Replace with something specific" typeahead — titles the
+  // user can pick from rather than free-typing a hint and finding out only
+  // after submitting whether anything matched. Source depends on the same
+  // ANTHROPIC_API_KEY branch as generatePlanMeals itself:
+  //  - demo mode: the curated pool regenerateItem will actually search, so
+  //    every suggestion offered is guaranteed to produce a real replacement.
+  //  - real AI mode: the FoodIdea catalog as broad inspiration — the AI can
+  //    honour an arbitrary specific dish fine, this pool doesn't need to be
+  //    a guaranteed-match set the way the demo one does.
+  async searchMealIdeas(query: string): Promise<string[]> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return this.claude.searchCuratedRecipeTitles(trimmed, 6);
+    }
+
+    const rows = await this.prisma.foodIdea.findMany({
+      where: { isActive: true, title: { contains: trimmed, mode: 'insensitive' } },
+      select: { title: true },
+      take: 6,
+      orderBy: { title: 'asc' },
+    });
+    return rows.map((r) => r.title);
+  }
+
   async regenerateItem(planId: string, itemId: string, userId: string, dto: RegeneratePlanItemDto = {}) {
     const plan = await this.ownedPlan(planId, userId);
     const item = plan.items.find((i) => i.id === itemId);

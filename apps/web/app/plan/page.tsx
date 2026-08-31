@@ -4,6 +4,7 @@ import { requireSession, serverFetch } from '../../lib/serverApi';
 import { PlanScopeForm } from './PlanScopeForm';
 import { PlanView } from './PlanView';
 import { BackLink } from '../../components/BackLink';
+import { Logo } from '../../components/Logo';
 import shellStyles from '../app-shell.module.css';
 import styles from './plan.module.css';
 
@@ -22,6 +23,7 @@ export default async function PlanPage({ searchParams }: { searchParams: { new?:
 
   return (
     <main className={shellStyles.container}>
+      <Logo href="/" size={32} className={shellStyles.pageLogo} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-md)' }}>
         <BackLink href="/" label="Home" />
         <Link href="/plan/saved" className={styles.itemActionText}>

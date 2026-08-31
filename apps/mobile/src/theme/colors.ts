@@ -61,9 +61,10 @@ export function colorsFor(scheme: ThemeScheme): ThemeColors {
   return scheme === 'dark' ? darkColors : lightColors;
 }
 
-// Back-compat: the ~30 screens/components that `import { colors }` statically
-// keep the light palette until they're migrated to useTheme(). New/updated
-// code should read colours from useTheme() so it responds to the setting.
+// Back-compat only — every screen/component has since migrated to
+// useTheme() so it responds to the black/white setting. Nothing imports
+// this directly any more; kept as a static light-palette fallback for any
+// future code that hasn't wired up useTheme() yet.
 export const colors = lightColors;
 
 // A small, consistent spacing scale — every screen should reach for these

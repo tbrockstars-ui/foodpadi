@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import type { ImageAsset } from '../../lib/imageAssets';
 import styles from './IntentCard.module.css';
 
@@ -22,11 +22,13 @@ interface IntentCardProps {
  * on mobile, which is most of FoodPadi's real usage.
  */
 export function IntentCard({ href, badge, label, subtitle, image, accent }: IntentCardProps) {
+  const prefersReducedMotion = useReducedMotion();
+
   return (
     <Link href={href} className={`${styles.card} ${styles[accent]}`}>
       <motion.div
         className={styles.imageWrap}
-        whileHover={{ scale: 1.04 }}
+        whileHover={prefersReducedMotion ? undefined : { scale: 1.04 }}
         whileTap={{ scale: 0.98 }}
         transition={{ type: 'tween', duration: 0.18 }}
       >

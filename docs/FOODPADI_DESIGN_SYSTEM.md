@@ -2,6 +2,8 @@
 
 **Scope:** this document covers the 17 sections requested before any design implementation, then the implementation itself is described in terms of what was actually built against the existing FoodPadi codebase (Expo/React Native mobile app + NestJS API + Neon Postgres — see [TECHNICAL_ARCHITECTURE.md](TECHNICAL_ARCHITECTURE.md)), not a parallel Framer prototype. The reasoning for that is in §1 and §13 below.
 
+> **Status note (added later, kept for history rather than rewritten):** §1–5 and §12–17 below describe FoodPadi as it stood in an earlier, mobile-only phase — before Eat Now, Plan Ahead, and the customer-facing `apps/web` app existed. They're left as-is as a record of that pass rather than silently rewritten; treat their screen inventory and journey map as historical, not current status. **§6 (tokens) and §7 (components) are kept current** — see the update below — since those are the parts other code actually points back to. For current product scope, see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) and [MVP_SCOPE.md](MVP_SCOPE.md).
+
 ---
 
 ## 1. Framer Template Selection Rationale
@@ -102,36 +104,63 @@ Mapped against the 26 screens the brief lists, honestly marked by actual status:
 
 ## 6. Design System
 
-Extends `apps/mobile/src/theme/colors.ts` (already had background/surface/text/primary/border/danger from earlier phases). Added in this pass: explicit `secondary`, `success`, `warning` roles (previously missing — the brief asks for them explicitly), formalized as named tokens rather than ad hoc hex values in individual screens.
+**Current as of the web visual-revamp pass.** `apps/mobile/src/theme/colors.ts` is the source of truth; `apps/web/app/globals.css` mirrors it exactly as CSS custom properties (`--primary`, `--space-md`, `--radius-lg`, …) so the two platforms can't silently drift into two different palettes. Web's tokens are named `kebab-case` with a `--` prefix; mobile's are the `camelCase` object keys below — same values, platform-native naming.
 
-| Token | Value | Use |
+| Token (mobile key / web var) | Value | Use |
 |---|---|---|
-| `primary` | `#2F6B4F` (forest green) | Primary actions, selected states |
-| `secondary` | `#C2760C` (warm amber — the "accent" token already in use, formally promoted to secondary) | Tags, highlights, secondary emphasis |
-| `background` | `#FBFAF7` | Screen background |
-| `surface` | `#FFFFFF` | Cards |
+| `primary` / `--primary` | `#2F6B4F` (forest green) | Primary actions, selected states |
+| `secondary` / `--secondary` | `#C2760C` (warm amber) | Tags, highlights, secondary emphasis |
+| `success` / `--success` | `#3B7A3B` | Confirmations |
+| `warning` / `--warning` | `#B7791F` | Non-blocking caution |
+| `danger` / `--danger` | `#B3261E` | Errors, destructive actions |
+| `background` / `--background` | `#FBFAF7` | Screen background |
+| `surface` / `--surface` | `#FFFFFF` | Cards |
+| `surfaceSunken` / `--surface-sunken` | `#F4F2EC` | Inset wells (search inputs, skeletons) |
 | `text` / `textMuted` / `textFaint` | near-black / grey / light grey | Content hierarchy |
-| `success` | `#3B7A3B` | Confirmations (e.g. "Saved") |
-| `warning` | `#B7791F` | Non-blocking caution (e.g. approaching a budget limit — future Plan Ahead use) |
-| `danger` | `#B3261E` | Errors, destructive actions |
+| `border` / `borderStrong` | light grey / darker grey | Default vs. emphasized dividers |
 
-Typography scale (`typography.*` in the same file): `display` (28px/700, screen titles), `title` (20px/700, section/card titles), `subtitle` (15px/500), `body` (15px/400, 22px line height), `caption` (13px), `label` (12px/600, uppercase-style section labels). Spacing (`spacing.*`, 4→32px scale) and elevation (`shadow.card`, `shadow.raised`) tokens were already added in the Cook Today pass and are reused, not redefined.
+Each of `primary`/`secondary`/`success`/`warning`/`danger` also has a `*Soft` tint (e.g. `primarySoft` / `--primary-soft`) for low-emphasis fills (badges, selected chips) — same pattern on both platforms.
+
+**Spacing:** `spacing.*` (mobile) / `--space-*` (web), a 4→32px scale (`xs` 4, `sm` 8, `md` 12, `lg` 16, `xl` 24, `xxl` 32). **Radius:** `radius.*` / `--radius-*` (`sm` 8, `md` 12, `lg` 16, `xl` 24, `pill` 999). **Typography** (mobile `typography.*`; web sets these directly per class, no shared type-scale variables yet — see backlog): `display` (28px/700, screen titles), `title` (20px/700), `subtitle` (15px/500), `body` (15px/400, 22px line-height), `caption` (13px), `label` (12px/600, uppercase section labels).
+
+**Elevation:** mobile's `shadow.card` / `shadow.raised` (React Native `shadow*` + Android `elevation` props, colour `#14150F`) were the starting point. Web didn't have equivalent shared tokens until this pass — ~18 individual CSS modules each hand-wrote their own `box-shadow` value, and several had silently drifted from each other (`0.05` vs `0.06` opacity for what was meant to be the same resting-card shadow; the two floating support buttons on `/` and the Home hub differed `0.2` vs `0.25`). Consolidated into a shared scale in `globals.css`, and every CSS module updated to reference it instead of repeating the literal value:
+
+| Web var | Value | Use |
+|---|---|---|
+| `--shadow-sm` | `0 2px 10px rgba(20,21,15,.05)` | Resting card (matches mobile `shadow.card`) |
+| `--shadow-md` | `0 8px 24px rgba(20,21,15,.12)` | Raised panels (dropdowns, popovers) |
+| `--shadow-lg` | `0 10px 24px rgba(20,21,15,.14)` | Card hover/focus elevation |
+| `--shadow-badge` | `0 2px 8px rgba(20,21,15,.2)` | Small circular icon badges |
+| `--shadow-fab` | `0 4px 16px rgba(20,21,15,.22)` | Fixed floating action buttons |
+
+(Mobile's `shadow.raised` at `0.1` opacity and web's `--shadow-md` at `0.12` differ slightly — both were independently tuned per-platform before this pass and left alone rather than forced to match a shared literal; RN's `shadowOpacity` and CSS's `box-shadow` alpha don't composite identically against their respective backgrounds anyway, so exact parity isn't the goal, consistency *within* each platform is.)
 
 ## 7. Component Architecture
 
-Built as real, reusable React Native components in `apps/mobile/src/components/` (previously only `SignupPromptModal` existed there; everything else was ad hoc per-screen styling):
+**Mobile** — real, reusable React Native components in `apps/mobile/src/components/`:
 
 | Component | File | Replaces |
 |---|---|---|
-| `Button` | `Button.tsx` | The repeated primary/secondary `TouchableOpacity` + `StyleSheet` pairs duplicated across `AuthScreen`, `GoalScreen`, `PreferencesScreen`, `CookTodayScreen` |
-| `Card` | `Card.tsx` | The repeated `{ backgroundColor: surface, borderRadius, ...shadow.card }` style object duplicated in `HomeScreen` and `CookTodayScreen` |
-| `Chip` | `Chip.tsx` | The repeated selectable-pill pattern duplicated in `GoalScreen`, `PreferencesScreen`, `CookTodayScreen` |
-| `Tag` | `Tag.tsx` | Promoted from a private helper inside `CookTodayScreen` to a shared component |
-| `EmptyState` | `EmptyState.tsx` | New — per brief §28, every screen needs one; none existed |
-| `LoadingState` | `LoadingState.tsx` | New — consolidates the repeated `ActivityIndicator` + message pattern |
-| `DisclaimerBanner` | `DisclaimerBanner.tsx` | New — the compact, non-frightening disclaimer strip from brief §14, distinct from the full-text `DisclaimerScreen` |
+| `Button` | `Button.tsx` | Repeated primary/secondary `TouchableOpacity` + `StyleSheet` pairs |
+| `Card` | `Card.tsx` | Repeated `{ backgroundColor: surface, borderRadius, ...shadow.card }` |
+| `Chip` | `Chip.tsx` | Repeated selectable-pill pattern |
+| `Tag` | `Tag.tsx` | Promoted from a private `CookTodayScreen` helper |
+| `EmptyState` / `LoadingState` | `EmptyState.tsx` / `LoadingState.tsx` | Shared empty/loading treatment |
+| `DisclaimerBanner` | `DisclaimerBanner.tsx` | Compact disclaimer strip, distinct from the full-text screen |
+| `FoodImage` | `FoodImage.tsx` | The representative food photo on recommendation cards — skeleton while loading, icon fallback on no-image/error, fade-in, provider attribution. Backed by the API's `food-image` module (Pexels/Unsplash search + cache), not a static asset. |
+| `BackLink` | `BackLink.tsx` | The "‹ Home"-style back navigation, now one pill+chevron component instead of ad hoc per-screen text links |
 
-Existing screens were refactored to use `Button`/`Card`/`Chip` in place of their duplicated inline styles (behaviour unchanged, verified by re-running the same live walkthrough as the previous session). `SignupPromptModal` was left as-is (it's already a single-purpose, non-duplicated component).
+**Web** — the equivalent layer in `apps/web/components/`, built later as the web app grew from a landing page into the full customer-facing product (§1's "no separate Framer site" call turned out to also mean "no separate design language" — web reuses the same tokens and the same component *shapes*, implemented as CSS Modules instead of `StyleSheet`):
+
+| Component | File | Mirrors |
+|---|---|---|
+| `Card` | `Card.tsx` | Mobile `Card.tsx` — same shadow/radius/padding tokens |
+| `FoodImage` | `FoodImage.tsx` | Mobile `FoodImage.tsx` — same skeleton/fallback/attribution behaviour, `<img>` instead of `Animated.Image` |
+| `Logo` | `Logo.tsx` | The FoodPadi mark + wordmark, used consistently across every app-shell page and the auth pages (mobile doesn't need this as a separate component — its header just renders the mark directly) |
+| `BackLink` | `BackLink.tsx` | Mobile `BackLink.tsx` |
+| `IntentCard` (`components/motion/`) | `IntentCard.tsx` | No direct mobile equivalent yet — the photo + accent-colour + badge "journey" card for Cooking/Plan ahead on the web Home hub |
+
+Both platforms' `DecideFlow` component (`apps/web/app/DecideFlow.tsx` / `apps/mobile/src/components/DecideFlow.tsx`) independently converged on the same option-card shape (image → title/reason → type badge → action), kept in sync by hand rather than a shared cross-platform component, since React Native and CSS Modules can't share JSX — see each file's own comments for the other's location.
 
 ## 8. Responsive Strategy
 

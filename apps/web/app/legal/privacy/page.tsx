@@ -1,3 +1,4 @@
+import { Logo } from '../../../components/Logo';
 import styles from '../legal.module.css';
 
 export const metadata = { title: 'Privacy — FoodPadi' };
@@ -5,6 +6,7 @@ export const metadata = { title: 'Privacy — FoodPadi' };
 export default function PrivacyPage() {
   return (
     <main className={styles.main}>
+      <Logo href="/" size={32} className={styles.logo} />
       <h1>Privacy</h1>
       <p className={styles.body}>
         FoodPadi collects only what it needs to run the app: your account details, the food

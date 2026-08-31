@@ -59,6 +59,27 @@ const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intoleranc
 // no code change needed, getClient() below picks it up automatically.
 const CURATED_RECIPES: RawRecipeCandidate[] = [
   {
+    title: 'Homemade Pizza',
+    cookTimeMinutes: 40,
+    servings: 4,
+    cuisine: 'Italian',
+    ingredients: [
+      { name: 'pizza dough', quantity: '2', unit: 'balls' },
+      { name: 'tomato sauce', quantity: '200', unit: 'g' },
+      { name: 'mozzarella', quantity: '250', unit: 'g' },
+      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
+      { name: 'basil', quantity: 'a handful', unit: null },
+      { name: 'garlic', quantity: '1 clove', unit: null },
+    ],
+    steps: [
+      'Heat the oven as high as it will go, with a tray inside to preheat.',
+      'Roll out the dough on a floured surface into a thin base.',
+      'Spread over the tomato sauce (mixed with the crushed garlic), then scatter the mozzarella.',
+      'Slide onto the hot tray and bake 10-12 minutes until the crust is golden and cheese is bubbling.',
+      'Drizzle with olive oil and scatter over fresh basil before serving.',
+    ],
+  },
+  {
     title: 'One-Pot Chicken & Rice',
     cookTimeMinutes: 35,
     servings: 4,
@@ -355,13 +376,7 @@ export class ClaudeService {
   // rice). Simple keyword-in-title-or-ingredient matching, same idea as
   // EatNowService's matcher but far smaller in scope: this is a fallback
   // demo dataset, not a search engine.
-  private curatedFallback(count: number, hint?: string): RawRecipeCandidate[] {
-    this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
-
-    if (!hint?.trim()) {
-      return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
-    }
-
+  private scoreCuratedByHint(hint: string): { recipe: RawRecipeCandidate; score: number }[] {
     const words = hint
       .toLowerCase()
       .split(/[^a-z0-9]+/)
@@ -373,7 +388,15 @@ export class ClaudeService {
       return { recipe, score };
     });
 
-    const matched = scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
+    return scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
+  }
+
+  private curatedFallback(count: number, hint?: string): RawRecipeCandidate[] {
+    this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
+
+    if (!hint?.trim()) {
+      return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
+    }
 
     // Deliberately NOT topped up to `count` when matches are thin or absent
     // — a real hint (e.g. "spicy pizza") with zero curated recipes about
@@ -383,7 +406,22 @@ export class ClaudeService {
     // already handles a short/empty cook-option list by leaning on Eat Now's
     // "get it" results instead, so an honest empty result is the safer
     // failure mode than a confidently wrong one.
-    return matched.slice(0, count).map((s) => s.recipe);
+    return this.scoreCuratedByHint(hint).slice(0, count).map((s) => s.recipe);
+  }
+
+  // Used only for the "Replace with something specific" typeahead — the
+  // titles a demo-mode (no ANTHROPIC_API_KEY) search can offer as picks that
+  // are *guaranteed* to succeed, since curatedFallback matches against this
+  // exact same pool. Picking a title the search never offered (an arbitrary
+  // free-typed hint) can still legitimately come back empty — this just
+  // stops that from being the *only* path, which is what the "type and
+  // submit blind" UX was doing before.
+  searchCuratedRecipeTitles(query: string, limit: number): string[] {
+    if (!query.trim()) return [];
+    return this.scoreCuratedByHint(query)
+      .slice(0, limit)
+      .map((s) => s.recipe.title)
+      .filter((t): t is string => typeof t === 'string');
   }
 
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {

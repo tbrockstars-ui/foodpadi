@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { MealPlanView } from '@foodpadi/shared';
 import { getCuisineImage } from '../../lib/imageAssets';
 import styles from './plan.module.css';
+
+const SUGGESTION_DEBOUNCE_MS = 300;
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -23,6 +25,41 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
   // the drafted prompt text for each, keyed by item id.
   const [focusOpenId, setFocusOpenId] = useState<string | null>(null);
   const [focusDrafts, setFocusDrafts] = useState<Record<string, string>>({});
+  // Typeahead for the currently-open box only — a dish-name picker instead
+  // of free-typing a hint and finding out only after submitting whether
+  // anything matched. Scoped to one box at a time (only one is ever open),
+  // so this doesn't need to be keyed by item id like focusDrafts is.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const suggestionsAbortRef = useRef<AbortController | null>(null);
+
+  const focusDraft = focusOpenId ? (focusDrafts[focusOpenId] ?? '') : '';
+
+  // Debounced fetch of suggestions as the user types in the open box.
+  useEffect(() => {
+    if (!focusOpenId || !focusDraft.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      suggestionsAbortRef.current?.abort();
+      const controller = new AbortController();
+      suggestionsAbortRef.current = controller;
+      try {
+        const res = await fetch(`/api/proxy/plan-ahead/meal-ideas?q=${encodeURIComponent(focusDraft.trim())}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as string[];
+        setSuggestions(data);
+      } catch {
+        // Aborted (a newer keystroke superseded this request) or a network
+        // blip — either way, just leave whatever suggestions are already
+        // showing rather than surfacing an error for a background typeahead.
+      }
+    }, SUGGESTION_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOpenId, focusDraft]);
 
   const readError = async (res: Response, fallback: string) => {
     const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
@@ -141,7 +178,10 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                 <button
                   type="button"
                   className={styles.itemActionText}
-                  onClick={() => setFocusOpenId(focusOpenId === item.id ? null : item.id)}
+                  onClick={() => {
+                    setSuggestions([]);
+                    setFocusOpenId(focusOpenId === item.id ? null : item.id);
+                  }}
                   disabled={busyItemId === item.id}
                 >
                   {focusOpenId === item.id ? 'Cancel' : 'Replace with something specific'}
@@ -164,17 +204,45 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
 
               {focusOpenId === item.id ? (
                 <div className={styles.focusRow}>
-                  <input
-                    className={styles.focusInput}
-                    type="text"
-                    autoFocus
-                    placeholder="e.g. something with fish, a quick pasta"
-                    value={focusDrafts[item.id] ?? ''}
-                    onChange={(e) => setFocusDrafts((cur) => ({ ...cur, [item.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined);
-                    }}
-                  />
+                  <div className={styles.focusWrap}>
+                    <input
+                      className={styles.focusInput}
+                      type="text"
+                      autoFocus
+                      placeholder="e.g. pizza, a quick pasta"
+                      autoComplete="off"
+                      value={focusDrafts[item.id] ?? ''}
+                      onChange={(e) => setFocusDrafts((cur) => ({ ...cur, [item.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined);
+                        if (e.key === 'Escape') setSuggestions([]);
+                      }}
+                    />
+                    {suggestions.length > 0 ? (
+                      <div className={styles.suggestionsList} role="listbox">
+                        {suggestions.map((title) => (
+                          <button
+                            key={title}
+                            type="button"
+                            role="option"
+                            aria-selected={false}
+                            className={styles.suggestionItem}
+                            // onMouseDown (not onClick) fires before the input's
+                            // onBlur, so the pick registers before the list would
+                            // otherwise vanish out from under the click.
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFocusDrafts((cur) => ({ ...cur, [item.id]: title }));
+                              setSuggestions([]);
+                              regenerate(item.id, title);
+                            }}
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
                     className={styles.focusButton}
