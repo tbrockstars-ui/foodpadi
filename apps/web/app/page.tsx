@@ -62,7 +62,7 @@ interface HubAction {
 // It's not one of the three intent branches, so it's a demoted secondary
 // link below the primary row rather than a fourth equal-weight card.
 const SECONDARY_ACTIONS: HubAction[] = [
-  { key: 'scan', icon: '📷', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
+  { key: 'scan', icon: '/scan-food.svg', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
 function HomeHub() {
@@ -116,7 +116,14 @@ function HomeHub() {
       <div className={homeStyles.secondaryRow}>
         {SECONDARY_ACTIONS.map((action) => (
           <span key={action.key} className={homeStyles.secondaryLink}>
-            {action.icon ? <span aria-hidden="true">{action.icon} </span> : null}
+            {action.icon ? (
+              action.icon.startsWith('/') ? (
+                // eslint-disable-next-line @next/next/no-img-element -- tiny inline icon, no layout shift
+                <img src={action.icon} alt="" className={homeStyles.secondaryIcon} />
+              ) : (
+                <span aria-hidden="true">{action.icon} </span>
+              )
+            ) : null}
             {action.label} · {action.subtitle}
             {action.disabledTag ? <span className={homeStyles.soonTag}>{action.disabledTag}</span> : null}
           </span>
