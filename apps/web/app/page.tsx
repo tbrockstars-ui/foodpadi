@@ -12,6 +12,7 @@ import { ChipRow } from '../components/motion/ChipRow';
 import { FoodCarousel } from '../components/motion/FoodCarousel';
 import { WeekStrip } from '../components/motion/WeekStrip';
 import { IntentCard } from '../components/motion/IntentCard';
+import { Logo } from '../components/Logo';
 import { IMAGE_ASSETS } from '../lib/imageAssets';
 import styles from './page.module.css';
 import homeStyles from './home.module.css';
@@ -66,6 +67,7 @@ const SECONDARY_ACTIONS: HubAction[] = [
 function HomeHub() {
   return (
     <main className={homeStyles.container}>
+      <Logo href="/" size={36} className={homeStyles.homeLogo} />
       <div className={homeStyles.header}>
         <h1 className={homeStyles.heading}>What should I eat? 🍽️</h1>
         <div className={homeStyles.headerLinks}>

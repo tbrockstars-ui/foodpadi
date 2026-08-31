@@ -24,6 +24,15 @@ const NEGATIVE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 // Max concurrent provider lookups when enriching a batch of recommendations.
 const BATCH_CONCURRENCY = 4;
 
+// Process-level cache in front of the DB, so the same dish resolves to the
+// exact same photo on every subsequent request without even a DB round-trip
+// — and, crucially, keeps working when the food_image_cache table isn't there
+// yet (the DB layer is fail-soft and would otherwise re-hit the provider
+// every time). A found image is pinned for a day; a miss is retried sooner.
+const MEMORY_TTL_OK_MS = 24 * 60 * 60 * 1000;
+const MEMORY_TTL_NONE_MS = 60 * 60 * 1000;
+const MEMORY_MAX_ENTRIES = 1000;
+
 interface ResolveOptions {
   /** Cuisine of the dish, if known — sharpens the image query (brief §29). */
   cuisine?: string;
@@ -44,16 +53,29 @@ type CacheRow = {
 /**
  * Resolves a representative photo for a recommended dish, so the customer can
  * SEE what they're choosing (visual-redesign brief). Provider-agnostic: tries
- * Pexels first, then Unsplash, behind a small relevance filter, and caches the
- * result (hit or miss) in `food_image_cache` keyed by the normalised dish
- * name — a provider is called at most once per distinct dish. Every public
- * method is best-effort and returns null rather than throwing: an image
- * lookup must never break or delay a recommendation.
+ * Pexels first, then Unsplash, behind a small relevance filter.
+ *
+ * Two-tier cache, keyed by the normalised dish name, so the same request
+ * always yields the same photo and a provider is hit at most once per dish:
+ *  1. a process-level in-memory map (+ in-flight de-dupe) — survives a
+ *     missing `food_image_cache` table and needs no DB round-trip on a hit;
+ *  2. the `food_image_cache` table — shared across instances, survives
+ *     restarts. Both cache misses too (`status = "none"`), briefly.
+ *
+ * Every public method is best-effort and returns null rather than throwing:
+ * an image lookup must never break or delay a recommendation.
  */
 @Injectable()
 export class FoodImageService {
   private readonly logger = new Logger(FoodImageService.name);
   private readonly providers: FoodImageProvider[];
+
+  // Resolved photo per normalised dish name (see MEMORY_TTL_* above).
+  private readonly memory = new Map<string, { view: FoodImageView | null; at: number }>();
+  // One in-flight resolve per key — concurrent callers (e.g. Decide and Eat
+  // Now asking for the same dish at once) share the single lookup rather than
+  // each firing their own, so everyone sees the same image.
+  private readonly inflight = new Map<string, Promise<FoodImageView | null>>();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -73,6 +95,34 @@ export class FoodImageService {
     const key = normaliseFoodKey(foodName);
     if (!key) return null;
 
+    const mem = this.memoryGet(key);
+    if (mem !== undefined) return mem;
+
+    const pending = this.inflight.get(key);
+    if (pending) return pending;
+
+    const work = this.resolveUncached(key, foodName, opts)
+      .then((view) => {
+        this.memorySet(key, view);
+        return view;
+      })
+      .catch((err) => {
+        this.logger.warn(`Image resolve for "${foodName}" failed: ${(err as Error).message}`);
+        return null;
+      })
+      .finally(() => {
+        this.inflight.delete(key);
+      });
+
+    this.inflight.set(key, work);
+    return work;
+  }
+
+  private async resolveUncached(
+    key: string,
+    foodName: string,
+    opts: ResolveOptions,
+  ): Promise<FoodImageView | null> {
     // Cache read is fail-soft: if the food_image_cache table doesn't exist yet
     // (migration not deployed) or the DB is unreachable, we fall through to a
     // live provider lookup rather than returning no image. So photos start
@@ -127,6 +177,30 @@ export class FoodImageService {
 
     await this.writeCache(key, foodName, query, { status: 'none' });
     return null;
+  }
+
+  // Returns the cached view (which may itself be null = "no image"), or
+  // `undefined` when there's no live entry. Stale entries are evicted here.
+  private memoryGet(key: string): FoodImageView | null | undefined {
+    const entry = this.memory.get(key);
+    if (!entry) return undefined;
+    const ttl = entry.view ? MEMORY_TTL_OK_MS : MEMORY_TTL_NONE_MS;
+    if (Date.now() - entry.at > ttl) {
+      this.memory.delete(key);
+      return undefined;
+    }
+    return entry.view;
+  }
+
+  private memorySet(key: string, view: FoodImageView | null): void {
+    // Cheap FIFO bound — Map preserves insertion order, so the first key is
+    // the oldest. Re-set an existing key at the end so hot dishes survive.
+    this.memory.delete(key);
+    if (this.memory.size >= MEMORY_MAX_ENTRIES) {
+      const oldest = this.memory.keys().next().value;
+      if (oldest !== undefined) this.memory.delete(oldest);
+    }
+    this.memory.set(key, { view, at: Date.now() });
   }
 
   private async readCache(key: string): Promise<CacheRow | null> {

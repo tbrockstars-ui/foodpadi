@@ -2,6 +2,7 @@ import type { SavedRecipeView } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../../lib/serverApi';
 import { SavedRecipesList } from './SavedRecipesList';
 import { BackLink } from '../../../components/BackLink';
+import { Logo } from '../../../components/Logo';
 import shellStyles from '../../app-shell.module.css';
 import styles from '../cook-today.module.css';
 

@@ -3,3 +3,7 @@
   margin: 0 auto;
   padding: 56px 24px var(--space-xxl);
 }
+
+.pageLogo {
+  margin-bottom: var(--space-lg);
+}

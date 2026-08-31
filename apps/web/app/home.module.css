@@ -4,6 +4,10 @@
   padding: 56px 24px var(--space-xxl);
 }
 
+.homeLogo {
+  margin-bottom: var(--space-lg);
+}
+
 .header {
   display: flex;
   justify-content: space-between;
