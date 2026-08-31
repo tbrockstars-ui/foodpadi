@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
+import { GoogleSignInButton } from '../GoogleSignInButton';
 import styles from '../auth.module.css';
 
 /**
@@ -101,6 +102,13 @@ function LoginForm() {
             {submitting ? 'Logging in…' : 'Log in'}
           </Button>
         </form>
+
+        <div className={styles.divider}>
+          <span className={styles.dividerLine} />
+          <span className={styles.dividerText}>or</span>
+          <span className={styles.dividerLine} />
+        </div>
+        <GoogleSignInButton next={next} text="signin_with" onError={setError} />
 
         <Link
           className={styles.switchModeText}

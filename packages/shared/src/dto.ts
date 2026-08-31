@@ -28,6 +28,14 @@ export interface LoginRequest {
   password: string;
 }
 
+// Sign up / sign in with a Google account. `idToken` is the JWT credential
+// from Google Identity Services (web) or expo-auth-session (mobile); the API
+// verifies it with Google and finds-or-creates the matching user. A verified
+// Google email that already has a password account logs into that account.
+export interface GoogleAuthRequest {
+  idToken: string;
+}
+
 export interface AuthResponse {
   accessToken: string;
   refreshToken: string;

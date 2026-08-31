@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../components/Button';
 import { Logo } from '../../components/Logo';
+import { GoogleSignInButton } from '../GoogleSignInButton';
 import styles from '../auth.module.css';
 
 // Open-eye / eye-with-slash, swapped based on showPassword — the icon
@@ -155,6 +156,13 @@ function RegisterForm() {
             {submitting ? 'Creating account…' : 'Create account'}
           </Button>
         </form>
+
+        <div className={styles.divider}>
+          <span className={styles.dividerLine} />
+          <span className={styles.dividerText}>or</span>
+          <span className={styles.dividerLine} />
+        </div>
+        <GoogleSignInButton next={next} text="signup_with" onError={setError} />
 
         <Link className={styles.switchModeText} href={next !== '/' ? `/login?next=${encodeURIComponent(next)}` : '/login'}>
           Already have an account? Log in

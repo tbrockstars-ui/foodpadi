@@ -159,6 +159,10 @@ export const api = {
     request<AuthResponse>('/auth/register', { method: 'POST', body: payload }),
   login: (payload: LoginRequest) =>
     request<AuthResponse>('/auth/login', { method: 'POST', body: payload }),
+  // Sign up / sign in with Google — `idToken` from expo-auth-session; the API
+  // verifies it and finds-or-creates the user.
+  googleAuth: (idToken: string) =>
+    request<AuthResponse>('/auth/google', { method: 'POST', body: { idToken } }),
   me: () => request<UserSummary>('/users/me', { auth: true }),
   acknowledgeDisclaimer: () =>
     request<UserSummary>('/users/me/disclaimer-acknowledge', { method: 'POST', auth: true }),
@@ -230,6 +234,12 @@ export const api = {
       body: focus ? { focus } : undefined,
       auth: true,
     }),
+  // Typeahead for "Replace with something specific" — dish-name picks
+  // instead of free-typing a hint and finding out only after submitting
+  // whether anything matched. Web counterpart: the same /plan-ahead/meal-ideas
+  // route, called directly from PlanView.tsx via the Next.js proxy.
+  searchMealIdeas: (query: string) =>
+    request<string[]>(`/plan-ahead/meal-ideas?q=${encodeURIComponent(query)}`, { auth: true }),
   removePlanItem: (planId: string, itemId: string) =>
     request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'DELETE', auth: true }),
   updatePlanItem: (planId: string, itemId: string, payload: UpdateMealPlanItemRequest) =>
