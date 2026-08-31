@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { useTheme } from '../theme/ThemeContext';
 import { HomeScreen } from '../screens/HomeScreen';
 import { EatNowScreen } from '../screens/EatNowScreen';
 import { CookTodayScreen } from '../screens/CookTodayScreen';
@@ -12,6 +13,7 @@ import { ImportRecipeScreen } from '../screens/ImportRecipeScreen';
 import { ScanScreen } from '../screens/ScanScreen';
 import { SavedRecipesScreen } from '../screens/SavedRecipesScreen';
 import { SavedPlansScreen } from '../screens/SavedPlansScreen';
+import { SettingsScreen } from '../screens/SettingsScreen';
 
 export type AppStackParamList = {
   Home: undefined;
@@ -25,6 +27,7 @@ export type AppStackParamList = {
   Scan: undefined;
   SavedRecipes: undefined;
   SavedPlans: undefined;
+  Settings: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -36,9 +39,17 @@ const Stack = createNativeStackNavigator<AppStackParamList>();
  * decides for itself what a guest can/can't do.
  */
 export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
+  const { scheme, colors } = useTheme();
+  // Themes the navigator's own chrome (card background between screens, etc.)
+  // so a dark-mode user doesn't get white flashes on transitions.
+  const navTheme =
+    scheme === 'dark'
+      ? { ...DarkTheme, colors: { ...DarkTheme.colors, background: colors.background, card: colors.surface, text: colors.text, border: colors.border, primary: colors.primary } }
+      : { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.background, card: colors.surface, text: colors.text, border: colors.border, primary: colors.primary } };
+
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <NavigationContainer theme={navTheme}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
         <Stack.Screen name="Home">
           {(props) => <HomeScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
@@ -54,6 +65,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="Scan" component={ScanScreen} />
         <Stack.Screen name="SavedRecipes" component={SavedRecipesScreen} />
         <Stack.Screen name="SavedPlans" component={SavedPlansScreen} />
+        <Stack.Screen name="Settings" component={SettingsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
