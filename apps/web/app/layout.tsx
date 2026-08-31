@@ -17,9 +17,16 @@ export const metadata: Metadata = {
   description: 'Your food companion that plans with you, not for you.',
 };
 
+// Applies the saved theme to <html> before the first paint, so a dark-mode
+// user never sees a white flash. Kept tiny and dependency-free.
+const THEME_INIT = `(function(){try{if(localStorage.getItem('foodpadi-theme')==='dark'){document.documentElement.setAttribute('data-theme','dark');}}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={plusJakartaSans.variable}>
+    <html lang="en-GB" className={plusJakartaSans.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+      </head>
       <body>{children}</body>
     </html>
   );

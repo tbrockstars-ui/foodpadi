@@ -1,0 +1,144 @@
+.root {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.trigger:hover,
+.trigger[aria-expanded='true'] {
+  color: var(--text);
+  border-color: var(--border-strong);
+}
+
+.gearIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 50;
+  width: 264px;
+  max-width: calc(100vw - 32px);
+  padding: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.sectionLabel {
+  margin: 8px 6px 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.sectionLabel:first-child {
+  margin-top: 2px;
+}
+
+.item {
+  display: block;
+  width: 100%;
+  padding: 9px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.item:hover {
+  background: var(--surface-sunken);
+}
+
+.danger {
+  color: var(--danger);
+}
+
+.divider {
+  height: 1px;
+  margin: 8px 0;
+  background: var(--border);
+}
+
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  margin: 0 6px;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+}
+
+.segment {
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.segmentActive {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
+}
+
+.infoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+}
+
+.infoKey {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.planBadge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+
+.muted {
+  margin: 2px 8px 6px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}

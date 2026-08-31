@@ -1,7 +1,7 @@
-import Link from 'next/link';
 import { DecideFlow } from './DecideFlow';
 import { IntentCard } from '../components/motion/IntentCard';
 import { Logo } from '../components/Logo';
+import { SettingsMenu } from './SettingsMenu';
 import { IMAGE_ASSETS } from '../lib/imageAssets';
 import homeStyles from './home.module.css';
 
@@ -25,20 +25,11 @@ export function HomeHub() {
   return (
     <main className={homeStyles.container}>
       <div className={homeStyles.topBar}>
-        <div className={homeStyles.headerLinks}>
-          <Link href="/profile" className={homeStyles.logoutLink}>
-            Profile
-          </Link>
-          <Link href="/cook-today/saved" className={homeStyles.logoutLink}>
-            Saved recipes
-          </Link>
-          <form action="/api/auth/logout" method="POST">
-            <button type="submit" className={homeStyles.logoutLink}>
-              Log out
-            </button>
-          </form>
-        </div>
         <Logo href="/" size={36} />
+        {/* Profile / Saved recipes / Log out + theme + subscription now live
+            in this menu (upper-right) so the header stays to just the mark
+            and one control. */}
+        <SettingsMenu />
       </div>
       <div className={homeStyles.header}>
         <h1 className={homeStyles.heading}>
