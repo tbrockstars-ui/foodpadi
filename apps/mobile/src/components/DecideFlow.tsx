@@ -23,6 +23,7 @@ const PROMPT_CHIPS = [
   { label: 'Something quick', text: 'Something quick to make' },
   { label: 'Something cheap', text: 'Something cheap and filling' },
   { label: 'Something comforting', text: 'Something comforting' },
+  { label: 'Vegan', text: 'Something vegan' },
   { label: 'Try something new', text: 'Something different from usual' },
 ];
 
@@ -50,7 +51,6 @@ export function DecideFlow() {
   const getToken = async () => (user ? ((await tokenStore.getAccessToken()) ?? '') : guestSession.ensureSession());
 
   const [description, setDescription] = useState('');
-  const [timeMinutes, setTimeMinutes] = useState('');
   const [budgetPounds, setBudgetPounds] = useState('');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
@@ -97,7 +97,6 @@ export function DecideFlow() {
       const data: DecideResponse = await api.decide(
         {
           description: trimmed,
-          timeMinutes: timeMinutes ? Number(timeMinutes) : undefined,
           budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
         },
         token,
@@ -129,9 +128,8 @@ export function DecideFlow() {
     if (text === description) return;
     setDescription(text);
     // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
-    // any time/budget constraint typed for the previous selection shouldn't
+    // any budget constraint typed for the previous selection shouldn't
     // silently carry over and narrow it. Matches web's DecideFlow.
-    setTimeMinutes('');
     setBudgetPounds('');
     // Picking a chip clears any results already on screen and re-enables
     // "Decide for me" rather than auto-firing a new decide() — the user
@@ -165,7 +163,7 @@ export function DecideFlow() {
     <View>
       <TextInput
         style={styles.input}
-        placeholder="What do you have, or what are you after? e.g. chicken and rice"
+        placeholder="Tell me what you want to eat"
         placeholderTextColor={colors.textFaint}
         value={description}
         onChangeText={handleDescriptionChange}
@@ -191,17 +189,6 @@ export function DecideFlow() {
       </View>
 
       <View style={styles.constraintsRow}>
-        <View style={styles.constraintField}>
-          <TextInput
-            style={[styles.input, styles.constraintInput, timeMinutes ? styles.constraintInputHasSuffix : null]}
-            placeholder="Minutes"
-            placeholderTextColor={colors.textFaint}
-            keyboardType="number-pad"
-            value={timeMinutes}
-            onChangeText={(v) => handleConstraintChange(setTimeMinutes, v)}
-          />
-          {timeMinutes ? <Text style={styles.constraintAffixSuffix}>mins</Text> : null}
-        </View>
         <View style={styles.constraintField}>
           {budgetPounds ? <Text style={styles.constraintAffixPrefix}>£</Text> : null}
           <TextInput
@@ -343,19 +330,15 @@ function makeStyles(c: ThemeColors) {
   promptChipText: { fontSize: 13, color: c.text },
   promptChipTextSelected: { color: c.primary, fontWeight: '600' },
   constraintsRow: { flexDirection: 'row', gap: spacing.sm },
-  constraintField: { flex: 1, justifyContent: 'center' },
+  // Only the budget field lives here now (Minutes was removed) — a fixed
+  // width rather than flex:1, so it sits left-aligned at roughly its old
+  // size instead of stretching across the whole row.
+  constraintField: { width: 160, justifyContent: 'center' },
   constraintInput: { flex: 1 },
   constraintInputHasPrefix: { paddingLeft: 22 },
-  constraintInputHasSuffix: { paddingRight: 44 },
   constraintAffixPrefix: {
     position: 'absolute',
     left: spacing.lg,
-    fontSize: 15,
-    color: c.textMuted,
-  },
-  constraintAffixSuffix: {
-    position: 'absolute',
-    right: spacing.lg,
     fontSize: 15,
     color: c.textMuted,
   },

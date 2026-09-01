@@ -19,6 +19,7 @@ const PROMPT_CHIPS = [
   { label: 'Something quick', text: 'Something quick to make' },
   { label: 'Something cheap', text: 'Something cheap and filling' },
   { label: 'Something comforting', text: 'Something comforting' },
+  { label: 'Vegan', text: 'Something vegan' },
   { label: 'Try something new', text: 'Something different from usual' },
   { label: 'Surprise me', text: 'Surprise me with something different' },
 ];
@@ -47,7 +48,6 @@ const optionVariants = (prefersReducedMotion: boolean) => ({
  */
 export function DecideFlow() {
   const [description, setDescription] = useState('');
-  const [timeMinutes, setTimeMinutes] = useState('');
   const [budgetPounds, setBudgetPounds] = useState('');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
@@ -97,7 +97,6 @@ export function DecideFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description: trimmed,
-          timeMinutes: timeMinutes ? Number(timeMinutes) : undefined,
           budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
         }),
       });
@@ -125,9 +124,8 @@ export function DecideFlow() {
     if (text === description) return;
     setDescription(text);
     // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
-    // any time/budget constraint typed for the previous selection shouldn't
+    // any budget constraint typed for the previous selection shouldn't
     // silently carry over and narrow it.
-    setTimeMinutes('');
     setBudgetPounds('');
     // Picking a chip clears any results already on screen and re-enables
     // "Decide for me" rather than auto-firing a new decide() — the user
@@ -144,7 +142,6 @@ export function DecideFlow() {
     // Same reasoning as pickChip: typing a new description is a fresh
     // prompt, so a constraint left over from a previous one shouldn't
     // silently narrow it.
-    setTimeMinutes('');
     setBudgetPounds('');
     if (hasResultsShowing) clearResults();
   };
@@ -158,7 +155,7 @@ export function DecideFlow() {
       <input
         className={styles.decideInput}
         type="text"
-        placeholder="What do you have, or what are you after? e.g. chicken and rice"
+        placeholder="Tell me what you want to eat"
         value={description}
         onChange={(e) => handleDescriptionChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && decide()}
@@ -180,18 +177,6 @@ export function DecideFlow() {
       </div>
 
       <div className={styles.constraintsRow}>
-        <div className={styles.constraintField}>
-          <input
-            className={`${styles.constraintInput} ${timeMinutes ? styles.constraintInputHasSuffix : ''}`}
-            type="number"
-            min={5}
-            max={240}
-            placeholder="Minutes"
-            value={timeMinutes}
-            onChange={(e) => handleConstraintChange(setTimeMinutes, e.target.value)}
-          />
-          {timeMinutes ? <span className={styles.constraintAffixSuffix}>mins</span> : null}
-        </div>
         <div className={styles.constraintField}>
           {budgetPounds ? <span className={styles.constraintAffixPrefix}>£</span> : null}
           <input
