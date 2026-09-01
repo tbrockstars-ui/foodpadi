@@ -1,5 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { FoodGoal } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
@@ -48,6 +50,29 @@ export class PlanAheadService {
     private readonly analytics: AnalyticsService,
   ) {}
 
+  // Favourite cuisines, avoided ingredients and food goals for one user,
+  // shaped for ClaudeService.generatePlanMeals. Same three signals Cook Today
+  // and Eat Now personalise from — pulled together here so generate(),
+  // regenerateItem() and regeneratePlan() all steer identically.
+  private async loadPersonalisation(
+    userId: string,
+  ): Promise<{ favouriteCuisines: string[]; avoidedIngredients: string[]; goalGuidance?: string }> {
+    const [preferences, avoided, goals] = await Promise.all([
+      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
+      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
+      this.prisma.foodGoal.findMany({ where: { userId, isActive: true } }),
+    ]);
+
+    const personalNote = goals.find((g) => g.goalType === 'personal')?.note ?? null;
+
+    return {
+      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
+      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      goalGuidance:
+        goalGuidanceLine({ goalTypes: goals.map((g) => g.goalType as FoodGoal), personalNote }) ?? undefined,
+    };
+  }
+
   private resolveDayCount(dto: GeneratePlanDto): number {
     if (dto.scope === 'custom') {
       if (!dto.customDays) {
@@ -66,16 +91,17 @@ export class PlanAheadService {
   async generate(dto: GeneratePlanDto, userId: string) {
     const days = this.resolveDayCount(dto);
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days,
       budgetPence: dto.budgetPence,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
+      // Reuses the same free-text `focus` field the single-day "replace with
+      // something specific" flow already sends — the prompt-building logic
+      // in generatePlanMeals already phrases it correctly for either one day
+      // ("this day") or several ("these days").
+      focus: dto.prompt,
     });
 
     const validated = raw
@@ -119,7 +145,11 @@ export class PlanAheadService {
       include: this.planInclude(),
     });
 
-    await this.analytics.track('plan_ahead_generated', { userId }, { scope: dto.scope, days: validated.length });
+    await this.analytics.track(
+      'plan_ahead_generated',
+      { userId },
+      { scope: dto.scope, days: validated.length, hasPrompt: !!dto.prompt?.trim() },
+    );
 
     return this.serialize(plan);
   }
@@ -196,15 +226,11 @@ export class PlanAheadService {
       throw new NotFoundException('Meal plan item not found.');
     }
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days: 1,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
       focus: dto.focus,
     });
     const [candidate] = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
@@ -254,16 +280,12 @@ export class PlanAheadService {
     const plan = await this.ownedPlan(planId, userId);
     const days = Math.min(daysBetweenInclusive(plan.startDate, plan.endDate), MAX_PLAN_DAYS);
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days,
       budgetPence: plan.budgetPence ?? undefined,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
     });
 
     const validated = raw

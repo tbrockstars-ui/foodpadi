@@ -14,6 +14,12 @@ export interface CookTodayGenerationInput {
   ingredients: string[];
   timeConstraintMinutes?: number;
   servings?: number;
+  /** The signed-in user's favourite cuisines (Preferences) — lean toward, don't restrict. */
+  favouriteCuisines?: string[];
+  /** The signed-in user's avoided ingredients (Preferences) — a hard exclusion. */
+  avoidedIngredients?: string[];
+  /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
+  goalGuidance?: string;
 }
 
 export interface PlanGenerationInput {
@@ -22,11 +28,15 @@ export interface PlanGenerationInput {
   favouriteCuisines?: string[];
   avoidedIngredients?: string[];
   /**
-   * Free-text steer for a single-day replacement — e.g. "something with fish",
-   * "a quick pasta", "vegetarian". Used by Plan Ahead's per-day "replace with
-   * something specific" action; ignored for a normal multi-day plan.
+   * Free-text steer, e.g. "something with fish", "Nigerian food this week",
+   * "no rice". Used both by Plan Ahead's per-day "replace with something
+   * specific" action (days=1) and by the initial multi-day plan prompt
+   * (days>1) — the message built below already phrases either case
+   * correctly ("this day" vs "these days").
    */
   focus?: string;
+  /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
+  goalGuidance?: string;
 }
 
 export interface RawScannedItem {
@@ -317,6 +327,9 @@ Rules you must follow:
 - Return between 2 and 3 recipes.
 - Prefer recipes that use mostly the ingredients the user listed. You may assume common pantry staples (salt, pepper, oil, water) are available even if not listed, but do not assume specialty or allergen-relevant ingredients (dairy, nuts, gluten-containing items, etc.) are available unless the user listed them or a very close equivalent.
 - If a time constraint is given, every recipe's cookTimeMinutes must be at or under that limit.
+- If a favourite-cuisine list is given, lean toward it where it fits the ingredients, but don't force every recipe into those cuisines.
+- If an avoided-ingredients list is given, do not include any of those ingredients in any recipe.
+- If food goals are given, treat them as soft steering only — never state or imply a recipe is healthy, medical, or weight-loss related.
 - ${SAFETY_RULES}`;
 
 const PLAN_AHEAD_SYSTEM_PROMPT = `You are the meal-planning component inside FoodPadi, a UK food companion app. You are called only for the "Plan Ahead" feature: a user wants a dinner planned for each of several days.
@@ -330,6 +343,7 @@ Rules you must follow:
 - If a favourite-cuisine list is given, lean toward it but don't restrict every meal to only those cuisines.
 - If an avoided-ingredients list is given, do not include any of those ingredients in any recipe.
 - If a weekly budget is given, treat it as a soft steering hint toward simpler, less expensive ingredients — you have no real pricing data, so never state or imply an exact cost.
+- If food goals are given, treat them as soft steering only — never state or imply a plan is healthy, medical, or weight-loss related.
 - ${SAFETY_RULES}`;
 
 const SCAN_SYSTEM_PROMPT = `You are the food-recognition component inside FoodPadi, a UK food companion app. You are shown a photo of food — a fridge, cupboard, shopping bag, or receipt — and must identify what food and drink items are visible.
@@ -433,6 +447,11 @@ export class ClaudeService {
       `Ingredients I have: ${input.ingredients.join(', ')}.`,
       input.timeConstraintMinutes ? `I have at most ${input.timeConstraintMinutes} minutes to cook.` : null,
       input.servings ? `I need ${input.servings} servings.` : null,
+      input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,
+      input.avoidedIngredients?.length
+        ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.`
+        : null,
+      input.goalGuidance ?? null,
     ]
       .filter(Boolean)
       .join(' ');
@@ -456,6 +475,7 @@ export class ClaudeService {
       input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,
       input.avoidedIngredients?.length ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.` : null,
       input.budgetPence ? `Weekly food budget is roughly £${(input.budgetPence / 100).toFixed(2)}.` : null,
+      input.goalGuidance ?? null,
     ]
       .filter(Boolean)
       .join(' ');
