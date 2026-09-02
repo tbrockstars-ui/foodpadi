@@ -71,8 +71,9 @@ export function PlanScopeForm() {
         const message = Array.isArray(data.message) ? data.message.join('. ') : data.message;
         throw new Error(message ?? 'Something went wrong creating your plan.');
       }
-      // Land on the generated plan rather than staying on the form.
-      router.push('/plan/current');
+      // Land on the generated plan rather than staying on the form — replace()
+      // (not push) so any ?new=1 is dropped and /plan renders the new plan.
+      router.replace('/plan');
       router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong creating your plan.');

@@ -4,7 +4,6 @@ import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DemoScenarioKey, FoodContentIngredientView, ScanImageMediaType, ScannedItemView } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
-import { tokenStore } from '../api/tokenStore';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -111,11 +110,10 @@ export function ScanScreen({ navigation }: Props) {
     setStep('loading');
     try {
       if (mode === 'dish') {
-        const token = (await tokenStore.getAccessToken()) ?? '';
-        const result = await api.scanFoodContent(
-          { imageBase64: asset.base64, mediaType: guessMediaType(asset) },
-          token,
-        );
+        const result = await api.scanFoodContent({
+          imageBase64: asset.base64,
+          mediaType: guessMediaType(asset),
+        });
         handleDishResult(result);
       } else {
         const result = await api.scanPhoto({ imageBase64: asset.base64, mediaType: guessMediaType(asset) });

@@ -37,24 +37,28 @@ export const IMAGE_ASSETS = {
   // (The "Right now" IntentCard was removed from Home — DecideFlow covers that
   // intent — so its image asset is gone too.)
   cooking: {
-    name: 'Sliced vegetables on a chopping board',
-    url: pexels(3872439, 400),
+    name: 'Slicing fresh peppers in the kitchen',
+    // w=800 (2x the default) — same reasoning as planAhead: this card goes
+    // near full-width on phones and a 400px source looked soft there.
+    url: pexels(8629042, 800),
     source: 'pexels',
-    sourceUrl: 'https://www.pexels.com/photo/photo-of-sliced-vegetables-on-wooden-chopping-board-3872439/',
-    photographer: 'Polina Tankilevitch',
+    sourceUrl: 'https://www.pexels.com/photo/a-person-slicing-peppers-8629042/',
+    photographer: 'Kampus Production',
     license: 'Pexels License — free for commercial use, no attribution required',
     component: 'IntentCard — Cooking',
-    alt: 'Fresh sliced vegetables on a wooden chopping board',
+    alt: 'Hands slicing a fresh red pepper on a chopping board in a kitchen',
   },
   planAhead: {
-    name: 'Weekly meal-prep containers',
-    url: pexels(30635720, 400),
+    name: 'A week of colourful meal-prep boxes',
+    // w=800 (2x the other IntentCard photos): this card renders near
+    // full-width on phones, where a 400px source looked visibly soft.
+    url: pexels(1640771, 800),
     source: 'pexels',
-    sourceUrl: 'https://www.pexels.com/photo/healthy-meal-prep-containers-with-rice-and-vegetables-30635720/',
-    photographer: 'Iara Melo',
+    sourceUrl: 'https://www.pexels.com/photo/variety-of-dishes-1640771/',
+    photographer: 'Ella Olsson',
     license: 'Pexels License — free for commercial use, no attribution required',
     component: 'IntentCard — Plan ahead',
-    alt: 'Rice and vegetables portioned into meal-prep containers',
+    alt: 'Four meal-prep boxes of falafel, chickpeas, rice and fresh vegetables laid out for the week',
   },
 } as const satisfies Record<string, ImageAsset>;
 

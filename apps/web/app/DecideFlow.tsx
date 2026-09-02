@@ -6,6 +6,10 @@ import type { DecideResponse, DecisionOptionView } from '@foodpadi/shared';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './eat-now/LocalFoodSearch';
 import { AiThinking } from '../components/motion/AiThinking';
 import { FoodImage } from '../components/FoodImage';
+import { MemberBenefitCard } from '../components/MemberBenefitCard';
+import { ShareNudge } from '../components/ShareNudge';
+import { AdSlot } from '../components/AdSlot';
+import { guestPrompts } from '../lib/guestClient';
 import styles from './home.module.css';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
@@ -46,11 +50,14 @@ const optionVariants = (prefersReducedMotion: boolean) => ({
  * Blends real Cook Today + Eat Now results into a small set of explained
  * options via POST /decide, rather than making the user pick a mode first.
  */
-export function DecideFlow() {
+export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
   const [description, setDescription] = useState('');
   const [budgetPounds, setBudgetPounds] = useState('');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
+  // Guests only: shown under the options once they've decided a couple of
+  // times (§12), then never again this visit (§13).
+  const [showBenefit, setShowBenefit] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [getSearchStage, setGetSearchStage] = useState<LocalFoodSearchStage>('idle');
@@ -113,6 +120,13 @@ export function DecideFlow() {
       if (reqId !== requestSeq.current) return;
       setOptions(data.options);
       setStage(data.options.length > 0 ? 'options' : 'no-options');
+      if (isGuest && data.options.length > 0) {
+        const count = guestPrompts.bumpCount('decide_options');
+        if (count >= 2 && !guestPrompts.hasSeen('decide_options')) {
+          setShowBenefit(true);
+          guestPrompts.markSeen('decide_options');
+        }
+      }
     } catch {
       if (reqId !== requestSeq.current) return;
       setErrorMessage("FoodPadi couldn't decide right now. Please try again.");
@@ -150,6 +164,17 @@ export function DecideFlow() {
     if (hasResultsShowing) clearResults();
   };
 
+  const hasSomethingToClear = description.trim().length > 0 || budgetPounds.trim().length > 0 || hasResultsShowing;
+
+  // Resets the whole flow back to blank — the text field, budget, and any
+  // results/error on screen — rather than just the input, so it reads as
+  // "start over" and never leaves a stale card sitting under an empty field.
+  const clearAll = () => {
+    setDescription('');
+    setBudgetPounds('');
+    clearResults();
+  };
+
   return (
     <div className={styles.decideSection}>
       <input
@@ -174,6 +199,11 @@ export function DecideFlow() {
             {chip.label}
           </motion.button>
         ))}
+        {hasSomethingToClear ? (
+          <button type="button" className={styles.clearButton} onClick={clearAll}>
+            ✕ Clear
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.constraintsRow}>
@@ -244,7 +274,13 @@ export function DecideFlow() {
               animate="visible"
               variants={optionVariants(!!prefersReducedMotion)}
             >
-              <FoodImage image={option.image} alt={option.title} className={styles.optionImage} eager={index === 0} />
+              <FoodImage
+                image={option.image}
+                alt={option.title}
+                className={styles.optionImage}
+                eager={index === 0}
+                badge={option.foodIdea?.tags?.includes('vegan') ? 'Vegan' : undefined}
+              />
 
               <div className={styles.optionHeader}>
                 <div>
@@ -256,7 +292,7 @@ export function DecideFlow() {
                     option.type === 'cook' ? styles.optionTypeCook : styles.optionTypeGet
                   }`}
                 >
-                  {option.type === 'cook' ? 'Cook it' : 'Get it'}
+                  {option.type === 'cook' ? 'Cook it' : 'Order now'}
                 </span>
               </div>
 
@@ -299,6 +335,20 @@ export function DecideFlow() {
             </motion.div>
           ))
         : null}
+
+      {isGuest && stage === 'options' && showBenefit ? (
+        <MemberBenefitCard
+          icon="🧠"
+          title="Want suggestions based on what you like?"
+          body="Right now FoodPadi is just exploring ideas. Tell it your cuisines, your budget and what you avoid, and it decides around you."
+          ctaLabel="Personalise FoodPadi"
+        />
+      ) : null}
+      {isGuest && stage === 'options' ? <AdSlot placement="decide_results" /> : null}
+
+      {/* Members: nudge to pass FoodPadi on right after it's proved useful
+          (strategy §4/§5 — referral is a key acquisition channel). */}
+      {!isGuest && stage === 'options' ? <ShareNudge context="decision" /> : null}
     </div>
   );
 }

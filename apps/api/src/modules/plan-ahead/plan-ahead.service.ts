@@ -1,10 +1,12 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import type { FoodGoal } from '@foodpadi/shared';
+import type { FoodGoal, PlanPreviewResponse } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { curatedPlanForDays } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import type { RequestActor } from '../auth/guest-or-auth.guard';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 import { GeneratePlanDto, PlanScope } from './dto/generate-plan.dto';
 import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
@@ -86,6 +88,27 @@ export class PlanAheadService {
   // 'tomorrow' plans the next day; everything else starts today.
   private startDateForScope(scope: PlanScope): Date {
     return scope === 'tomorrow' ? addDays(startOfToday(), 1) : startOfToday();
+  }
+
+  /**
+   * Guest / signed-out Plan Ahead preview (guest-mode brief §8) — a few
+   * curated dinner ideas for the chosen number of days. No AI (curated pool,
+   * never ClaudeService), nothing persisted. Building a real saved plan with
+   * reminders and per-day edits still needs an account (generate() above).
+   */
+  async preview(days: number, actor: RequestActor): Promise<PlanPreviewResponse> {
+    const clamped = Math.min(Math.max(1, Math.round(days || 3)), 7);
+    const recipes = curatedPlanForDays(clamped)
+      .map((candidate) => sanitizeRecipeCandidate(candidate))
+      .filter((recipe): recipe is RecipeView => recipe !== null);
+
+    await this.analytics.track(
+      'plan_preview_generated',
+      actor.type === 'user' ? { userId: actor.userId } : { guestSessionId: actor.sessionId },
+      { days: clamped, resultCount: recipes.length, guest: actor.type === 'guest' },
+    );
+
+    return { days: recipes.map((recipe, dayIndex) => ({ dayIndex, recipe })) };
   }
 
   async generate(dto: GeneratePlanDto, userId: string) {

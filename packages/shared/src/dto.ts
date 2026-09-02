@@ -21,6 +21,14 @@ export interface RegisterRequest {
   email: string;
   password: string;
   displayName?: string;
+  /**
+   * "Feed a Friend" referral code, when the user arrived via an invite link
+   * (docs/REFERRAL_PLAN.md). Best-effort attribution only — an unknown,
+   * malformed, or self-referring code is silently ignored and never blocks
+   * registration. On web the value rides the `fp_ref` cookie and is attached
+   * by the register route handler, not typed by the user.
+   */
+  referralCode?: string;
 }
 
 export interface LoginRequest {
@@ -34,6 +42,8 @@ export interface LoginRequest {
 // Google email that already has a password account logs into that account.
 export interface GoogleAuthRequest {
   idToken: string;
+  /** "Feed a Friend" code, applied only when this sign-in creates a new account. */
+  referralCode?: string;
 }
 
 export interface AuthResponse {
@@ -276,6 +286,20 @@ export interface GeneratePlanRequest {
   scope: PlanScope;
   customDays?: number;
   budgetPence?: number;
+  /** Free-text steer for the whole plan — e.g. "Nigerian food this week", "quick family dinners", "no rice". Optional; falls back to stored cuisine/avoided-ingredient preferences alone when omitted. */
+  prompt?: string;
+}
+
+// GET /plan-ahead/preview — the guest-accessible, AI-free preview of Plan
+// Ahead (a few curated dinner ideas for the chosen number of days, nothing
+// persisted). Building a real saved/reminder-backed plan needs an account.
+export interface PlanPreviewDay {
+  dayIndex: number;
+  recipe: RecipeView;
+}
+
+export interface PlanPreviewResponse {
+  days: PlanPreviewDay[];
 }
 
 export interface GenerateShoppingListRequest {
@@ -425,6 +449,79 @@ export interface DecisionOptionView {
 export interface DecideResponse {
   options: DecisionOptionView[];
 }
+
+// --- Referrals ("Feed a Friend", docs/REFERRAL_PLAN.md) ---
+
+export type ReferralStatus = 'pending' | 'qualified' | 'rewarded';
+
+export interface ReferralListItem {
+  /** Masked so the dashboard never exposes a referred person's full email. */
+  maskedHandle: string;
+  status: ReferralStatus;
+  createdAt: string;
+}
+
+/**
+ * The referrer recognition ladder (Phase 1b). Rewards are status/badges, not
+ * paid perks — see docs/REFERRAL_PLAN.md §3. The API is the authority on which
+ * tier a user is at; this constant lets the client draw the whole ladder.
+ */
+export interface ReferralTier {
+  /** Qualified-referral count that unlocks this tier. */
+  threshold: number;
+  label: string;
+  /** Leading emoji for the badge. */
+  icon: string;
+}
+
+export const REFERRAL_TIERS: readonly ReferralTier[] = [
+  { threshold: 1, label: 'First Invite', icon: '🌱' },
+  { threshold: 3, label: 'Food Explorer', icon: '🧭' },
+  { threshold: 5, label: 'Super Connector', icon: '⚡' },
+  { threshold: 10, label: 'FoodPadi Ambassador', icon: '👑' },
+] as const;
+
+export type ReferralMilestoneKind = 'referrer_tier' | 'joined_via_friend';
+
+/** A badge the user has earned but not yet seen a celebration for. */
+export interface ReferralMilestoneNotice {
+  kind: ReferralMilestoneKind;
+  label: string;
+  icon: string;
+}
+
+export interface ReferralSummary {
+  /** The member's personal code, e.g. "K7RPXQ2". */
+  code: string;
+  /** Ready-to-share absolute URL, e.g. "https://foodpadi.app/?ref=K7RPXQ2". */
+  link: string;
+  counts: {
+    /** Friends who registered through this member's link. */
+    joined: number;
+    /** ...of whom this many have since done something meaningful in FoodPadi. */
+    qualified: number;
+  };
+  /** Highest tier reached, or null before the first qualified referral. */
+  tier: ReferralTier | null;
+  /** Next tier to aim for + how many more qualified friends it needs; null once all are earned. */
+  nextTier: (ReferralTier & { remaining: number }) | null;
+  /** Badges earned but not yet acknowledged — the client shows a celebration, then POSTs the ack. */
+  unseen: ReferralMilestoneNotice[];
+  /** Most-recent-first, capped server-side. */
+  recent: ReferralListItem[];
+}
+
+/** Friend-side: whether this account was created via an invite, and whether the welcome is still unseen. */
+export interface ReferralReceivedStatus {
+  invitedByFriend: boolean;
+  unseenWelcome: boolean;
+}
+
+/** Where a contextual "share FoodPadi" nudge was shown. */
+export type ReferralNudgeContext = 'decision' | 'cook' | 'plan';
+
+/** Channel a share was initiated through — reported from the client. */
+export type ReferralShareChannel = 'whatsapp' | 'copy' | 'native' | 'other';
 
 export const DISCLAIMER_TEXT = `AI Food Companion provides food discovery, ingredient information, meal planning, recipes, shopping assistance and general food-related recommendations.
 

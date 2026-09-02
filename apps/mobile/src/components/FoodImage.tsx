@@ -15,6 +15,10 @@ interface Props {
   /** Dish name — accessibility label for the photo. */
   alt: string;
   style?: StyleProp<ViewStyle>;
+  /** Small overlay label in the image's corner — e.g. "Vegan". Shown whenever
+   * passed, on the real photo or the icon fallback alike (the fact is still
+   * true either way). Omit when it doesn't apply. */
+  badge?: string;
 }
 
 /**
@@ -26,7 +30,7 @@ interface Props {
  * broken image or a big empty box. Attribution sits subtly beneath, per the
  * Pexels/Unsplash API terms. Web counterpart: apps/web/components/FoodImage.tsx.
  */
-export function FoodImage({ image, alt, style }: Props) {
+export function FoodImage({ image, alt, style, badge }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
@@ -41,6 +45,11 @@ export function FoodImage({ image, alt, style }: Props) {
     return (
       <View style={style}>
         <View style={[styles.frame, styles.frameFallback]}>
+          {badge ? (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>{badge}</Text>
+            </View>
+          ) : null}
           <Text style={styles.fallbackIcon} accessibilityLabel={alt || 'food'}>
             🍽️
           </Text>
@@ -52,6 +61,11 @@ export function FoodImage({ image, alt, style }: Props) {
   return (
     <View style={style}>
       <View style={styles.frame}>
+        {badge ? (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{badge}</Text>
+          </View>
+        ) : null}
         {status === 'loading' ? <View style={[StyleSheet.absoluteFill, styles.skeleton]} /> : null}
         <Animated.Image
           source={{ uri: image.url }}
@@ -94,6 +108,23 @@ function makeStyles(c: ThemeColors) {
     fallbackIcon: {
       fontSize: 24,
       opacity: 0.55,
+    },
+    // Small dietary-fact overlay ("Vegan" etc.) — zIndex so it sits above
+    // the photo/skeleton regardless of sibling order.
+    badge: {
+      position: 'absolute',
+      top: 8,
+      left: 8,
+      zIndex: 2,
+      backgroundColor: c.success,
+      borderRadius: radius.pill,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+    },
+    badgeText: {
+      color: '#fff',
+      fontSize: 11,
+      fontWeight: '700',
     },
     skeleton: {
       backgroundColor: c.surfaceSunken,

@@ -1,12 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { MealChoice, MealPlanItemView, MealPlanView, PlanScope } from '@foodpadi/shared';
+import { FoodIdeaView, MealChoice, MealPlanItemView, MealPlanView, PlanScope } from '@foodpadi/shared';
+import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
+import { tokenStore } from '../api/tokenStore';
 import { BackLink } from '../components/BackLink';
+import { PlanAheadGuestPreview } from './PlanAheadGuestPreview';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
+import { FoodImage } from '../components/FoodImage';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
 import { getCuisineImage } from '../constants/cuisineImages';
@@ -18,13 +22,41 @@ import type { AppStackParamList } from '../navigation/AppStack';
 const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
 const SUGGESTION_DEBOUNCE_MS = 300;
 
-type Props = NativeStackScreenProps<AppStackParamList, 'PlanAhead'>;
+const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
+  low: '£',
+  medium: '££',
+  high: '£££',
+};
+
+function formatPence(pence: number): string {
+  return pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`;
+}
+
+type Props = NativeStackScreenProps<AppStackParamList, 'PlanAhead'> & { onRequestLogin: () => void };
 
 // Two primary choices — plan just the next day, or the whole week. Anything
 // in between lives behind "More options" as a custom day count (1-14).
 const SCOPE_OPTIONS: { label: string; value: PlanScope }[] = [
   { label: 'Just tomorrow', value: 'tomorrow' },
   { label: 'This week', value: 'week' },
+];
+
+// Lightweight prompt suggestions — same pattern as Decide's PROMPT_CHIPS:
+// each just populates the same free-text field the user could type into by
+// hand, never required. Web counterpart: apps/web/app/plan/PlanScopeForm.tsx.
+const PROMPT_SUGGESTIONS: { label: string; text: string }[] = [
+  { label: 'Quick meals', text: 'Quick meals I can make after work' },
+  { label: 'Family meals', text: 'Family-friendly meals' },
+  { label: 'Healthy', text: 'Healthy meals' },
+  { label: 'Budget-friendly', text: 'Cheap and filling meals' },
+  { label: 'Nigerian', text: 'Nigerian food' },
+  { label: 'Italian', text: 'Italian food' },
+  { label: 'Vegetarian', text: 'Vegetarian meals' },
+  { label: 'Vegan', text: 'Vegan meals' },
+  { label: 'High-protein', text: 'High-protein meals' },
+  { label: 'Comfort food', text: 'Comforting meals' },
+  { label: 'Use what I have', text: 'Meals using simple, everyday ingredients' },
+  { label: 'Something different', text: 'Something different from usual' },
 ];
 
 function formatDate(iso: string) {
@@ -40,14 +72,16 @@ function formatReminderTime(plannedTime: string): string {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
-export function PlanAheadScreen({ navigation }: Props) {
+export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const { user } = useAuth();
   const [step, setStep] = useState<'scope' | 'loading' | 'plan'>('scope');
   const [scope, setScope] = useState<PlanScope>('week');
   const [showCustom, setShowCustom] = useState(false);
   const [customDays, setCustomDays] = useState('3');
   const [budget, setBudget] = useState('');
+  const [prompt, setPrompt] = useState('');
   const [plan, setPlan] = useState<MealPlanView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyItemId, setBusyItemId] = useState<string | null>(null);
@@ -56,6 +90,14 @@ export function PlanAheadScreen({ navigation }: Props) {
   const [creatingList, setCreatingList] = useState(false);
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // "Find it nearby" for a Get-it day — MVP-simulated the same way Eat Now's
+  // own primary search is: the real /eat-now/search catalogue endpoint
+  // (illustrative distance/time/price, honestly labelled as such), not the
+  // real-geolocation LocalFoodSearch. Only one item's results show at once.
+  const [nearbyOpenId, setNearbyOpenId] = useState<string | null>(null);
+  const [nearbyResults, setNearbyResults] = useState<FoodIdeaView[] | null>(null);
+  const [nearbySearching, setNearbySearching] = useState(false);
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
   // Per-day "replace with something specific" — which day's prompt box is
   // open, and the drafted text for each, keyed by item id.
   const [focusOpenId, setFocusOpenId] = useState<string | null>(null);
@@ -99,6 +141,12 @@ export function PlanAheadScreen({ navigation }: Props) {
   // returning-user pattern).
   useEffect(() => {
     (async () => {
+      // Guests have no saved plan and can't call this account-only endpoint —
+      // they get the AI-free preview branch below instead.
+      if (!user) {
+        setCheckingExisting(false);
+        return;
+      }
       const current = await api.getCurrentPlan();
       if (current) {
         setPlan(current);
@@ -132,6 +180,7 @@ export function PlanAheadScreen({ navigation }: Props) {
         scope: effectiveScope,
         customDays: effectiveScope === 'custom' ? Number(customDays) : undefined,
         budgetPence,
+        prompt: prompt.trim() || undefined,
       });
       setPlan(result);
       setStep('plan');
@@ -217,8 +266,37 @@ export function PlanAheadScreen({ navigation }: Props) {
       setPlan(updated);
       const item = updated.items.find((i) => i.id === itemId);
       if (item?.plannedTime) scheduleMealReminder(item); // wording differs by choice — resync
+      // Switching away from "Eat out" hides any nearby results open for it.
+      if (mealChoice !== 'eat_out' && nearbyOpenId === itemId) {
+        setNearbyOpenId(null);
+        setNearbyResults(null);
+      }
     } finally {
       setBusyItemId(null);
+    }
+  };
+
+  // MVP-simulated "find it nearby" — reuses Eat Now's existing illustrative
+  // catalogue search (real cuisine/price band, illustrative distance/time/
+  // price) rather than building a separate system for Plan Ahead.
+  const findNearby = async (item: MealPlanItemView) => {
+    if (!item.recipe) return;
+    if (nearbyOpenId === item.id) {
+      setNearbyOpenId(null);
+      return;
+    }
+    setNearbyOpenId(item.id);
+    setNearbyResults(null);
+    setNearbyError(null);
+    setNearbySearching(true);
+    try {
+      const token = (await tokenStore.getAccessToken()) ?? '';
+      const results = await api.searchEatNow({ query: item.recipe.title }, token);
+      setNearbyResults(results);
+    } catch (e) {
+      setNearbyError(e instanceof ApiError ? e.message : 'Something went wrong searching for food.');
+    } finally {
+      setNearbySearching(false);
     }
   };
 
@@ -258,6 +336,13 @@ export function PlanAheadScreen({ navigation }: Props) {
       setCreatingList(false);
     }
   };
+
+  // Guests get an AI-free preview of Plan Ahead (guest-mode brief §8) —
+  // curated dinner ideas, nothing saved. All the account-only machinery
+  // above (existing-plan lookup, reminders, per-day regenerate) is skipped.
+  if (!user) {
+    return <PlanAheadGuestPreview navigation={navigation} onRequestLogin={onRequestLogin} />;
+  }
 
   if (checkingExisting) {
     return <LoadingState />;
@@ -342,6 +427,54 @@ export function PlanAheadScreen({ navigation }: Props) {
                 onPress={() => setMealChoice(item.id, 'eat_out')}
               />
             </View>
+
+            {item.mealChoice === 'eat_out' ? (
+              <TouchableOpacity onPress={() => findNearby(item)} accessibilityRole="button">
+                <Text style={styles.itemActionText}>{nearbyOpenId === item.id ? 'Hide' : 'Find it nearby'}</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {nearbyOpenId === item.id ? (
+              <View style={styles.nearbyBlock}>
+                {nearbySearching ? <Text style={styles.mealDate}>Looking nearby…</Text> : null}
+                {nearbyError ? <Text style={styles.errorText}>{nearbyError}</Text> : null}
+                {nearbyResults ? (
+                  <>
+                    <Text style={styles.disclaimerNote}>
+                      Example suggestions from a small curated list — cuisine and price band are real;
+                      distance, delivery time and exact price are illustrative estimates, not live data from
+                      any restaurant.
+                    </Text>
+                    {nearbyResults.length === 0 ? (
+                      <Text style={styles.emptyText}>
+                        Nothing matched nearby. Try replacing this day with something else.
+                      </Text>
+                    ) : (
+                      nearbyResults.map((idea) => (
+                        <Card key={idea.id} style={styles.resultCard}>
+                          <FoodImage
+                            image={idea.image}
+                            alt={idea.title}
+                            style={styles.resultImage}
+                            badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
+                          />
+                          <Text style={styles.resultTitle}>{idea.title}</Text>
+                          <Text style={styles.resultBody}>{idea.description}</Text>
+                          <Text style={styles.estimateText}>
+                            ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
+                            {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
+                          </Text>
+                          <View style={styles.tagRow}>
+                            <Tag label={idea.cuisine} />
+                            <Tag label={BUDGET_LABEL[idea.budgetTier]} />
+                          </View>
+                        </Card>
+                      ))
+                    )}
+                  </>
+                ) : null}
+              </View>
+            ) : null}
 
             <View style={styles.timeRow}>
               <TextInput
@@ -510,16 +643,38 @@ export function PlanAheadScreen({ navigation }: Props) {
       ) : null}
 
       <View style={styles.fieldRow}>
-        <Text style={styles.fieldLabel}>Weekly budget (optional)</Text>
+        <Text style={styles.fieldLabel}>What would you like to eat? (optional)</Text>
         <TextInput
-          style={styles.smallInput}
-          keyboardType="decimal-pad"
-          placeholder="£70"
+          style={styles.promptTextarea}
+          placeholder="Tell FoodPadi what you're in the mood for… e.g. &quot;Nigerian food this week&quot;"
           placeholderTextColor={colors.textFaint}
-          value={budget}
-          onChangeText={setBudget}
-          autoComplete="off"
+          value={prompt}
+          onChangeText={setPrompt}
+          multiline
+          numberOfLines={2}
+          maxLength={200}
         />
+        <View style={styles.chipWrap}>
+          {PROMPT_SUGGESTIONS.map((s) => (
+            <Chip key={s.label} label={s.label} selected={prompt === s.text} onPress={() => setPrompt(s.text)} />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.fieldRow}>
+        <Text style={styles.fieldLabel}>Weekly budget (optional)</Text>
+        <View style={styles.budgetField}>
+          {budget ? <Text style={styles.budgetAffixPrefix}>£</Text> : null}
+          <TextInput
+            style={[styles.smallInput, budget ? styles.budgetInputHasPrefix : null]}
+            keyboardType="decimal-pad"
+            placeholder="£70"
+            placeholderTextColor={colors.textFaint}
+            value={budget}
+            onChangeText={setBudget}
+            autoComplete="off"
+          />
+        </View>
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
@@ -548,8 +703,44 @@ function makeStyles(c: ThemeColors) {
     color: c.text,
     maxWidth: 160,
   },
+  // Budget field — a £ prefix that appears once a value is typed, same
+  // pattern as DecideFlow's budget input.
+  budgetField: { position: 'relative', maxWidth: 160 },
+  budgetInputHasPrefix: { paddingLeft: 22 },
+  budgetAffixPrefix: {
+    position: 'absolute',
+    top: '50%',
+    left: spacing.lg,
+    marginTop: -8,
+    fontSize: 15,
+    color: c.textMuted,
+    zIndex: 1,
+  },
+  promptTextarea: {
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
+    borderRadius: 12,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    fontSize: 15,
+    color: c.text,
+    minHeight: 64,
+    textAlignVertical: 'top',
+    marginBottom: spacing.sm,
+  },
   errorText: { color: c.danger, marginBottom: spacing.md, fontSize: 14 },
   actionSpacing: { marginTop: spacing.lg },
+  // "Find it nearby" results (Get-it days) — mirrors EatNowScreen's result
+  // card styling exactly, since this reuses the same /eat-now/search data.
+  nearbyBlock: { marginTop: spacing.sm, marginBottom: spacing.xs },
+  disclaimerNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.md, lineHeight: 18 },
+  emptyText: { ...typography.body, color: c.textMuted, marginBottom: spacing.md },
+  resultCard: { marginBottom: spacing.md },
+  resultImage: { marginBottom: spacing.md },
+  resultTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  resultBody: { ...typography.body, color: c.textMuted, marginBottom: spacing.sm },
+  estimateText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.sm },
   mealCard: { marginBottom: spacing.md },
   mealHeaderRow: { flexDirection: 'row', gap: spacing.md },
   mealImage: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: c.surfaceSunken },

@@ -1,0 +1,37 @@
+/* GuestAutoStart's brief loading/error screen — same tokens, spacing and
+   type scale as the rest of the app (home.module.css, page.module.css)
+   rather than one-off inline styles, so it reads as FoodPadi even in the
+   moment before the real guest Home takes over. */
+.container {
+  min-height: 60vh;
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 96px var(--space-xl) var(--space-xxl);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-lg);
+}
+
+.message {
+  color: var(--text-muted);
+  font-size: 15px;
+  margin: 0;
+}
+
+.retryLink {
+  display: inline-block;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text);
+  padding: 12px 24px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.retryLink:hover {
+  background: var(--primary-dark);
+}

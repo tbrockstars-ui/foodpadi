@@ -11,8 +11,10 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { LoadingState } from '../components/LoadingState';
+import { MemberBenefitCard } from '../components/MemberBenefitCard';
 import { SignupPromptModal } from '../components/SignupPromptModal';
 import { Tag } from '../components/Tag';
+import { guestPrompts } from '../lib/guestPrompts';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
@@ -59,6 +61,9 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
+  // Shown once per guest session under the results list (frequency control,
+  // guest-mode brief §13) — reworded from the old always-on guest card.
+  const [showResultsBenefit, setShowResultsBenefit] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
@@ -111,6 +116,13 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
       }
       setRecipes(results);
       setStep('results');
+      if (!user) {
+        const seen = await guestPrompts.hasSeen('cook_results');
+        if (!seen) {
+          setShowResultsBenefit(true);
+          void guestPrompts.markSeen('cook_results');
+        }
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 503) {
         setError("Cook Today isn't ready yet — the recipe generator isn't configured. Check back soon.");
@@ -236,6 +248,15 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
                 </View>
               </Card>
             ))}
+            {showResultsBenefit ? (
+              <MemberBenefitCard
+                icon="🔖"
+                title="Don't lose these"
+                body="Create a free account and FoodPadi keeps your recipes so you can cook them again anytime."
+                ctaLabel="Create free account"
+                onPress={onRequestLogin}
+              />
+            ) : null}
           </ScrollView>
         )}
         <Button label="Start over" variant="secondary" onPress={() => setStep('input')} style={styles.actionSpacing} />

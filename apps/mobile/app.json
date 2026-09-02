@@ -3,6 +3,7 @@
     "name": "FoodPadi",
     "slug": "foodpadi",
     "version": "0.1.0",
+    "scheme": "foodpadi",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "assetBundlePatterns": [
@@ -43,10 +44,16 @@
           "resizeMode": "contain",
           "backgroundColor": "#FBFAF7"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "extra": {
       "apiBaseUrl": "https://foodpadi-api.onrender.com",
+      "googleAuth": {
+        "webClientId": "1012058800117-jsk24r6p16gu0h8ih8vrr8sec1u05eh6.apps.googleusercontent.com",
+        "androidClientId": "1012058800117-7q6r357g99cqgce1oe1nc1km8d60h531.apps.googleusercontent.com",
+        "iosClientId": ""
+      },
       "eas": {
         "projectId": "95068528-5f02-41d4-b96f-b588c365ba5b"
       }

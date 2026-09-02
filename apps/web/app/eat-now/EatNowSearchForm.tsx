@@ -5,6 +5,7 @@ import type { FoodIdeaView } from '@foodpadi/shared';
 import styles from './eat-now.module.css';
 import { LocalFoodSearch } from './LocalFoodSearch';
 import { FoodImage } from '../../components/FoodImage';
+import { AdSlot } from '../../components/AdSlot';
 
 const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
   low: '£',
@@ -17,7 +18,7 @@ function formatPence(pence: number): string {
 }
 
 /** Web counterpart to apps/mobile/src/screens/EatNowScreen.tsx's search step. */
-export function EatNowSearchForm() {
+export function EatNowSearchForm({ isGuest = false }: { isGuest?: boolean }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<FoodIdeaView[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +82,12 @@ export function EatNowSearchForm() {
           ) : (
             results.map((idea) => (
               <div key={idea.id} className={styles.resultCard}>
-                <FoodImage image={idea.image} alt={idea.title} className={styles.resultImage} />
+                <FoodImage
+                  image={idea.image}
+                  alt={idea.title}
+                  className={styles.resultImage}
+                  badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
+                />
                 <p className={styles.resultTitle}>{idea.title}</p>
                 <p className={styles.resultBody}>{idea.description}</p>
                 <p className={styles.estimateText}>
@@ -95,6 +101,12 @@ export function EatNowSearchForm() {
               </div>
             ))
           )}
+          {isGuest ? (
+            <>
+              <p className={styles.disclaimerNote}>FoodPadi gets better when it knows you.</p>
+              <AdSlot placement="eat_now_results" />
+            </>
+          ) : null}
         </>
       ) : null}
 

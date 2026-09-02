@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { FoodGoal } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { pickCuratedRecipes } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -34,11 +35,18 @@ export class CookTodayService {
   ) {}
 
   async generate(dto: GenerateRecipesDto, actor: RequestActor): Promise<RecipeView[]> {
+    // A guest must never trigger a paid AI call (guest-mode brief §2/§22).
+    // They get deterministic recipes from the curated pool instead — the same
+    // Layer 3 validation, no ClaudeService, nothing stored to personalise
+    // from. Also covers the "cook it" lane of guest Decide, which calls this.
+    if (actor.type === 'guest') {
+      return this.generateForGuest(dto, actor);
+    }
+
     // Signed-in users get recipes shaped by their Preferences + Goals
     // (favourite cuisines, avoided ingredients, food goals) — same treatment
-    // Eat Now and Plan Ahead already give. Guests have nothing stored, so
-    // they get the plain generation. Also reached via DecideService, so the
-    // "cook it" options in "What should I eat?" are personalised too.
+    // Eat Now and Plan Ahead already give. Also reached via DecideService, so
+    // the "cook it" options in "What should I eat?" are personalised too.
     const personalisation = await this.loadPersonalisation(actor);
 
     const raw = await this.claude.generateCookTodayRecipes({
@@ -78,6 +86,35 @@ export class CookTodayService {
     });
 
     return safe;
+  }
+
+  /**
+   * Guest Cook Today / guest Decide "cook it" lane — deterministic, no AI.
+   * The time constraint is honoured best-effort inside pickCuratedRecipes and
+   * deliberately NOT re-applied in sanitizeRecipeCandidate here: a guest has
+   * no Eat Now "get it" fallback in Cook Today, so a slightly-too-long
+   * curated recipe beats an empty result they can't act on.
+   */
+  private async generateForGuest(
+    dto: GenerateRecipesDto,
+    actor: RequestActor,
+  ): Promise<RecipeView[]> {
+    const raw = pickCuratedRecipes(dto.ingredients.join(' '), 3, {
+      maxMinutes: dto.timeConstraintMinutes,
+    });
+    const recipes = raw
+      .map((candidate) => sanitizeRecipeCandidate(candidate))
+      .filter((recipe): recipe is RecipeView => recipe !== null);
+
+    await this.analytics.track('cook_today_recipes_generated', actorToAnalyticsFields(actor), {
+      ingredientCount: dto.ingredients.length,
+      resultCount: recipes.length,
+      personalised: false,
+      source: 'curated',
+      guest: true,
+    });
+
+    return recipes;
   }
 
   private dropRecipesWithAvoided(recipes: RecipeView[], avoided: string[]): RecipeView[] {

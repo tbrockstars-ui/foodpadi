@@ -421,7 +421,7 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
         >
           {regeneratingPlan ? 'Rebuilding…' : planLevelLabel}
         </button>
-        <Link href="/plan" className={styles.itemActionText}>
+        <Link href="/plan?new=1" className={styles.itemActionText}>
           Start a new plan
         </Link>
       </div>

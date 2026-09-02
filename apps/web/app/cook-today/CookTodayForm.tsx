@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { RecipeView } from '@foodpadi/shared';
 import styles from './cook-today.module.css';
+import { MemberBenefitCard } from '../../components/MemberBenefitCard';
+import { guestPrompts } from '../../lib/guestClient';
 
 // Grouped loosely (protein / carb / veg / dairy) for scannability, but kept
 // as one flat tappable list — same simple chip-wrap layout as before, just
@@ -50,8 +52,12 @@ async function errorMessageFrom(res: Response, fallback: string): Promise<string
 }
 
 /** Web counterpart to apps/mobile/src/screens/CookTodayScreen.tsx. */
-export function CookTodayForm() {
+export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
   const [step, setStep] = useState<Step>('input');
+  // Guests: shown once per visit under the results, and in place of the
+  // save-recipe flow (which needs an account).
+  const [showResultsBenefit, setShowResultsBenefit] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [customIngredient, setCustomIngredient] = useState('');
   const [timeConstraint, setTimeConstraint] = useState<number | undefined>(undefined);
@@ -96,6 +102,10 @@ export function CookTodayForm() {
       }
       setRecipes((await res.json()) as RecipeView[]);
       setStep('results');
+      if (isGuest && !guestPrompts.hasSeen('cook_results')) {
+        setShowResultsBenefit(true);
+        guestPrompts.markSeen('cook_results');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong finding recipes.');
     } finally {
@@ -112,6 +122,12 @@ export function CookTodayForm() {
 
   const saveRecipe = async () => {
     if (!selectedRecipe) return;
+    if (isGuest) {
+      // Saving needs an account — show the value, don't bounce straight to a
+      // login screen (guest-mode brief §6).
+      setShowSavePrompt(true);
+      return;
+    }
     setSaving(true);
     setSaveError(null);
     try {
@@ -176,6 +192,14 @@ export function CookTodayForm() {
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save this recipe'}
         </button>
         {saveError ? <p className={styles.errorText}>{saveError}</p> : null}
+        {showSavePrompt ? (
+          <MemberBenefitCard
+            icon="🔖"
+            title="Want FoodPadi to remember this?"
+            body="Create a free account to save recipes, keep your preferences and open them again on your other devices."
+            ctaLabel="Create free account"
+          />
+        ) : null}
       </div>
     );
   }
@@ -200,6 +224,14 @@ export function CookTodayForm() {
             </button>
           ))
         )}
+        {showResultsBenefit ? (
+          <MemberBenefitCard
+            icon="🔖"
+            title="Don't lose these"
+            body="Create a free account and FoodPadi keeps your recipes so you can cook them again anytime."
+            ctaLabel="Create free account"
+          />
+        ) : null}
         <button type="button" className={styles.secondaryButton} onClick={() => setStep('input')}>
           Start over
         </button>

@@ -6,6 +6,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
+import { AdSlot } from '../components/AdSlot';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -154,7 +155,12 @@ export function EatNowScreen({ navigation, route }: Props) {
         ) : (
           results.map((idea) => (
             <Card key={idea.id} style={styles.resultCard}>
-              <FoodImage image={idea.image} alt={idea.title} style={styles.resultImage} />
+              <FoodImage
+                image={idea.image}
+                alt={idea.title}
+                style={styles.resultImage}
+                badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
+              />
               <Text style={styles.resultTitle}>{idea.title}</Text>
               <Text style={styles.resultBody}>{idea.description}</Text>
               <Text style={styles.estimateText}>
@@ -168,6 +174,13 @@ export function EatNowScreen({ navigation, route }: Props) {
             </Card>
           ))
         )}
+
+        {!user ? (
+          <>
+            <Text style={styles.guestNudge}>FoodPadi gets better when it knows you.</Text>
+            <AdSlot placement="eat_now_results" />
+          </>
+        ) : null}
       </ScrollView>
     );
   }
@@ -206,6 +219,7 @@ function makeStyles(c: ThemeColors) {
   subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   whyText: { ...typography.body, color: c.primary, marginBottom: spacing.sm, fontWeight: '600' },
   disclaimerNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+  guestNudge: { ...typography.caption, color: c.textFaint, textAlign: 'center', marginTop: spacing.lg },
   emptyText: { ...typography.body, color: c.textMuted, marginBottom: spacing.md },
   searchInput: {
     borderWidth: 1,

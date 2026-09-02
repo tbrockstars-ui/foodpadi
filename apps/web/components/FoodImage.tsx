@@ -17,6 +17,10 @@ interface Props {
   /** Load eagerly instead of lazily (default lazy — brief §20/§27). */
   eager?: boolean;
   className?: string;
+  /** Small overlay label in the image's corner — e.g. "Vegan". Shown whenever
+   * passed, on the real photo or the icon fallback alike (the fact is still
+   * true either way). Omit when it doesn't apply. */
+  badge?: string;
 }
 
 /**
@@ -29,7 +33,7 @@ interface Props {
  * Attribution sits subtly beneath, per the Pexels/Unsplash API terms. Mobile
  * counterpart: apps/mobile/src/components/FoodImage.tsx.
  */
-export function FoodImage({ image, alt, eager, className }: Props) {
+export function FoodImage({ image, alt, eager, className, badge }: Props) {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
 
   const showIconFallback = !image || status === 'error';
@@ -37,6 +41,7 @@ export function FoodImage({ image, alt, eager, className }: Props) {
   return (
     <div className={`${styles.wrap} ${className ?? ''}`}>
       <div className={`${styles.frame} ${showIconFallback ? styles.frameFallback : ''}`}>
+        {badge ? <span className={styles.badge}>{badge}</span> : null}
         {showIconFallback ? (
           <span className={styles.fallbackIcon} role="img" aria-label={alt || 'food'}>
             🍽️

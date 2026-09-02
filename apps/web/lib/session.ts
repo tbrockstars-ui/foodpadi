@@ -1,5 +1,11 @@
 export const ACCESS_COOKIE = 'fp_access';
 export const REFRESH_COOKIE = 'fp_refresh';
+// Anonymous "try FoodPadi" session — a signed guest JWT from the API's
+// POST /auth/guest-session (docs/FOODPADI_AUTHENTICATION_SPEC.md). Not a real
+// account: it only lets a guest reach the guest-accessible, AI-free endpoints
+// (Eat Now, Cook Today/Decide curated recipes, Plan Ahead preview). Same
+// httpOnly cookie treatment as the real session tokens.
+export const GUEST_COOKIE = 'fp_guest';
 
 // Access tokens live 15 minutes (JWT_ACCESS_TTL). Keep the cookie's lifetime
 // the same — an earlier version gave it 5 min of "slack" over the token,
@@ -10,6 +16,7 @@ export const REFRESH_COOKIE = 'fp_refresh';
 // when the cookie is still present but the API rejects the token.
 export const ACCESS_COOKIE_MAX_AGE = 15 * 60;
 export const REFRESH_COOKIE_MAX_AGE = 30 * 24 * 60 * 60; // 30 days, matches JWT_REFRESH_TTL
+export const GUEST_COOKIE_MAX_AGE = 24 * 60 * 60; // 24h, matches the API's JWT_GUEST_TTL default
 
 export function sessionCookieOptions(maxAge: number) {
   return {

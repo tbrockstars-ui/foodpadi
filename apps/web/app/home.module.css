@@ -194,6 +194,45 @@
   border-radius: var(--radius-pill);
 }
 
+/* "Feed a Friend" — a quiet nudge to invite someone (docs/REFERRAL_PLAN.md) */
+.inviteCard {
+  margin-top: var(--space-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.inviteCardIcon {
+  font-size: 1.5rem;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.inviteCardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.inviteCardText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+.inviteCardLink {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
 /* Decide flow — "FoodPadi decides" (Understand Context -> 3 explained options) */
 
 .decideSection {
@@ -209,6 +248,31 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-bottom: var(--space-md);
+}
+
+/* Resets the whole flow (text, budget, results) back to blank. Pushed to
+   the end of the chip row via margin-left:auto — sits in the row's trailing
+   space rather than wrapping onto its own line, and only renders once
+   there's actually something to clear. Deliberately muted/dashed rather
+   than chip-styled, so it doesn't read as one more suggestion to pick. */
+.clearButton {
+  margin-left: auto;
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: inherit;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.clearButton:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+  background: var(--surface-sunken);
 }
 
 .promptChip {
@@ -262,7 +326,11 @@
 
 .constraintField {
   position: relative;
-  flex: 1;
+  /* Only the budget field lives here now (Minutes was removed) — sized to
+     roughly what it was before rather than stretching to the full row
+     width, so it reads as one left-aligned field, not a full-width one. */
+  flex: 0 1 auto;
+  width: min(220px, 100%);
 }
 
 .constraintInput {
@@ -280,26 +348,14 @@
   padding-left: 22px;
 }
 
-.constraintInputHasSuffix {
-  padding-right: 40px;
-}
-
-.constraintAffixPrefix,
-.constraintAffixSuffix {
+.constraintAffixPrefix {
   position: absolute;
   top: 50%;
+  left: 14px;
   transform: translateY(-50%);
   font-size: 13px;
   color: var(--text-muted);
   pointer-events: none;
-}
-
-.constraintAffixPrefix {
-  left: 14px;
-}
-
-.constraintAffixSuffix {
-  right: 14px;
 }
 
 .decideButton {

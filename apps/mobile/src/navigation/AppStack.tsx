@@ -8,6 +8,7 @@ import { CookTodayScreen } from '../screens/CookTodayScreen';
 import { PlanAheadScreen } from '../screens/PlanAheadScreen';
 import { ShoppingListScreen } from '../screens/ShoppingListScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { InviteScreen } from '../screens/InviteScreen';
 import { EditGoalsScreen } from '../screens/EditGoalsScreen';
 import { ImportRecipeScreen } from '../screens/ImportRecipeScreen';
 import { ScanScreen } from '../screens/ScanScreen';
@@ -22,6 +23,7 @@ export type AppStackParamList = {
   PlanAhead: undefined;
   ShoppingList: { listId: string };
   Profile: undefined;
+  Invite: undefined;
   EditGoals: undefined;
   ImportRecipe: undefined;
   Scan: undefined;
@@ -57,9 +59,12 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="CookToday">
           {(props) => <CookTodayScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
-        <Stack.Screen name="PlanAhead" component={PlanAheadScreen} />
+        <Stack.Screen name="PlanAhead">
+          {(props) => <PlanAheadScreen {...props} onRequestLogin={onRequestLogin} />}
+        </Stack.Screen>
         <Stack.Screen name="ShoppingList" component={ShoppingListScreen} />
         <Stack.Screen name="Profile" component={ProfileScreen} />
+        <Stack.Screen name="Invite" component={InviteScreen} />
         <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
         <Stack.Screen name="ImportRecipe" component={ImportRecipeScreen} />
         <Stack.Screen name="Scan" component={ScanScreen} />

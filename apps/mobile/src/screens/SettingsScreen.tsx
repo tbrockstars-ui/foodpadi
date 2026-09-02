@@ -14,6 +14,11 @@ type Props = NativeStackScreenProps<AppStackParamList, 'Settings'>;
  * the account links, the black (default) / white theme choice, and
  * read-only subscription / payment placeholders behind one screen reached
  * from the Home gear.
+ *
+ * Visual pattern (bold section headers, icon + label + chevron rows grouped
+ * into bordered cards) is modelled on established competitor settings
+ * screens (e.g. Virgin Media's "Manage settings") — FoodPadi's own colour
+ * palette throughout, none of theirs.
  */
 export function SettingsScreen({ navigation }: Props) {
   const { logout } = useAuth();
@@ -27,9 +32,9 @@ export function SettingsScreen({ navigation }: Props) {
 
       <Text style={s.sectionLabel}>Account</Text>
       <View style={s.group}>
-        <Row label="Profile" onPress={() => navigation.navigate('Profile')} colors={colors} />
-        <Row label="Saved recipes" onPress={() => navigation.navigate('SavedRecipes')} colors={colors} />
-        <Row label="Saved plans" onPress={() => navigation.navigate('SavedPlans')} colors={colors} last />
+        <Row icon="👤" label="Profile" onPress={() => navigation.navigate('Profile')} colors={colors} />
+        <Row icon="📖" label="Saved recipes" onPress={() => navigation.navigate('SavedRecipes')} colors={colors} />
+        <Row icon="📅" label="Saved plans" onPress={() => navigation.navigate('SavedPlans')} colors={colors} last />
       </View>
 
       <Text style={s.sectionLabel}>Appearance</Text>
@@ -55,7 +60,10 @@ export function SettingsScreen({ navigation }: Props) {
       <Text style={s.sectionLabel}>Subscription</Text>
       <View style={s.group}>
         <View style={[s.row, s.rowLast]}>
-          <Text style={s.rowLabel}>Plan</Text>
+          <View style={s.rowLeft}>
+            <Text style={s.rowIcon}>💳</Text>
+            <Text style={s.rowLabel}>Plan</Text>
+          </View>
           <View style={s.planBadge}>
             <Text style={s.planBadgeText}>Free</Text>
           </View>
@@ -64,9 +72,17 @@ export function SettingsScreen({ navigation }: Props) {
       <Text style={s.muted}>You&apos;re on the free plan. Paid plans aren&apos;t available yet.</Text>
 
       <Text style={s.sectionLabel}>Payment history</Text>
-      <Text style={s.muted}>No payments yet.</Text>
+      <View style={s.group}>
+        <View style={[s.row, s.rowLast]}>
+          <View style={s.rowLeft}>
+            <Text style={s.rowIcon}>🧾</Text>
+            <Text style={s.mutedRowLabel}>No payments yet</Text>
+          </View>
+        </View>
+      </View>
 
       <TouchableOpacity style={s.logout} onPress={logout} accessibilityRole="button">
+        <Text style={s.logoutIcon}>🚪</Text>
         <Text style={s.logoutText}>Log out</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -74,11 +90,13 @@ export function SettingsScreen({ navigation }: Props) {
 }
 
 function Row({
+  icon,
   label,
   onPress,
   colors,
   last,
 }: {
+  icon: string;
   label: string;
   onPress: () => void;
   colors: ThemeColors;
@@ -87,7 +105,10 @@ function Row({
   const s = makeStyles(colors);
   return (
     <TouchableOpacity style={[s.row, last && s.rowLast]} onPress={onPress} accessibilityRole="button">
-      <Text style={s.rowLabel}>{label}</Text>
+      <View style={s.rowLeft}>
+        <Text style={s.rowIcon}>{icon}</Text>
+        <Text style={s.rowLabel}>{label}</Text>
+      </View>
       <Text style={s.chevron}>›</Text>
     </TouchableOpacity>
   );
@@ -96,12 +117,16 @@ function Row({
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-    title: { ...typography.display, color: c.text, marginBottom: spacing.lg },
+    title: { ...typography.display, fontWeight: '800', color: c.text, marginBottom: spacing.lg },
+    // Bold, full-size section headers rather than a tiny muted uppercase
+    // caption — reads as confident information architecture ("Account",
+    // "Subscription", ...) instead of fine print above each group.
     sectionLabel: {
-      ...typography.label,
-      color: c.textFaint,
-      textTransform: 'uppercase',
-      marginTop: spacing.lg,
+      fontSize: 20,
+      fontWeight: '700',
+      letterSpacing: -0.2,
+      color: c.text,
+      marginTop: spacing.xl,
       marginBottom: spacing.sm,
     },
     group: {
@@ -115,14 +140,17 @@ function makeStyles(c: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingVertical: spacing.md,
+      paddingVertical: spacing.lg,
       paddingHorizontal: spacing.lg,
       borderBottomWidth: 1,
       borderBottomColor: c.border,
     },
     rowLast: { borderBottomWidth: 0 },
-    rowLabel: { fontSize: 15, fontWeight: '600', color: c.text },
-    chevron: { fontSize: 20, color: c.textFaint },
+    rowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexShrink: 1 },
+    rowIcon: { fontSize: 20, width: 24, textAlign: 'center' },
+    rowLabel: { fontSize: 16, fontWeight: '600', color: c.text },
+    mutedRowLabel: { fontSize: 15, fontWeight: '500', color: c.textMuted },
+    chevron: { fontSize: 22, color: c.textFaint },
     segmented: {
       flexDirection: 'row',
       gap: spacing.xs,
@@ -143,13 +171,17 @@ function makeStyles(c: ThemeColors) {
     planBadgeText: { fontSize: 12, fontWeight: '700', color: c.primary },
     muted: { ...typography.caption, color: c.textFaint, marginTop: spacing.xs, lineHeight: 18 },
     logout: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
       marginTop: spacing.xl,
       borderWidth: 1,
       borderColor: c.danger,
       borderRadius: radius.md,
       paddingVertical: spacing.lg,
-      alignItems: 'center',
     },
+    logoutIcon: { fontSize: 16 },
     logoutText: { fontSize: 16, fontWeight: '600', color: c.danger },
   });
 }

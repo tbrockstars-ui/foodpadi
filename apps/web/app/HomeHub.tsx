@@ -1,6 +1,10 @@
+import Link from 'next/link';
 import { DecideFlow } from './DecideFlow';
 import { IntentCard } from '../components/motion/IntentCard';
 import { Logo } from '../components/Logo';
+import { GuestDisclaimerGate } from '../components/GuestDisclaimerGate';
+import { MemberBenefitCard } from '../components/MemberBenefitCard';
+import { FriendWelcomeBanner } from '../components/FriendWelcomeBanner';
 import { SettingsMenu } from './SettingsMenu';
 import { IMAGE_ASSETS } from '../lib/imageAssets';
 import homeStyles from './home.module.css';
@@ -21,16 +25,35 @@ const SECONDARY_ACTIONS: HubAction[] = [
   { key: 'scan', icon: '/scan-food.png', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
-export function HomeHub() {
+export function HomeHub({
+  guest = false,
+  guestDisclaimerAcknowledged = false,
+}: {
+  guest?: boolean;
+  guestDisclaimerAcknowledged?: boolean;
+}) {
   return (
     <main className={homeStyles.container}>
       <div className={homeStyles.topBar}>
         <Logo href="/" size={36} />
         {/* Profile / Saved recipes / Log out + theme + subscription now live
             in this menu (upper-right) so the header stays to just the mark
-            and one control. */}
-        <SettingsMenu />
+            and one control. A guest has no account menu — just the way in. */}
+        {guest ? (
+          <span className={homeStyles.headerLinks}>
+            <Link href="/login" className={homeStyles.logoutLink}>
+              Log in
+            </Link>
+            <Link href="/register" className={homeStyles.logoutLink}>
+              Create account
+            </Link>
+          </span>
+        ) : (
+          <SettingsMenu />
+        )}
       </div>
+
+      {!guest ? <FriendWelcomeBanner /> : null}
       <div className={homeStyles.header}>
         <h1 className={homeStyles.heading}>
           What should I eat?
@@ -45,7 +68,13 @@ export function HomeHub() {
           single stacked column below 900px. */}
       <div className={homeStyles.hubGrid}>
         <div className={homeStyles.hubMain}>
-          <DecideFlow />
+          {guest ? (
+            <GuestDisclaimerGate acknowledged={guestDisclaimerAcknowledged}>
+              <DecideFlow isGuest />
+            </GuestDisclaimerGate>
+          ) : (
+            <DecideFlow />
+          )}
         </div>
 
         <div className={homeStyles.hubAside}>
@@ -84,6 +113,29 @@ export function HomeHub() {
               </span>
             ))}
           </div>
+
+          {guest ? (
+            <MemberBenefitCard
+              icon="✨"
+              title="Make FoodPadi yours"
+              body="Deciding what to eat and Cook Today work without an account. Create a free one and FoodPadi remembers your recipes, your preferences and your plans."
+              ctaLabel="Create free account"
+            />
+          ) : (
+            /* "Feed a Friend" nudge — food is social; invite someone who never
+               knows what to eat (docs/REFERRAL_PLAN.md §2.5). */
+            <div className={homeStyles.inviteCard}>
+              <span className={homeStyles.inviteCardIcon} aria-hidden="true">🍽️</span>
+              <div className={homeStyles.inviteCardBody}>
+                <p className={homeStyles.inviteCardText}>
+                  Know someone who always says &ldquo;I don&apos;t know what to eat&rdquo;?
+                </p>
+                <Link href="/invite" className={homeStyles.inviteCardLink}>
+                  Invite a friend →
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

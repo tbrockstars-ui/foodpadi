@@ -3,7 +3,10 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
+import { getGuestState, hasGuestSession } from '../lib/guestSession';
 import { HeroContent } from './HeroContent';
+import { TryFoodPadiButton } from './TryFoodPadiButton';
+import { WaitlistForm } from './WaitlistForm';
 import { ScrollReveal } from '../components/motion/ScrollReveal';
 import { FloatingFoodCards } from '../components/motion/FloatingFoodCards';
 import { HeroDecor } from '../components/motion/HeroDecor';
@@ -85,6 +88,12 @@ export default async function LandingPage() {
     }
   }
 
+  // An anonymous visitor who tapped "Try it now" — same home, guest variant
+  // (no SettingsMenu, a "Make FoodPadi yours" card instead).
+  if (hasGuestSession()) {
+    return <HomeHub guest guestDisclaimerAcknowledged={getGuestState()?.disclaimerAcknowledged ?? false} />;
+  }
+
   return (
     <>
       <section className={styles.hero}>
@@ -103,9 +112,7 @@ export default async function LandingPage() {
           <Link className={styles.navLink} href="/login">
             Log in
           </Link>
-          <a className={styles.navWaitlistButton} href="#waitlist-email">
-            Join the waitlist
-          </a>
+          <TryFoodPadiButton className={styles.navPrimaryButton}>Try FoodPadi</TryFoodPadiButton>
         </nav>
 
         <div className={styles.heroGrid}>
@@ -186,9 +193,17 @@ export default async function LandingPage() {
             <div className={styles.closingBlock}>
               <h2 className={styles.sectionHeading}>Your food. Your choices. Your plan.</h2>
               <p className={styles.sectionSubtext}>
-                FoodPadi is still in development — join the waitlist above and we&apos;ll email you the
-                moment it launches.
+                No account needed to see what FoodPadi comes up with for you.
               </p>
+              <TryFoodPadiButton className={styles.waitlistButton}>Try FoodPadi</TryFoodPadiButton>
+              {/* New features (not "the product" — that already works, above)
+                  land steadily; this is for anyone who wants a heads-up
+                  rather than checking back. Deliberately quiet/secondary —
+                  never the page's primary action. */}
+              <p className={styles.waitlistLead}>
+                Or leave your email and we&apos;ll let you know as new features land.
+              </p>
+              <WaitlistForm />
             </div>
           </ScrollReveal>
         </section>

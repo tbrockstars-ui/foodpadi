@@ -1,5 +1,7 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, HttpCode, HttpStatus, Post, Req } from '@nestjs/common';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
+import { clientIp } from '../../common/client-ip.util';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { GoogleAuthDto } from './dto/google-auth.dto';
@@ -12,8 +14,8 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() dto: RegisterDto) {
-    return this.authService.register(dto);
+  register(@Body() dto: RegisterDto, @Req() req: Request) {
+    return this.authService.register(dto, clientIp(req));
   }
 
   @Post('login')
@@ -25,8 +27,8 @@ export class AuthController {
   // Sign up / sign in with Google. Same AuthResponse shape as register/login.
   @Post('google')
   @HttpCode(HttpStatus.OK)
-  google(@Body() dto: GoogleAuthDto) {
-    return this.authService.loginWithGoogle(dto.idToken);
+  google(@Body() dto: GoogleAuthDto, @Req() req: Request) {
+    return this.authService.loginWithGoogle(dto.idToken, dto.referralCode, clientIp(req));
   }
 
   @Post('refresh')

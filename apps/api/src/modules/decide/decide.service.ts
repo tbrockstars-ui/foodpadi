@@ -96,6 +96,10 @@ export class DecideService {
       cookCount: optionsWithImages.filter((o) => o.type === 'cook').length,
       getCount: optionsWithImages.filter((o) => o.type === 'get').length,
       withImage: optionsWithImages.filter((o) => o.image).length,
+      // Guests never reach a model here — the "cook it" lane comes from
+      // CookTodayService's curated guest branch, the "get it" lane from Eat
+      // Now's deterministic catalog search.
+      guest: actor.type === 'guest',
     });
 
     return { options: optionsWithImages };

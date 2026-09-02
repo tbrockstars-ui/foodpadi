@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
+import { useGoogleSignIn } from '../auth/useGoogleSignIn';
 import { ApiError } from '../api/client';
 import { Button } from '../components/Button';
 import { type ThemeColors } from '../theme/colors';
@@ -23,6 +24,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
+  const google = useGoogleSignIn(setError);
 
   const continueAsGuest = async () => {
     setGuestLoading(true);
@@ -119,6 +121,29 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
         style={styles.primaryButton}
       />
 
+      {google.available ? (
+        <TouchableOpacity
+          style={styles.googleButton}
+          onPress={() => {
+            setError(null);
+            google.signIn();
+          }}
+          disabled={google.busy}
+          accessibilityRole="button"
+          accessibilityLabel={mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
+        >
+          {google.busy ? (
+            <ActivityIndicator color={colors.text} />
+          ) : (
+            <Text style={styles.googleButtonText}>
+              {mode === 'login' ? 'Continue with Google' : 'Sign up with Google'}
+            </Text>
+          )}
+        </TouchableOpacity>
+      ) : google.isExpoGo ? (
+        <Text style={styles.googleNote}>Google sign-in needs a dev build — use email for now in Expo Go.</Text>
+      ) : null}
+
       {mode === 'login' ? (
         <TouchableOpacity onPress={onForgotPassword}>
           <Text style={styles.forgotPasswordText}>Forgot your password?</Text>
@@ -172,6 +197,18 @@ function makeStyles(c: ThemeColors) {
     color: c.text,
   },
   primaryButton: { marginTop: 8 },
+  googleButton: {
+    marginTop: 12,
+    borderWidth: 1,
+    borderColor: c.border,
+    backgroundColor: c.surface,
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleButtonText: { color: c.text, fontSize: 16, fontWeight: '600' },
+  googleNote: { color: c.textMuted, fontSize: 13, textAlign: 'center', marginTop: 12 },
   hint: { color: c.textMuted, fontSize: 13, marginTop: -6, marginBottom: 12 },
   forgotPasswordText: { color: c.textMuted, textAlign: 'center', marginTop: 16, fontSize: 14 },
   switchModeText: { color: c.primary, textAlign: 'center', marginTop: 20, fontSize: 14 },

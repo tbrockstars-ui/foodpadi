@@ -9,6 +9,10 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { FoodImage } from './FoodImage';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './LocalFoodSearch';
+import { MemberBenefitCard } from './MemberBenefitCard';
+import { ShareNudge } from './ShareNudge';
+import { AdSlot } from './AdSlot';
+import { guestPrompts } from '../lib/guestPrompts';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -35,7 +39,12 @@ const PROMPT_CHIPS = [
  * explained options via POST /decide, rather than making the user pick a
  * mode first. Web counterpart: apps/web/app/DecideFlow.tsx.
  */
-export function DecideFlow() {
+interface DecideFlowProps {
+  /** Guests only — routes the "let FoodPadi remember you" card's CTA to signup. */
+  onRequestLogin?: () => void;
+}
+
+export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
@@ -57,6 +66,10 @@ export function DecideFlow() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [getSearchStage, setGetSearchStage] = useState<LocalFoodSearchStage>('idle');
+  // Guests only: shown under the options once they've decided a couple of
+  // times — demonstrated intent before a prompt (guest-mode brief §12), then
+  // never again this session (§13).
+  const [showBenefit, setShowBenefit] = useState(false);
 
   // Bumped on every decide() call; a response whose id no longer matches is
   // stale (the user changed their selection mid-request) and is discarded so
@@ -104,6 +117,14 @@ export function DecideFlow() {
       if (reqId !== requestSeq.current) return; // superseded by a newer selection
       setOptions(data.options);
       setStage(data.options.length > 0 ? 'options' : 'no-options');
+      if (!user && data.options.length > 0 && onRequestLogin) {
+        const count = await guestPrompts.bumpCount('decide_options');
+        const seen = await guestPrompts.hasSeen('decide_options');
+        if (count >= 2 && !seen) {
+          setShowBenefit(true);
+          void guestPrompts.markSeen('decide_options');
+        }
+      }
     } catch (e) {
       if (reqId !== requestSeq.current) return;
       setErrorMessage(
@@ -147,6 +168,17 @@ export function DecideFlow() {
     if (hasResultsShowing) clearResults();
   };
 
+  const hasSomethingToClear = description.trim().length > 0 || budgetPounds.trim().length > 0 || hasResultsShowing;
+
+  // Resets the whole flow back to blank — the text field, budget, and any
+  // results/error on screen — rather than just the input. Matches web's
+  // DecideFlow.
+  const clearAll = () => {
+    setDescription('');
+    setBudgetPounds('');
+    clearResults();
+  };
+
   if (disclaimerShown && needsGuestDisclaimer) {
     return (
       <Card style={styles.disclaimerCard}>
@@ -186,6 +218,11 @@ export function DecideFlow() {
             </Text>
           </TouchableOpacity>
         ))}
+        {hasSomethingToClear ? (
+          <TouchableOpacity style={styles.clearButton} onPress={clearAll} accessibilityRole="button">
+            <Text style={styles.clearButtonText}>✕ Clear</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.constraintsRow}>
@@ -229,7 +266,12 @@ export function DecideFlow() {
       {stage === 'options'
         ? options.map((option) => (
             <Card key={option.id} style={styles.optionCard}>
-              <FoodImage image={option.image} alt={option.title} style={styles.optionImage} />
+              <FoodImage
+                image={option.image}
+                alt={option.title}
+                style={styles.optionImage}
+                badge={option.foodIdea?.tags?.includes('vegan') ? 'Vegan' : undefined}
+              />
               <View style={styles.optionHeader}>
                 <View style={styles.optionHeaderText}>
                   <Text style={styles.optionTitle}>{option.title}</Text>
@@ -242,7 +284,7 @@ export function DecideFlow() {
                       option.type === 'cook' ? styles.optionTypeCookText : styles.optionTypeGetText,
                     ]}
                   >
-                    {option.type === 'cook' ? 'Cook it' : 'Get it'}
+                    {option.type === 'cook' ? 'Cook it' : 'Order now'}
                   </Text>
                 </View>
               </View>
@@ -288,6 +330,22 @@ export function DecideFlow() {
             </Card>
           ))
         : null}
+
+      {stage === 'options' && showBenefit && onRequestLogin ? (
+        <MemberBenefitCard
+          icon="🧠"
+          title="Want suggestions based on what you like?"
+          body="Right now FoodPadi is just exploring ideas. Tell it your cuisines, your budget and what you avoid, and it decides around you."
+          ctaLabel="Personalise FoodPadi"
+          onPress={onRequestLogin}
+        />
+      ) : null}
+
+      {stage === 'options' && !user ? <AdSlot placement="decide_results" /> : null}
+
+      {/* Members: nudge to pass FoodPadi on right after it's proved useful
+          (strategy §4/§5 — referral is a key acquisition channel). */}
+      {stage === 'options' && user ? <ShareNudge context="decision" /> : null}
     </View>
   );
 }
@@ -329,6 +387,19 @@ function makeStyles(c: ThemeColors) {
   promptChipSelected: { borderColor: c.primary, backgroundColor: c.primarySoft },
   promptChipText: { fontSize: 13, color: c.text },
   promptChipTextSelected: { color: c.primary, fontWeight: '600' },
+  // Resets the whole flow (text, budget, results) back to blank. Pushed to
+  // the end of the chip row's line via marginLeft:auto, dashed/muted rather
+  // than chip-styled so it doesn't read as one more suggestion to pick.
+  clearButton: {
+    marginLeft: 'auto',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: c.borderStrong,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+  },
+  clearButtonText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
   constraintsRow: { flexDirection: 'row', gap: spacing.sm },
   // Only the budget field lives here now (Minutes was removed) — a fixed
   // width rather than flex:1, so it sits left-aligned at roughly its old

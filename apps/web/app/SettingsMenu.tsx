@@ -79,6 +79,9 @@ export function SettingsMenu() {
           <Link href="/plan/saved" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Saved plans
           </Link>
+          <Link href="/invite" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+            Invite a friend
+          </Link>
 
           <div className={styles.divider} />
 

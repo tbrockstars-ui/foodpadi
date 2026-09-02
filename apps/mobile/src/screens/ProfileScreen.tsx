@@ -119,6 +119,19 @@ export function ProfileScreen({ navigation }: Props) {
         />
       </Card>
 
+      <Text style={styles.sectionHeading}>Invite a friend</Text>
+      <Card style={styles.section}>
+        <Text style={styles.emptyText}>
+          Know someone who never knows what to eat? Send them FoodPadi and track who joins.
+        </Text>
+        <Button
+          label="Invite friends"
+          variant="secondary"
+          onPress={() => navigation.navigate('Invite')}
+          style={{ marginTop: spacing.sm }}
+        />
+      </Card>
+
       <Text style={styles.sectionHeading}>Food & lifestyle goals</Text>
       <Card style={styles.section}>
         {goals.length === 0 ? (

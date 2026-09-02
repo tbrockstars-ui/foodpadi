@@ -1,6 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
+import { guestPrompts } from '../lib/guestPrompts';
 
 interface GuestSessionContextValue {
   isLoading: boolean;
@@ -78,10 +79,12 @@ export function GuestSessionProvider({ children }: { children: React.ReactNode }
 
   // Called once a guest converts to a real account — guest state is
   // intentionally ephemeral (docs/FOODPADI_AUTHENTICATION_SPEC.md), there is
-  // nothing to migrate, just clear it.
+  // nothing to migrate, just clear it. Also wipes the conversion-prompt
+  // frequency flags so a later sign-out-then-guest starts fresh.
   const clearSession = useCallback(async () => {
     await tokenStore.clearGuestToken();
     await tokenStore.clearGuestDisclaimerAcknowledged();
+    await guestPrompts.clearAll();
     setGuestToken(null);
     setDisclaimerAcknowledged(false);
   }, []);

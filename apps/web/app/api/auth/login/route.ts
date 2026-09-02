@@ -3,6 +3,7 @@ import type { AuthResponse, LoginRequest } from '@foodpadi/shared';
 import {
   ACCESS_COOKIE,
   ACCESS_COOKIE_MAX_AGE,
+  GUEST_COOKIE,
   REFRESH_COOKIE,
   REFRESH_COOKIE_MAX_AGE,
   sessionCookieOptions,
@@ -28,5 +29,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({ user: data.user });
   response.cookies.set(ACCESS_COOKIE, data.accessToken, sessionCookieOptions(ACCESS_COOKIE_MAX_AGE));
   response.cookies.set(REFRESH_COOKIE, data.refreshToken, sessionCookieOptions(REFRESH_COOKIE_MAX_AGE));
+  // Any prior guest session is spent — the real account supersedes it.
+  response.cookies.delete(GUEST_COOKIE);
   return response;
 }

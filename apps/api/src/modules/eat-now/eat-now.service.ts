@@ -271,6 +271,9 @@ export class EatNowService {
 
     await this.analytics.track('eat_now_searched', actorToAnalyticsFields(actor), {
       resultCount: results.length,
+      // Eat Now is deterministic (keyword scoring over the food_ideas
+      // catalog) — no model call for anyone, guest or not.
+      guest: actor.type === 'guest',
     });
 
     const enriched: FoodIdeaResult[] = results.map(({ idea, estimate }) => ({ ...idea, ...estimate }));
