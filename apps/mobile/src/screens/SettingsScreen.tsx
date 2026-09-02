@@ -33,9 +33,24 @@ export function SettingsScreen({ navigation }: Props) {
       <Text style={s.sectionLabel}>Account</Text>
       <View style={s.group}>
         <Row icon="👤" label="Profile" onPress={() => navigation.navigate('Profile')} colors={colors} />
+        <Row
+          icon="🚫"
+          label="Foods to avoid"
+          onPress={() => navigation.navigate('Profile', { scrollTo: 'avoided' })}
+          colors={colors}
+        />
         <Row icon="📖" label="Saved recipes" onPress={() => navigation.navigate('SavedRecipes')} colors={colors} />
         <Row icon="📅" label="Saved plans" onPress={() => navigation.navigate('SavedPlans')} colors={colors} last />
       </View>
+
+      {/* Right under Account rather than after every other section — a
+          sign-out control buried at the bottom of a long scroll is hard to
+          find; this keeps it reachable without scrolling past Appearance
+          and Subscription first. */}
+      <TouchableOpacity style={s.logout} onPress={logout} accessibilityRole="button">
+        <Text style={s.logoutIcon}>🚪</Text>
+        <Text style={s.logoutText}>Log out</Text>
+      </TouchableOpacity>
 
       <Text style={s.sectionLabel}>Appearance</Text>
       <View style={s.segmented}>
@@ -59,32 +74,26 @@ export function SettingsScreen({ navigation }: Props) {
 
       <Text style={s.sectionLabel}>Subscription</Text>
       <View style={s.group}>
-        <View style={[s.row, s.rowLast]}>
+        {/* Subscription plan + payment history tucked behind one row that
+            opens its own screen — each gets proper room there instead of
+            two thin, mostly-empty sections here. */}
+        <TouchableOpacity
+          style={[s.row, s.rowLast]}
+          onPress={() => navigation.navigate('Subscription')}
+          accessibilityRole="button"
+        >
           <View style={s.rowLeft}>
             <Text style={s.rowIcon}>💳</Text>
-            <Text style={s.rowLabel}>Plan</Text>
+            <Text style={s.rowLabel}>Subscription &amp; payments</Text>
           </View>
-          <View style={s.planBadge}>
-            <Text style={s.planBadgeText}>Free</Text>
+          <View style={s.rowRight}>
+            <View style={s.planBadge}>
+              <Text style={s.planBadgeText}>Free</Text>
+            </View>
+            <Text style={s.chevron}>›</Text>
           </View>
-        </View>
+        </TouchableOpacity>
       </View>
-      <Text style={s.muted}>You&apos;re on the free plan. Paid plans aren&apos;t available yet.</Text>
-
-      <Text style={s.sectionLabel}>Payment history</Text>
-      <View style={s.group}>
-        <View style={[s.row, s.rowLast]}>
-          <View style={s.rowLeft}>
-            <Text style={s.rowIcon}>🧾</Text>
-            <Text style={s.mutedRowLabel}>No payments yet</Text>
-          </View>
-        </View>
-      </View>
-
-      <TouchableOpacity style={s.logout} onPress={logout} accessibilityRole="button">
-        <Text style={s.logoutIcon}>🚪</Text>
-        <Text style={s.logoutText}>Log out</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -147,6 +156,7 @@ function makeStyles(c: ThemeColors) {
     },
     rowLast: { borderBottomWidth: 0 },
     rowLeft: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexShrink: 1 },
+    rowRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     rowIcon: { fontSize: 20, width: 24, textAlign: 'center' },
     rowLabel: { fontSize: 16, fontWeight: '600', color: c.text },
     mutedRowLabel: { fontSize: 15, fontWeight: '500', color: c.textMuted },

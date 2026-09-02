@@ -73,6 +73,9 @@ export function SettingsMenu() {
           <Link href="/profile" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Profile
           </Link>
+          <Link href="/profile#avoided-foods" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+            Foods to avoid
+          </Link>
           <Link href="/cook-today/saved" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Saved recipes
           </Link>

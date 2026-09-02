@@ -8,6 +8,12 @@ import type { FoodGoal } from '@foodpadi/shared';
 // handled separately below; anything unmapped contributes nothing.
 const GOAL_PHRASES: Partial<Record<FoodGoal, string>> = {
   balanced_meals: 'aim for balanced plates — a protein, a vegetable and a carbohydrate in most meals',
+  eat_more_plants:
+    'work more vegetables, beans, lentils and other plants into the meals, and lean toward ' +
+    'vegetable-forward or vegetarian dishes where they fit',
+  quick_meals:
+    'favour quick dishes with short ingredient lists and little prep — one-pan, stir-fry, ' +
+    'assembly-style meals rather than anything long or fiddly',
   support_fitness: 'include a solid protein source in each meal',
   maintain_weight:
     'keep portions moderate and lean toward lighter dishes — plenty of vegetables and leaner ' +
@@ -16,6 +22,9 @@ const GOAL_PHRASES: Partial<Record<FoodGoal, string>> = {
   reduce_waste: 'favour dishes that use common ingredients fully, with few awkward leftovers',
   home_cooked: 'keep everything cooked from scratch with whole ingredients, no ready-made shortcuts',
   explore_cuisines: 'lean toward more varied and less familiar cuisines',
+  cook_for_others:
+    'lean toward crowd-pleasing dishes that suit a range of tastes — nothing too spicy, ' +
+    'unusual or fiddly, and easy to scale up for a few people',
 };
 
 export interface GoalContext {

@@ -15,6 +15,7 @@ import { ScanScreen } from '../screens/ScanScreen';
 import { SavedRecipesScreen } from '../screens/SavedRecipesScreen';
 import { SavedPlansScreen } from '../screens/SavedPlansScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
+import { SubscriptionScreen } from '../screens/SubscriptionScreen';
 
 export type AppStackParamList = {
   Home: undefined;
@@ -22,7 +23,9 @@ export type AppStackParamList = {
   CookToday: { initialIngredients?: string[] } | undefined;
   PlanAhead: undefined;
   ShoppingList: { listId: string };
-  Profile: undefined;
+  // scrollTo lets Settings deep-link straight to a section (e.g. "Foods to
+  // avoid") instead of dropping the user at the top of a long scroll view.
+  Profile: { scrollTo?: 'avoided' } | undefined;
   Invite: undefined;
   EditGoals: undefined;
   ImportRecipe: undefined;
@@ -30,6 +33,7 @@ export type AppStackParamList = {
   SavedRecipes: undefined;
   SavedPlans: undefined;
   Settings: undefined;
+  Subscription: undefined;
 };
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -71,6 +75,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="SavedRecipes" component={SavedRecipesScreen} />
         <Stack.Screen name="SavedPlans" component={SavedPlansScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen} />
+        <Stack.Screen name="Subscription" component={SubscriptionScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

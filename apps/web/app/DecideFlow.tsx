@@ -28,6 +28,17 @@ const PROMPT_CHIPS = [
   { label: 'Surprise me', text: 'Surprise me with something different' },
 ];
 
+// A "Get it" option carries real dietary tags (option.foodIdea.tags); a
+// "Cook it" option's RecipeView has no tags field at all, so a genuinely
+// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
+// — falls back to the option's own title/reason text, which reliably says
+// so when it's true (the AI/curated titles are written that way already).
+function isVeganOption(option: DecisionOptionView): boolean {
+  if (option.foodIdea?.tags?.includes('vegan')) return true;
+  const haystack = `${option.title} ${option.reason}`.toLowerCase();
+  return haystack.includes('vegan');
+}
+
 // A function (not a static object) so it can drop the translateY move and
 // the stagger delay under prefers-reduced-motion — an opacity-only,
 // all-at-once fade instead of cards visibly travelling up the screen one
@@ -279,7 +290,7 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
                 alt={option.title}
                 className={styles.optionImage}
                 eager={index === 0}
-                badge={option.foodIdea?.tags?.includes('vegan') ? 'Vegan' : undefined}
+                badge={isVeganOption(option) ? 'Vegan' : undefined}
               />
 
               <div className={styles.optionHeader}>

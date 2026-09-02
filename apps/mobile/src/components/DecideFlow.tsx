@@ -31,6 +31,18 @@ const PROMPT_CHIPS = [
   { label: 'Try something new', text: 'Something different from usual' },
 ];
 
+// A "Get it" option carries real dietary tags (option.foodIdea.tags); a
+// "Cook it" option's RecipeView has no tags field at all, so a genuinely
+// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
+// — falls back to the option's own title/reason text, which reliably says
+// so when it's true (the AI/curated titles are written that way already).
+// Matches web's DecideFlow.
+function isVeganOption(option: DecisionOptionView): boolean {
+  if (option.foodIdea?.tags?.includes('vegan')) return true;
+  const haystack = `${option.title} ${option.reason}`.toLowerCase();
+  return haystack.includes('vegan');
+}
+
 /**
  * "FoodPadi decides" — the Understand Context -> Decide layer of the
  * intent-first decision engine, sitting above the direct Eat Now / Cook
@@ -270,7 +282,7 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
                 image={option.image}
                 alt={option.title}
                 style={styles.optionImage}
-                badge={option.foodIdea?.tags?.includes('vegan') ? 'Vegan' : undefined}
+                badge={isVeganOption(option) ? 'Vegan' : undefined}
               />
               <View style={styles.optionHeader}>
                 <View style={styles.optionHeaderText}>

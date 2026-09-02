@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { Animated, Linking, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Animated, Linking, Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import type { FoodImageView } from '@foodpadi/shared';
 import { radius, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -27,13 +27,18 @@ interface Props {
  * image supports the decision, it never overpowers it). Compact fixed-height
  * frame, skeleton while loading, fades in on load. If there's no image, or the
  * URL fails, it falls back to a small food icon on a branded tint — never a
- * broken image or a big empty box. Attribution sits subtly beneath, per the
- * Pexels/Unsplash API terms. Web counterpart: apps/web/components/FoodImage.tsx.
+ * broken image or a big empty box.
+ *
+ * Attribution: the Pexels/Unsplash API terms want a linked photographer +
+ * provider credit reachable. It's tucked behind a small ⓘ in the image corner
+ * (tap to reveal) rather than a line under every card. Web counterpart:
+ * apps/web/components/FoodImage.tsx.
  */
 export function FoodImage({ image, alt, style, badge }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const [status, setStatus] = useState<'loading' | 'loaded' | 'error'>('loading');
+  const [creditOpen, setCreditOpen] = useState(false);
   const opacity = useRef(new Animated.Value(0)).current;
 
   const handleLoad = () => {
@@ -75,15 +80,25 @@ export function FoodImage({ image, alt, style, badge }: Props) {
           onLoad={handleLoad}
           onError={() => setStatus('error')}
         />
+        {status === 'loaded' ? (
+          <Pressable
+            style={styles.creditToggle}
+            onPress={() => setCreditOpen((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel="Photo credit"
+            hitSlop={8}
+          >
+            <Text style={styles.creditToggleText}>i</Text>
+          </Pressable>
+        ) : null}
       </View>
 
-      {status === 'loaded' ? (
+      {status === 'loaded' && creditOpen ? (
         <Text style={styles.credit}>
           Photo: {image.photographer} /{' '}
           <Text style={styles.creditLink} onPress={() => Linking.openURL(image.sourceUrl)}>
             {PROVIDER_LABEL[image.provider]}
           </Text>
-          {image.isRepresentative ? ' · representative image' : ''}
         </Text>
       ) : null}
     </View>
@@ -128,6 +143,26 @@ function makeStyles(c: ThemeColors) {
     },
     skeleton: {
       backgroundColor: c.surfaceSunken,
+    },
+    // Small ⓘ in the photo's bottom-right — tap to reveal the credit line.
+    creditToggle: {
+      position: 'absolute',
+      right: 6,
+      bottom: 6,
+      zIndex: 2,
+      width: 18,
+      height: 18,
+      borderRadius: radius.pill,
+      backgroundColor: 'rgba(20, 21, 15, 0.5)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    creditToggleText: {
+      color: '#fff',
+      fontSize: 11,
+      fontStyle: 'italic',
+      fontWeight: '700',
+      lineHeight: 13,
     },
     credit: { marginTop: 6, marginHorizontal: 2, fontSize: 10, lineHeight: 13, color: c.textFaint },
     creditLink: { textDecorationLine: 'underline', color: c.textFaint },

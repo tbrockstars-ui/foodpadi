@@ -4,16 +4,21 @@ import { useState } from 'react';
 import { FOOD_GOALS, FoodGoal, FoodGoalItem, MAX_FOOD_GOALS } from '@foodpadi/shared';
 import styles from './profile.module.css';
 
+// Keep in sync with apps/web/app/goal/GoalForm.tsx and
+// apps/mobile/src/constants/goalLabels.ts.
 const GOAL_LABELS: Record<FoodGoal, string> = {
-  balanced_meals: 'Eat more balanced meals',
-  support_fitness: 'Support my fitness',
-  maintain_weight: 'Maintain my current weight',
-  reduce_spending: 'Reduce food spending',
-  reduce_waste: 'Reduce food waste',
-  home_cooked: 'Eat more home-cooked meals',
-  explore_cuisines: 'Explore new foods',
-  personal: 'Personal goal',
-  none: 'No particular goal',
+  balanced_meals: 'Eat well without the stress',
+  eat_more_plants: 'Eat more veg and plants',
+  quick_meals: 'Get dinner done faster',
+  reduce_spending: 'Spend less on food',
+  reduce_waste: 'Waste less of what I buy',
+  home_cooked: 'Cook from scratch more often',
+  explore_cuisines: 'Break out of my food rut',
+  cook_for_others: 'Cook meals my household enjoys',
+  support_fitness: 'Eat to support my training',
+  maintain_weight: 'Keep my weight steady',
+  personal: 'Something else',
+  none: 'Just exploring for now',
 };
 
 const SELECTABLE_GOALS = FOOD_GOALS.filter((g) => g !== 'none');

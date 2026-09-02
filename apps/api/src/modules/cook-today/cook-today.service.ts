@@ -4,6 +4,7 @@ import { ClaudeService } from '../ai/claude.service';
 import { pickCuratedRecipes } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
+import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { RequestActor } from '../auth/guest-or-auth.guard';
@@ -66,7 +67,7 @@ export class CookTodayService {
     // the demo/curated fallback never sees the prompt and a live model can
     // still slip, so drop any recipe that names an avoided ingredient rather
     // than trusting the generator. Substring match, mirroring EatNowService.
-    const safe = this.dropRecipesWithAvoided(validated, personalisation.avoidedIngredients);
+    const safe = dropRecipesWithAvoided(validated, personalisation.avoidedIngredients);
 
     if (safe.length === 0) {
       this.logger.warn(
@@ -115,15 +116,6 @@ export class CookTodayService {
     });
 
     return recipes;
-  }
-
-  private dropRecipesWithAvoided(recipes: RecipeView[], avoided: string[]): RecipeView[] {
-    if (avoided.length === 0) return recipes;
-    const terms = avoided.map((a) => a.toLowerCase()).filter(Boolean);
-    return recipes.filter((recipe) => {
-      const haystack = `${recipe.title} ${recipe.ingredients.map((i) => i.name).join(' ')}`.toLowerCase();
-      return !terms.some((term) => haystack.includes(term));
-    });
   }
 
   private async loadPersonalisation(actor: RequestActor): Promise<CookPersonalisation> {

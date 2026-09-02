@@ -5,6 +5,9 @@ import styles from './Logo.module.css';
 interface LogoProps {
   /** Diameter of the circular mark, in px. */
   size?: number;
+  /** Wordmark font size in px. Defaults to the CSS value (19px); pass this to
+      keep the lockup balanced when `size` is larger than usual. */
+  wordmarkSize?: number;
   /** Show the "FoodPadi" wordmark next to the mark. */
   withWordmark?: boolean;
   /** Use light text for the wordmark (hero sits on the dark-green background). */
@@ -20,7 +23,14 @@ interface LogoProps {
  * optionally with the wordmark beside it. Shared between the landing page's
  * hero top bar and the login page so both use the same asset consistently.
  */
-export function Logo({ size = 44, withWordmark = true, onDark = false, href, className }: LogoProps) {
+export function Logo({
+  size = 44,
+  wordmarkSize,
+  withWordmark = true,
+  onDark = false,
+  href,
+  className,
+}: LogoProps) {
   const inner = (
     <>
       <Image
@@ -32,7 +42,14 @@ export function Logo({ size = 44, withWordmark = true, onDark = false, href, cla
         style={{ width: size, height: size }}
         priority
       />
-      {withWordmark ? <span className={styles.wordmark}>FoodPadi</span> : null}
+      {withWordmark ? (
+        <span
+          className={styles.wordmark}
+          style={wordmarkSize ? { fontSize: wordmarkSize } : undefined}
+        >
+          FoodPadi
+        </span>
+      ) : null}
     </>
   );
 

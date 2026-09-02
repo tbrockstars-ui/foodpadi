@@ -20,6 +20,10 @@
   margin: var(--space-xl) 0 var(--space-sm);
 }
 
+.anchorTarget {
+  scroll-margin-top: var(--space-xl);
+}
+
 .section {
   background: var(--surface);
   border-radius: var(--radius-lg);

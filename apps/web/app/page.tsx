@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
-import { getGuestState, hasGuestSession } from '../lib/guestSession';
 import { HeroContent } from './HeroContent';
 import { TryFoodPadiButton } from './TryFoodPadiButton';
 import { WaitlistForm } from './WaitlistForm';
@@ -88,12 +87,15 @@ export default async function LandingPage() {
     }
   }
 
-  // An anonymous visitor who tapped "Try it now" — same home, guest variant
-  // (no SettingsMenu, a "Make FoodPadi yours" card instead).
-  if (hasGuestSession()) {
-    return <HomeHub guest guestDisclaimerAcknowledged={getGuestState()?.disclaimerAcknowledged ?? false} />;
-  }
-
+  // `/` is always the marketing landing page for anyone not authenticated —
+  // including a returning guest with a live session. That continuation
+  // happens at /guest instead (GuestAutoStart there picks the existing
+  // cookie straight up, no re-clicking "Try FoodPadi" needed) so the two
+  // routes stay cleanly separated: `/` sells the product, `/guest` is the
+  // product. This used to also branch a guest straight into guest Home
+  // here, which meant `/` silently stopped being the landing page for
+  // anyone who'd ever tried it — not what "the landing page is always the
+  // front door" was supposed to mean.
   return (
     <>
       <section className={styles.hero}>

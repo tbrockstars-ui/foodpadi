@@ -9,7 +9,7 @@ export default async function GoalPage() {
 
   return (
     <main className={shellStyles.container}>
-      <Logo href="/" size={32} className={shellStyles.pageLogo} />
+      <Logo href="/" size={64} wordmarkSize={30} className={shellStyles.pageLogo} />
       <GoalForm />
     </main>
   );

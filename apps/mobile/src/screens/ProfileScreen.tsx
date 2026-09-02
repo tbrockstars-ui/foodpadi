@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -17,7 +17,7 @@ import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Profile'>;
 
-export function ProfileScreen({ navigation }: Props) {
+export function ProfileScreen({ navigation, route }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { logout } = useAuth();
@@ -32,6 +32,30 @@ export function ProfileScreen({ navigation }: Props) {
   const [exportedData, setExportedData] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Settings' "Foods to avoid" shortcut lands here with scrollTo: 'avoided'
+  // — scroll to that Card once content has laid out, rather than dropping
+  // the user at the top of a long profile scroll view. avoidedSectionY is
+  // filled in by the heading's onLayout below; pendingScroll covers the
+  // (common) case where that layout hasn't happened yet when this runs.
+  const scrollRef = useRef<ScrollView>(null);
+  const avoidedSectionY = useRef(0);
+  const pendingScroll = useRef(false);
+
+  // useFocusEffect rather than a mount-only effect: native-stack can reuse
+  // an already-mounted Profile instance instead of pushing a fresh one when
+  // Settings navigates here a second time, so a plain mount effect would
+  // silently miss that case.
+  useFocusEffect(
+    useCallback(() => {
+      if (route.params?.scrollTo !== 'avoided') return;
+      if (avoidedSectionY.current > 0) {
+        scrollRef.current?.scrollTo({ y: avoidedSectionY.current - spacing.lg, animated: true });
+      } else {
+        pendingScroll.current = true;
+      }
+    }, [route.params?.scrollTo]),
+  );
 
   const load = async () => {
     const [me, prefs, avoidedItems, goalsResponse] = await Promise.all([
@@ -102,7 +126,7 @@ export function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+    <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
       <BackLink label="Home" onPress={() => navigation.goBack()} />
 
       <Text style={styles.title}>Profile</Text>
@@ -185,7 +209,18 @@ export function ProfileScreen({ navigation }: Props) {
         </View>
       </Card>
 
-      <Text style={styles.sectionHeading}>Foods I choose to avoid</Text>
+      <Text
+        style={styles.sectionHeading}
+        onLayout={(e) => {
+          avoidedSectionY.current = e.nativeEvent.layout.y;
+          if (pendingScroll.current) {
+            pendingScroll.current = false;
+            scrollRef.current?.scrollTo({ y: avoidedSectionY.current - spacing.lg, animated: true });
+          }
+        }}
+      >
+        Foods I choose to avoid
+      </Text>
       <Card style={styles.section}>
         <View style={styles.tagList}>
           {avoided.length === 0 ? (

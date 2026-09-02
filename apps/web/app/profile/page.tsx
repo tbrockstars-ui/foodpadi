@@ -56,7 +56,13 @@ export default async function ProfilePage() {
         <CuisinesSection initialPreferences={preferences} />
       </div>
 
-      <h2 className={styles.sectionHeading}>Foods I choose to avoid</h2>
+      {/* id target for SettingsMenu's "Foods to avoid" shortcut
+          (/profile#avoided-foods) — scroll-margin-top keeps the heading
+          clear of the viewport edge on jump instead of landing flush
+          against it. */}
+      <h2 id="avoided-foods" className={`${styles.sectionHeading} ${styles.anchorTarget}`}>
+        Foods I choose to avoid
+      </h2>
       <div className={styles.section}>
         <AvoidedIngredientsSection initialAvoided={avoided} />
       </div>

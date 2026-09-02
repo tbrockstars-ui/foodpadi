@@ -4,6 +4,7 @@ import { ClaudeService } from '../ai/claude.service';
 import { curatedPlanForDays } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
+import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import type { RequestActor } from '../auth/guest-or-auth.guard';
@@ -128,12 +129,20 @@ export class PlanAheadService {
       focus: dto.prompt,
     });
 
-    const validated = raw
+    const sanitized = raw
       .map((candidate) => sanitizeRecipeCandidate(candidate))
       .filter((recipe): recipe is RecipeView => recipe !== null);
+    // The prompt already told Claude to avoid these — this is the hard
+    // backstop for when a multi-day generation lets one slip through
+    // anyway, same guarantee Cook Today and Eat Now already give.
+    const validated = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
 
     if (validated.length === 0) {
-      throw new BadRequestException('Could not generate a meal plan right now. Please try again.');
+      throw new BadRequestException(
+        sanitized.length === 0
+          ? 'Could not generate a meal plan right now. Please try again.'
+          : "Everything FoodPadi came up with matched something you've asked to avoid. Please try again.",
+      );
     }
 
     const startDate = this.startDateForScope(dto.scope);
@@ -257,7 +266,10 @@ export class PlanAheadService {
       ...personalisation,
       focus: dto.focus,
     });
-    const [candidate] = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
+    const sanitized = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
+    // Same hard backstop as generate()/regeneratePlan() — don't let a
+    // single-day replacement hand back something the user said to avoid.
+    const [candidate] = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
     if (!candidate) {
       throw new BadRequestException(
         dto.focus
@@ -313,12 +325,17 @@ export class PlanAheadService {
       allowGenericFallback: true,
     });
 
-    const validated = raw
+    const sanitized = raw
       .map((candidate) => sanitizeRecipeCandidate(candidate))
       .filter((recipe): recipe is RecipeView => recipe !== null);
+    const validated = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
 
     if (validated.length === 0) {
-      throw new BadRequestException('Could not rebuild the plan right now. Please try again.');
+      throw new BadRequestException(
+        sanitized.length === 0
+          ? 'Could not rebuild the plan right now. Please try again.'
+          : "Everything FoodPadi came up with matched something you've asked to avoid. Please try again.",
+      );
     }
 
     const startDate = plan.startDate;
