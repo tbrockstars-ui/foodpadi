@@ -9,7 +9,9 @@ import type { FoodGoal } from '@foodpadi/shared';
 const GOAL_PHRASES: Partial<Record<FoodGoal, string>> = {
   balanced_meals: 'aim for balanced plates — a protein, a vegetable and a carbohydrate in most meals',
   support_fitness: 'include a solid protein source in each meal',
-  maintain_weight: 'keep portions sensible and steer away from heavy, very rich dishes',
+  maintain_weight:
+    'keep portions moderate and lean toward lighter dishes — plenty of vegetables and leaner ' +
+    'proteins, and less deep-fried, heavily creamy or sugary food',
   reduce_spending: 'lean toward inexpensive, everyday ingredients and simple dishes',
   reduce_waste: 'favour dishes that use common ingredients fully, with few awkward leftovers',
   home_cooked: 'keep everything cooked from scratch with whole ingredients, no ready-made shortcuts',
