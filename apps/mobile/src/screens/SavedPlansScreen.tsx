@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
@@ -39,10 +40,19 @@ export function SavedPlansScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const [plans, setPlans] = useState<MealPlanView[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = async () => setPlans(await api.listPlans());
+  const load = async () => {
+    try {
+      setPlans(await api.listPlans());
+      setLoadFailed(false);
+    } catch {
+      // Don't strand the screen on the spinner if the request fails.
+      setLoadFailed(true);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -62,6 +72,22 @@ export function SavedPlansScreen({ navigation }: Props) {
   };
 
   if (plans === null) {
+    if (loadFailed) {
+      return (
+        <ScrollView style={styles.container}>
+          <BackLink label="Back" onPress={() => navigation.goBack()} />
+          <EmptyState
+            title="Couldn't load your saved plans"
+            body="Check your connection and try again."
+            actionLabel="Try again"
+            onAction={() => {
+              setLoadFailed(false);
+              void load();
+            }}
+          />
+        </ScrollView>
+      );
+    }
     return <LoadingState message="Loading your saved plans…" />;
   }
 

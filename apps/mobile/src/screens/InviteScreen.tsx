@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -26,15 +27,24 @@ export function InviteScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const [summary, setSummary] = useState<ReferralSummary | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [celebrated, setCelebrated] = useState<ReferralSummary['unseen']>([]);
   const [sharing, setSharing] = useState(false);
 
   const load = useCallback(async () => {
-    const data = await api.getReferralSummary();
-    setSummary(data);
-    if (data.unseen.length > 0) {
-      setCelebrated(data.unseen);
-      void api.ackReferralMilestones();
+    try {
+      const data = await api.getReferralSummary();
+      setLoadFailed(false);
+      setSummary(data);
+      if (data.unseen.length > 0) {
+        setCelebrated(data.unseen);
+        void api.ackReferralMilestones();
+      }
+    } catch {
+      // Without this the screen sat on the spinner forever whenever the
+      // request failed — most often because the referrals API isn't live on
+      // this environment yet.
+      setLoadFailed(true);
     }
   }, []);
 
@@ -58,6 +68,22 @@ export function InviteScreen({ navigation }: Props) {
   };
 
   if (!summary) {
+    if (loadFailed) {
+      return (
+        <View style={styles.container}>
+          <BackLink label="Back" onPress={() => navigation.goBack()} />
+          <EmptyState
+            title="Couldn't load your invites"
+            body="Check your connection and try again. Inviting friends may not be available on this build yet."
+            actionLabel="Try again"
+            onAction={() => {
+              setLoadFailed(false);
+              void load();
+            }}
+          />
+        </View>
+      );
+    }
     return <LoadingState message="Loading your invites…" />;
   }
 

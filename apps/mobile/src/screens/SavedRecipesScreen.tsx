@@ -7,6 +7,7 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
@@ -24,12 +25,18 @@ export function SavedRecipesScreen({ navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const [recipes, setRecipes] = useState<SavedRecipeView[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
-    const list = await api.listSavedRecipes();
-    setRecipes(list);
+    try {
+      setRecipes(await api.listSavedRecipes());
+      setLoadFailed(false);
+    } catch {
+      // Don't strand the screen on the spinner if the request fails.
+      setLoadFailed(true);
+    }
   };
 
   useFocusEffect(
@@ -50,6 +57,22 @@ export function SavedRecipesScreen({ navigation }: Props) {
   };
 
   if (recipes === null) {
+    if (loadFailed) {
+      return (
+        <ScrollView style={styles.container}>
+          <BackLink label="Back" onPress={() => navigation.goBack()} />
+          <EmptyState
+            title="Couldn't load your saved recipes"
+            body="Check your connection and try again."
+            actionLabel="Try again"
+            onAction={() => {
+              setLoadFailed(false);
+              void load();
+            }}
+          />
+        </ScrollView>
+      );
+    }
     return <LoadingState message="Loading your saved recipes…" />;
   }
 
