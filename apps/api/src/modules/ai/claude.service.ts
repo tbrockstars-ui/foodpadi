@@ -37,6 +37,15 @@ export interface PlanGenerationInput {
   focus?: string;
   /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
   goalGuidance?: string;
+  /**
+   * Demo mode only (no ANTHROPIC_API_KEY). When true, a `focus` that matches
+   * nothing in the small curated pool falls back to a generic plan rather
+   * than returning nothing — so building a whole plan is never a dead end.
+   * The initial `generate` and the whole-plan `regeneratePlan` set this; the
+   * single-day "replace with something specific" flow leaves it off, since
+   * an honest "couldn't find that" is the right answer there.
+   */
+  allowGenericFallback?: boolean;
 }
 
 export interface RawScannedItem {
@@ -423,6 +432,33 @@ export class ClaudeService {
     return this.scoreCuratedByHint(hint).slice(0, count).map((s) => s.recipe);
   }
 
+  // Plan Ahead's demo fallback. Unlike curatedFallback above, this ALWAYS
+  // returns exactly `days` recipes: a whole meal plan failing to generate
+  // just because a free-text steer ("Nigerian food") doesn't keyword-match
+  // the dozen curated dev recipes is a dead end for the feature, not an
+  // honest-empty result. Hint matches lead (best effort), then the rest of
+  // the pool fills the remaining days, round-robin if days exceeds the pool.
+  private curatedPlanFallback(days: number, hint?: string): RawRecipeCandidate[] {
+    this.logger.warn(`ANTHROPIC_API_KEY not set — serving a ${days}-day curated plan.`);
+
+    const matched = hint?.trim() ? this.scoreCuratedByHint(hint).map((s) => s.recipe) : [];
+    const ordered = [...matched, ...CURATED_RECIPES];
+
+    const result: RawRecipeCandidate[] = [];
+    const seenTitles = new Set<unknown>();
+    for (const recipe of ordered) {
+      if (result.length >= days) break;
+      if (seenTitles.has(recipe.title)) continue;
+      seenTitles.add(recipe.title);
+      result.push(recipe);
+    }
+    // days can be up to 14 but the curated pool is smaller — wrap to fill.
+    for (let i = 0; result.length < days; i++) {
+      result.push(CURATED_RECIPES[i % CURATED_RECIPES.length]);
+    }
+    return result;
+  }
+
   // Used only for the "Replace with something specific" typeahead — the
   // titles a demo-mode (no ANTHROPIC_API_KEY) search can offer as picks that
   // are *guaranteed* to succeed, since curatedFallback matches against this
@@ -461,10 +497,14 @@ export class ClaudeService {
 
   async generatePlanMeals(input: PlanGenerationInput): Promise<RawRecipeCandidate[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-      // A focused single-day replace ("something with fish") keyword-matches
-      // the curated set the same way Cook Today's hint does; a plain plan
-      // request has nothing to match on and takes the round-robin path.
-      return this.curatedFallback(input.days, input.focus);
+      // Building a whole plan (generate / regeneratePlan) must never come
+      // back empty just because a free-text steer doesn't match the curated
+      // dev set — curatedPlanFallback always returns `days` recipes. The
+      // single-day "replace with something specific" flow keeps the honest
+      // curatedFallback, so an unmatched request there says so.
+      return input.allowGenericFallback
+        ? this.curatedPlanFallback(input.days, input.focus)
+        : this.curatedFallback(input.days, input.focus);
     }
 
     const userMessage = [

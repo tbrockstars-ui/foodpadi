@@ -97,6 +97,7 @@ export class PlanAheadService {
       days,
       budgetPence: dto.budgetPence,
       ...personalisation,
+      allowGenericFallback: true,
       // Reuses the same free-text `focus` field the single-day "replace with
       // something specific" flow already sends — the prompt-building logic
       // in generatePlanMeals already phrases it correctly for either one day
@@ -286,6 +287,7 @@ export class PlanAheadService {
       days,
       budgetPence: plan.budgetPence ?? undefined,
       ...personalisation,
+      allowGenericFallback: true,
     });
 
     const validated = raw

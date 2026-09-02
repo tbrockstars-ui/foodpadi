@@ -18,6 +18,16 @@
   margin-bottom: var(--space-lg);
 }
 
+.currentPlanNote {
+  margin: var(--space-md) 0 0;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
 .chip {
   border: 1px solid var(--border);
   background: var(--surface);
@@ -59,6 +69,48 @@
   color: var(--text);
   max-width: 160px;
   font-family: inherit;
+}
+
+/* Budget field — a £ prefix that appears once a value is typed, same
+   pattern as DecideFlow's budget input, so the number is never ambiguously
+   unitless once the "£70" placeholder itself is gone. */
+.budgetField {
+  position: relative;
+  max-width: 160px;
+}
+
+.budgetInputHasPrefix {
+  padding-left: 22px;
+}
+
+.budgetAffixPrefix {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.promptTextarea {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 15px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+  margin-bottom: var(--space-sm);
+}
+
+.promptTextarea:focus {
+  outline: none;
+  border-color: var(--primary);
 }
 
 .errorText {
@@ -261,6 +313,13 @@
   flex-wrap: wrap;
   gap: var(--space-md) var(--space-lg);
   margin-top: var(--space-xs);
+}
+
+/* "Find it nearby" results for a Get-it day — reuses eat-now.module.css's
+   card styles directly (imported alongside this file), this just spaces the
+   block off from the actions row above it. */
+.nearbyBlock {
+  margin-top: var(--space-md);
 }
 
 .itemActionText {
