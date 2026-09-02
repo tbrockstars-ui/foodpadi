@@ -5,6 +5,18 @@
   text-decoration: none;
 }
 
+/* Linked form: a block-level flex row that takes only its content's width,
+   so it sits on its own line above a page's back link rather than flowing
+   inline next to it. */
+.logoLink {
+  display: flex;
+  width: max-content;
+  max-width: 100%;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+}
+
 .mark {
   border-radius: 50%;
   display: block;

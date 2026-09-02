@@ -8,7 +8,7 @@
 .questionCard {
   position: absolute;
   bottom: 6%;
-  right: 4%;
+  right: 8%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -38,31 +38,6 @@
   line-height: 1.35;
 }
 
-.foodCard {
-  position: absolute;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #fff;
-  border-radius: 16px;
-  padding: 10px 16px 10px 12px;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-  z-index: 1;
-  will-change: transform;
-}
-
-.foodCardEmoji {
-  font-size: 24px;
-  line-height: 1;
-}
-
-.foodCardLabel {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  white-space: nowrap;
-}
-
 @media (max-width: 980px) {
   .questionCard {
     right: 50%;
@@ -87,17 +62,5 @@
 
   .questionText {
     font-size: 12px;
-  }
-
-  .foodCard {
-    padding: 8px 12px 8px 10px;
-  }
-
-  .foodCardEmoji {
-    font-size: 18px;
-  }
-
-  .foodCardLabel {
-    font-size: 11px;
   }
 }

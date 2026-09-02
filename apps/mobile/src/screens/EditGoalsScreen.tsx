@@ -6,7 +6,8 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { GoalsEditor } from '../components/goals/GoalsEditor';
 import { LoadingState } from '../components/LoadingState';
-import { colors } from '../theme/colors';
+import { type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'EditGoals'>;
@@ -17,6 +18,8 @@ type Props = NativeStackScreenProps<AppStackParamList, 'EditGoals'>;
  * the same GoalsEditor onboarding uses, seeded from the user's current goals.
  */
 export function EditGoalsScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [loading, setLoading] = useState(true);
   const [initialGoals, setInitialGoals] = useState<FoodGoal[]>([]);
   const [initialPrimary, setInitialPrimary] = useState<FoodGoal | null>(null);
@@ -50,6 +53,8 @@ export function EditGoalsScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, paddingTop: 56 },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 56 },
+  });
+}

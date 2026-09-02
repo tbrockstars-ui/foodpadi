@@ -15,6 +15,7 @@ import { RecipeImportModule } from './modules/recipe-import/recipe-import.module
 import { ScanModule } from './modules/scan/scan.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
+import { ReferralsModule } from './modules/referrals/referrals.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -35,6 +36,7 @@ import { AppController } from './app.controller';
     ScanModule,
     AdminModule,
     WaitlistModule,
+    ReferralsModule,
   ],
   controllers: [AppController],
 })

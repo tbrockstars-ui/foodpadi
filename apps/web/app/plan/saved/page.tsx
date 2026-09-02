@@ -2,6 +2,7 @@ import type { MealPlanView } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../../lib/serverApi';
 import { SavedPlansList } from './SavedPlansList';
 import { BackLink } from '../../../components/BackLink';
+import { Logo } from '../../../components/Logo';
 import shellStyles from '../../app-shell.module.css';
 import styles from '../plan.module.css';
 
@@ -15,6 +16,7 @@ export default async function SavedPlansPage() {
 
   return (
     <main className={shellStyles.container}>
+      <Logo href="/" size={32} className={shellStyles.pageLogo} />
       <BackLink href="/plan" label="Plan ahead" />
       <h1 className={styles.title}>Saved plans</h1>
       <SavedPlansList initialPlans={plans} />

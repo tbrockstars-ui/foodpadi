@@ -7,9 +7,11 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'SavedRecipes'>;
@@ -20,13 +22,21 @@ type Props = NativeStackScreenProps<AppStackParamList, 'SavedRecipes'>;
  * this is that missing viewer.
  */
 export function SavedRecipesScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [recipes, setRecipes] = useState<SavedRecipeView[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const load = async () => {
-    const list = await api.listSavedRecipes();
-    setRecipes(list);
+    try {
+      setRecipes(await api.listSavedRecipes());
+      setLoadFailed(false);
+    } catch {
+      // Don't strand the screen on the spinner if the request fails.
+      setLoadFailed(true);
+    }
   };
 
   useFocusEffect(
@@ -47,6 +57,22 @@ export function SavedRecipesScreen({ navigation }: Props) {
   };
 
   if (recipes === null) {
+    if (loadFailed) {
+      return (
+        <ScrollView style={styles.container}>
+          <BackLink label="Back" onPress={() => navigation.goBack()} />
+          <EmptyState
+            title="Couldn't load your saved recipes"
+            body="Check your connection and try again."
+            actionLabel="Try again"
+            onAction={() => {
+              setLoadFailed(false);
+              void load();
+            }}
+          />
+        </ScrollView>
+      );
+    }
     return <LoadingState message="Loading your saved recipes…" />;
   }
 
@@ -109,28 +135,30 @@ export function SavedRecipesScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.lg },
-  emptyText: { ...typography.body, color: colors.textMuted },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.lg },
+  emptyText: { ...typography.body, color: c.textMuted },
   recipeCard: { marginBottom: spacing.md },
-  recipeTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  recipeTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
-  sectionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: 4 },
+  detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: c.border },
+  sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: 4 },
   stepRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   stepNumber: {
     flexShrink: 0,
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: colors.primarySoft,
-    color: colors.primary,
+    backgroundColor: c.primarySoft,
+    color: c.primary,
     fontSize: 11,
     fontWeight: '600',
     textAlign: 'center',
     lineHeight: 22,
   },
-  stepText: { ...typography.body, color: colors.text, flex: 1, lineHeight: 20 },
-});
+  stepText: { ...typography.body, color: c.text, flex: 1, lineHeight: 20 },
+  });
+}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors, radius, shadow, spacing, typography } from '../theme/colors';
+import { radius, shadow, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   visible: boolean;
@@ -17,6 +18,8 @@ interface Props {
  * unmounts the screen behind it.
  */
 export function SignupPromptModal({ visible, message, onCreateAccount, onDismiss }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onDismiss}>
       <View style={styles.backdrop}>
@@ -35,30 +38,32 @@ export function SignupPromptModal({ visible, message, onCreateAccount, onDismiss
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(20, 21, 15, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.xl,
-    borderTopRightRadius: radius.xl,
-    padding: spacing.xl,
-    paddingBottom: spacing.xxl,
-    ...shadow.raised,
-  },
-  title: { ...typography.title, color: colors.text, marginBottom: spacing.sm },
-  message: { ...typography.body, color: colors.textMuted, marginBottom: spacing.xl },
-  primaryButton: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  primaryButtonText: { color: colors.primaryText, fontSize: 16, fontWeight: '600' },
-  secondaryButton: { paddingVertical: spacing.md, alignItems: 'center' },
-  secondaryButtonText: { color: colors.textMuted, fontSize: 15, fontWeight: '500' },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    backdrop: {
+      flex: 1,
+      backgroundColor: 'rgba(20, 21, 15, 0.45)',
+      justifyContent: 'flex-end',
+    },
+    card: {
+      backgroundColor: c.surface,
+      borderTopLeftRadius: radius.xl,
+      borderTopRightRadius: radius.xl,
+      padding: spacing.xl,
+      paddingBottom: spacing.xxl,
+      ...shadow.raised,
+    },
+    title: { ...typography.title, color: c.text, marginBottom: spacing.sm },
+    message: { ...typography.body, color: c.textMuted, marginBottom: spacing.xl },
+    primaryButton: {
+      backgroundColor: c.primary,
+      borderRadius: radius.md,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    primaryButtonText: { color: c.primaryText, fontSize: 16, fontWeight: '600' },
+    secondaryButton: { paddingVertical: spacing.md, alignItems: 'center' },
+    secondaryButtonText: { color: c.textMuted, fontSize: 15, fontWeight: '500' },
+  });
+}

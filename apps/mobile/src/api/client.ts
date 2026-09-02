@@ -19,7 +19,11 @@ import type {
   LocalFoodSearchResponse,
   LoginRequest,
   MealPlanView,
+  PlanPreviewResponse,
   RecipeView,
+  ReferralReceivedStatus,
+  ReferralShareChannel,
+  ReferralSummary,
   RegisterRequest,
   RequestPasswordResetRequest,
   SavedRecipeView,
@@ -191,6 +195,18 @@ export const api = {
     request<void>('/auth/password-reset/request', { method: 'POST', body: payload }),
   confirmPasswordReset: (payload: ConfirmPasswordResetRequest) =>
     request<void>('/auth/password-reset/confirm', { method: 'POST', body: payload }),
+  // "Feed a Friend" (docs/REFERRAL_PLAN.md). Mobile shares the *web* invite
+  // link — inbound attribution on mobile (deep links / install attribution)
+  // is a separate piece of work.
+  getReferralSummary: () => request<ReferralSummary>('/referrals/me', { auth: true }),
+  getReferralLink: () => request<{ link: string }>('/referrals/link', { auth: true }),
+  trackReferralShare: (channel: ReferralShareChannel) =>
+    request<void>('/referrals/share', { method: 'POST', body: { channel }, auth: true }).catch(() => undefined),
+  ackReferralMilestones: () =>
+    request<void>('/referrals/milestones/ack', { method: 'POST', auth: true }).catch(() => undefined),
+  getReferralReceived: () => request<ReferralReceivedStatus>('/referrals/received', { auth: true }),
+  ackReferralWelcome: () =>
+    request<void>('/referrals/received/ack', { method: 'POST', auth: true }).catch(() => undefined),
   createGuestSession: () =>
     request<GuestSessionResponse>('/auth/guest-session', { method: 'POST' }),
   acknowledgeGuestDisclaimer: (guestToken: string) =>
@@ -217,6 +233,10 @@ export const api = {
     request<LocalFoodSearchResponse>('/local-food-search', { method: 'POST', body: payload, token }),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
+  // Guest-or-auth, AI-free preview of Plan Ahead — a few curated dinner ideas
+  // for `days`, nothing persisted (see plan-preview.controller.ts).
+  getPlanPreview: (days: number, token: string) =>
+    request<PlanPreviewResponse>(`/plan-ahead/preview?days=${days}`, { token }),
   getCurrentPlan: () => request<MealPlanView | null>('/plan-ahead/current', { auth: true }),
   // Every plan the user has generated (auto-saved), newest first.
   listPlans: () => request<MealPlanView[]>('/plan-ahead', { auth: true }),
@@ -261,9 +281,10 @@ export const api = {
     request<void>(`/plan-ahead/shopping-lists/${listId}/items/${itemId}`, { method: 'DELETE', auth: true }),
   scanPhoto: (payload: ScanPhotoRequest) =>
     request<ScanPhotoResponse>('/scan/photo', { method: 'POST', body: payload, auth: true }),
-  // Guest-or-auth, unlike scanPhoto above — see food-content.controller.ts.
-  scanFoodContent: (payload: ScanFoodContentRequest, token: string) =>
-    request<ScanFoodContentResponse>('/scan/food-content', { method: 'POST', body: payload, token }),
+  // Account-only, same as scanPhoto above — a guest must never trigger the
+  // vision model (see food-content.controller.ts).
+  scanFoodContent: (payload: ScanFoodContentRequest) =>
+    request<ScanFoodContentResponse>('/scan/food-content', { method: 'POST', body: payload, auth: true }),
   addPantryItems: (payload: AddPantryItemsRequest) =>
     request<AddPantryItemsResponse>('/pantry/items', { method: 'POST', body: payload, auth: true }),
 };

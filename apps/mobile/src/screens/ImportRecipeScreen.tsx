@@ -8,7 +8,8 @@ import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ImportRecipe'>;
@@ -16,6 +17,8 @@ type Props = NativeStackScreenProps<AppStackParamList, 'ImportRecipe'>;
 type Step = 'input' | 'loading' | 'preview';
 
 export function ImportRecipeScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [step, setStep] = useState<Step>('input');
   const [url, setUrl] = useState('');
   const [recipe, setRecipe] = useState<RecipeView | null>(null);
@@ -122,36 +125,38 @@ export function ImportRecipeScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   urlInput: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
   },
-  errorText: { color: colors.danger, marginTop: spacing.lg, fontSize: 14 },
+  errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
-  sectionHeading: { ...typography.label, color: colors.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
+  sectionHeading: { ...typography.label, color: c.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
   section: { marginBottom: spacing.sm },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: spacing.xs },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
   stepNumber: {
     ...typography.label,
-    color: colors.primary,
-    backgroundColor: colors.primarySoft,
+    color: c.primary,
+    backgroundColor: c.primarySoft,
     width: 24,
     height: 24,
     borderRadius: 12,
     textAlign: 'center',
     lineHeight: 24,
   },
-  stepText: { ...typography.body, color: colors.text, flex: 1 },
-});
+  stepText: { ...typography.body, color: c.text, flex: 1 },
+  });
+}

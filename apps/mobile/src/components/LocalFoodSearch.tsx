@@ -5,7 +5,8 @@ import type { FoodProviderResult, LocalFoodSearchResponse } from '@foodpadi/shar
 import { api, ApiError } from '../api/client';
 import { Button } from './Button';
 import { Card } from './Card';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 export type LocalFoodSearchStage =
   | 'idle'
@@ -40,6 +41,8 @@ export function LocalFoodSearch({
    * than let it interrupt something already underway. */
   onStageChange?: (stage: Stage) => void;
 }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [stage, setStage] = useState<Stage>('idle');
   const [manualLocation, setManualLocation] = useState('');
   const [results, setResults] = useState<FoodProviderResult[]>([]);
@@ -248,51 +251,53 @@ export function LocalFoodSearch({
   );
 }
 
-const styles = StyleSheet.create({
-  container: { marginTop: spacing.xl, paddingTop: spacing.xl, borderTopWidth: 1, borderTopColor: colors.border },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { marginTop: spacing.xl, paddingTop: spacing.xl, borderTopWidth: 1, borderTopColor: c.border },
   // Embedded inside a DecideFlow option card, which already has its own
   // border/padding — the extra top rule + spacing here would double up.
   containerEmbedded: { marginTop: spacing.md, paddingTop: 0, borderTopWidth: 0 },
-  heading: { fontSize: 18, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md, lineHeight: 18 },
-  box: { backgroundColor: colors.surfaceSunken, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md },
-  boxText: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.md, lineHeight: 18 },
+  heading: { fontSize: 18, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  subtitle: { ...typography.caption, color: c.textMuted, marginBottom: spacing.md, lineHeight: 18 },
+  box: { backgroundColor: c.surfaceSunken, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md },
+  boxText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.md, lineHeight: 18 },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 14,
-    color: colors.text,
+    color: c.text,
     marginBottom: spacing.md,
   },
   buttonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
-  attribution: { ...typography.caption, color: colors.textFaint, marginTop: spacing.md, marginBottom: spacing.sm },
+  attribution: { ...typography.caption, color: c.textFaint, marginTop: spacing.md, marginBottom: spacing.sm },
   providerCard: { marginTop: spacing.md },
-  providerName: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  providerName: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
   matchBadge: { fontSize: 13, fontWeight: '600', marginBottom: spacing.xs },
-  matchExact: { color: colors.success },
-  matchClose: { color: colors.secondary },
-  providerMeta: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.xs },
+  matchExact: { color: c.success },
+  matchClose: { color: c.secondary },
+  providerMeta: { ...typography.caption, color: c.textMuted, marginBottom: spacing.xs },
   actionChip: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.primarySoft,
+    borderColor: c.border,
+    backgroundColor: c.primarySoft,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,
   },
-  actionChipText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
+  actionChipText: { color: c.primary, fontSize: 13, fontWeight: '600' },
   searchChip: {
     borderWidth: 1,
     borderStyle: 'dashed',
-    borderColor: colors.borderStrong,
+    borderColor: c.borderStrong,
     backgroundColor: 'transparent',
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,
   },
-  searchChipText: { color: colors.textMuted, fontSize: 13, fontWeight: '600' },
-});
+  searchChipText: { color: c.textMuted, fontSize: 13, fontWeight: '600' },
+  });
+}

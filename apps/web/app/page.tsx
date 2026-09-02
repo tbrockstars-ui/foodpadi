@@ -3,19 +3,17 @@ import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
-import { DecideFlow } from './DecideFlow';
 import { HeroContent } from './HeroContent';
+import { TryFoodPadiButton } from './TryFoodPadiButton';
+import { WaitlistForm } from './WaitlistForm';
 import { ScrollReveal } from '../components/motion/ScrollReveal';
 import { FloatingFoodCards } from '../components/motion/FloatingFoodCards';
 import { HeroDecor } from '../components/motion/HeroDecor';
 import { ChipRow } from '../components/motion/ChipRow';
 import { FoodCarousel } from '../components/motion/FoodCarousel';
 import { WeekStrip } from '../components/motion/WeekStrip';
-import { IntentCard } from '../components/motion/IntentCard';
-import { Logo } from '../components/Logo';
-import { IMAGE_ASSETS } from '../lib/imageAssets';
+import { HomeHub } from './HomeHub';
 import styles from './page.module.css';
-import homeStyles from './home.module.css';
 
 // Placeholder support address — swap for the real inbox once set up.
 const SUPPORT_EMAIL = 'support@foodpadi.app';
@@ -65,74 +63,6 @@ const SECONDARY_ACTIONS: HubAction[] = [
   { key: 'scan', icon: '/scan-food.png', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
-function HomeHub() {
-  return (
-    <main className={homeStyles.container}>
-      <Logo href="/" size={36} className={homeStyles.homeLogo} />
-      <div className={homeStyles.header}>
-        <h1 className={homeStyles.heading}>What should I eat? 🍽️</h1>
-        <div className={homeStyles.headerLinks}>
-          <Link href="/profile" className={homeStyles.logoutLink}>
-            Profile
-          </Link>
-          <Link href="/cook-today/saved" className={homeStyles.logoutLink}>
-            Saved recipes
-          </Link>
-          <form action="/api/auth/logout" method="POST">
-            <button type="submit" className={homeStyles.logoutLink}>
-              Log out
-            </button>
-          </form>
-        </div>
-      </div>
-      <p className={homeStyles.subheading}>Tell FoodPadi what you&apos;re in the mood for, and we&apos;ll help you decide.</p>
-
-      <DecideFlow />
-
-      <div className={homeStyles.primaryGrid}>
-        {/* "Right now / I'm hungry" is not a card here — the DecideFlow above
-            already covers it (and routes to Eat Now's "find it nearby" when
-            the user picks a "Get it" option). Home only needs the two intents
-            DecideFlow doesn't fully own: cooking from what you have, and
-            multi-day planning. */}
-        <IntentCard
-          href="/cook-today"
-          badge="🥕"
-          label="Cooking"
-          subtitle="Use what I've got"
-          image={IMAGE_ASSETS.cooking}
-          accent="cooking"
-        />
-        <IntentCard
-          href="/plan"
-          badge="📅"
-          label="Plan ahead"
-          subtitle="Plan my meals"
-          image={IMAGE_ASSETS.planAhead}
-          accent="plan-ahead"
-        />
-      </div>
-
-      <div className={homeStyles.secondaryRow}>
-        {SECONDARY_ACTIONS.map((action) => (
-          <span key={action.key} className={homeStyles.secondaryLink}>
-            {action.icon ? (
-              action.icon.startsWith('/') ? (
-                // eslint-disable-next-line @next/next/no-img-element -- tiny inline icon, no layout shift
-                <img src={action.icon} alt="" className={homeStyles.secondaryIcon} />
-              ) : (
-                <span aria-hidden="true">{action.icon} </span>
-              )
-            ) : null}
-            {action.label} · {action.subtitle}
-            {action.disabledTag ? <span className={homeStyles.soonTag}>{action.disabledTag}</span> : null}
-          </span>
-        ))}
-      </div>
-    </main>
-  );
-}
-
 export default async function LandingPage() {
   if (isAuthenticated()) {
     // Same gate as mobile's RootNavigator: disclaimer is mandatory before
@@ -157,6 +87,15 @@ export default async function LandingPage() {
     }
   }
 
+  // `/` is always the marketing landing page for anyone not authenticated —
+  // including a returning guest with a live session. That continuation
+  // happens at /guest instead (GuestAutoStart there picks the existing
+  // cookie straight up, no re-clicking "Try FoodPadi" needed) so the two
+  // routes stay cleanly separated: `/` sells the product, `/guest` is the
+  // product. This used to also branch a guest straight into guest Home
+  // here, which meant `/` silently stopped being the landing page for
+  // anyone who'd ever tried it — not what "the landing page is always the
+  // front door" was supposed to mean.
   return (
     <>
       <section className={styles.hero}>
@@ -175,9 +114,7 @@ export default async function LandingPage() {
           <Link className={styles.navLink} href="/login">
             Log in
           </Link>
-          <a className={styles.navWaitlistButton} href="#waitlist-email">
-            Join the waitlist
-          </a>
+          <TryFoodPadiButton className={styles.navPrimaryButton}>Try FoodPadi</TryFoodPadiButton>
         </nav>
 
         <div className={styles.heroGrid}>
@@ -258,9 +195,17 @@ export default async function LandingPage() {
             <div className={styles.closingBlock}>
               <h2 className={styles.sectionHeading}>Your food. Your choices. Your plan.</h2>
               <p className={styles.sectionSubtext}>
-                FoodPadi is still in development — join the waitlist above and we&apos;ll email you the
-                moment it launches.
+                No account needed to see what FoodPadi comes up with for you.
               </p>
+              <TryFoodPadiButton className={styles.waitlistButton}>Try FoodPadi</TryFoodPadiButton>
+              {/* New features (not "the product" — that already works, above)
+                  land steadily; this is for anyone who wants a heads-up
+                  rather than checking back. Deliberately quiet/secondary —
+                  never the page's primary action. */}
+              <p className={styles.waitlistLead}>
+                Or leave your email and we&apos;ll let you know as new features land.
+              </p>
+              <WaitlistForm />
             </div>
           </ScrollReveal>
         </section>

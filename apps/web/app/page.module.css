@@ -49,7 +49,7 @@
   color: #fff;
 }
 
-.navWaitlistButton {
+.navPrimaryButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -61,14 +61,21 @@
   color: #0e5135;
   font-size: 16px;
   font-weight: 700;
-  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
   white-space: nowrap;
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.navWaitlistButton:hover {
+.navPrimaryButton:hover:not(:disabled) {
   background: #fff;
   transform: translateY(-1px);
+}
+
+.navPrimaryButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .heroGrid {
@@ -117,10 +124,17 @@
   line-height: 1.6;
 }
 
+/* Relocated out of the hero into the closing section (lower on the page —
+   §13 of the guest-mode brief: don't let it compete with "Try FoodPadi").
+   Now sits on the ordinary page background rather than the dark hero
+   gradient, so text colours are theme tokens instead of hard-coded white. */
 .waitlistRow {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  justify-content: center;
+  max-width: 420px;
+  margin: 0 auto;
 }
 
 .waitlistInput {
@@ -128,14 +142,15 @@
   min-width: 0;
   padding: 14px 20px;
   border-radius: 999px;
-  border: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
   font-size: 15px;
-  color: var(--text, #111);
+  color: var(--text);
   scroll-margin-top: 140px;
 }
 
 .waitlistInput:focus {
-  outline: 2px solid #fff;
+  outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
 
@@ -163,8 +178,8 @@
 }
 
 .waitlistError {
-  color: #fff;
-  background: rgba(0, 0, 0, 0.2);
+  color: var(--danger);
+  background: var(--danger-soft);
   border-radius: 8px;
   padding: 8px 14px;
   margin: 12px 0 0;
@@ -172,18 +187,68 @@
 }
 
 .waitlistDone {
-  color: #fff;
+  color: var(--text);
   font-weight: 600;
   font-size: 16px;
   margin: 0 0 20px;
 }
 
-.loginLink {
+/* The hero's primary CTA — "Try FoodPadi" — takes over the strong, filled
+   treatment the waitlist button used to have; it leads to an actually-working
+   experience, so it earns the confident visual weight. */
+.heroCtaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.tryNowButton {
   display: inline-block;
-  margin-top: 20px;
-  color: rgba(255, 255, 255, 0.85);
+  background: #fff;
+  color: #0e5135;
+  padding: 15px 30px;
+  border-radius: 999px;
+  border: none;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.tryNowButton:hover:not(:disabled) {
+  background: #f0faf5;
+  transform: translateY(-1px);
+}
+
+.tryNowButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.signInButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 15px 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  color: #fff;
+  font-weight: 600;
+  font-size: 16px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.signInButton:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.tryNowHint {
+  margin: 14px 0 0;
   font-size: 14px;
-  text-decoration: underline;
+  color: rgba(255, 255, 255, 0.75);
 }
 
 .heroVisual {
@@ -228,6 +293,12 @@
   text-align: center;
   max-width: 640px;
   margin: 0 auto;
+}
+
+.waitlistLead {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 28px 0 12px;
 }
 
 .principles {
@@ -276,7 +347,7 @@
   justify-content: center;
   font-size: 24px;
   text-decoration: none;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-fab);
   z-index: 40;
   transition: transform 0.15s ease;
 }

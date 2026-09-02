@@ -7,9 +7,11 @@ import { api } from '../api/client';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'SavedPlans'>;
@@ -35,11 +37,22 @@ function scopeLabel(scope: PlanScope, dayCount: number): string {
 
 /** Every meal plan the user has generated (auto-saved), like Saved recipes. */
 export function SavedPlansScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [plans, setPlans] = useState<MealPlanView[] | null>(null);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const load = async () => setPlans(await api.listPlans());
+  const load = async () => {
+    try {
+      setPlans(await api.listPlans());
+      setLoadFailed(false);
+    } catch {
+      // Don't strand the screen on the spinner if the request fails.
+      setLoadFailed(true);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -59,6 +72,22 @@ export function SavedPlansScreen({ navigation }: Props) {
   };
 
   if (plans === null) {
+    if (loadFailed) {
+      return (
+        <ScrollView style={styles.container}>
+          <BackLink label="Back" onPress={() => navigation.goBack()} />
+          <EmptyState
+            title="Couldn't load your saved plans"
+            body="Check your connection and try again."
+            actionLabel="Try again"
+            onAction={() => {
+              setLoadFailed(false);
+              void load();
+            }}
+          />
+        </ScrollView>
+      );
+    }
     return <LoadingState message="Loading your saved plans…" />;
   }
 
@@ -122,15 +151,17 @@ export function SavedPlansScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text, marginBottom: spacing.lg },
-  emptyText: { ...typography.body, color: colors.textMuted },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text, marginBottom: spacing.lg },
+  emptyText: { ...typography.body, color: c.textMuted },
   planCard: { marginBottom: spacing.md },
-  planTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
+  planTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: colors.border },
+  detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: c.border },
   dayRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
-  dayDate: { ...typography.caption, color: colors.textMuted, width: 56 },
-  dayMeal: { ...typography.body, color: colors.text, flex: 1 },
-});
+  dayDate: { ...typography.caption, color: c.textMuted, width: 56 },
+  dayMeal: { ...typography.body, color: c.text, flex: 1 },
+  });
+}

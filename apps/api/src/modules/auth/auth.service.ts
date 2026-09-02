@@ -11,6 +11,9 @@ import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parseDurationMs } from '../../common/duration.util';
 import { MailerService } from '../../common/mailer.service';
+import { AnalyticsService } from '../analytics/analytics.service';
+import { ReferralsService } from '../referrals/referrals.service';
+import { normaliseReferralCode } from '../referrals/referral-code.util';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -44,9 +47,11 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly mailer: MailerService,
+    private readonly referrals: ReferralsService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, signupIp?: string | null) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
     if (existing) {
       throw new ConflictException('An account with this email already exists.');
@@ -66,7 +71,35 @@ export class AuthService {
       include: { profile: true },
     });
 
+    await this.applyReferral(user.id, dto.referralCode, signupIp);
+
     return this.issueTokens(user.id, user.email, user.profile);
+  }
+
+  /**
+   * "Feed a Friend" attribution, run right after a *new* account is created
+   * (password or Google). Deliberately awaited but fully self-contained and
+   * non-throwing — ReferralsService.attributeOnRegister swallows its own
+   * errors — so it can never turn a successful signup into a failed one.
+   */
+  private async applyReferral(
+    referredUserId: string,
+    code: string | undefined,
+    signupIp?: string | null,
+  ) {
+    if (!code) return;
+    const { attributed } = await this.referrals.attributeOnRegister({
+      referredUserId,
+      code,
+      signupIp,
+    });
+    if (attributed) {
+      void this.analytics.track(
+        'referral_attributed',
+        { userId: referredUserId },
+        { code: normaliseReferralCode(code) },
+      );
+    }
   }
 
   async login(dto: LoginDto) {
@@ -102,7 +135,7 @@ export class AuthService {
    * and a brand-new email creates a passwordless `authProvider: "google"`
    * account. Never creates or overwrites a password.
    */
-  async loginWithGoogle(idToken: string) {
+  async loginWithGoogle(idToken: string, referralCode?: string, signupIp?: string | null) {
     const { email, name } = await this.verifyGoogleToken(idToken);
 
     const existing = await this.prisma.user.findUnique({
@@ -114,6 +147,9 @@ export class AuthService {
       if (existing.deletedAt) {
         throw new UnauthorizedException('This account has been suspended.');
       }
+      // Existing account — this is a sign-in, not a signup; a referral code
+      // riding along (e.g. a returning user who happened to click an invite
+      // link) is intentionally ignored.
       return this.issueTokens(existing.id, existing.email, existing.profile);
     }
 
@@ -125,6 +161,8 @@ export class AuthService {
       },
       include: { profile: true },
     });
+
+    await this.applyReferral(user.id, referralCode, signupIp);
 
     return this.issueTokens(user.id, user.email, user.profile);
   }

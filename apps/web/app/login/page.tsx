@@ -73,7 +73,7 @@ function LoginForm() {
     <main className={styles.container}>
       <div className={styles.card}>
         <div className={styles.brandStage}>
-          <Logo withWordmark={false} size={84} className={styles.brandBadge} />
+          <Logo withWordmark={false} size={185} className={styles.brandBadge} />
         </div>
         <h1 className={styles.title}>FoodPadi</h1>
         <p className={styles.subtitle}>Your food companion that plans with you, not for you.</p>

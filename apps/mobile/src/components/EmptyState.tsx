@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, spacing, typography } from '../theme/colors';
+import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import { Button } from './Button';
 
 interface Props {
@@ -11,6 +12,8 @@ interface Props {
 }
 
 export function EmptyState({ title, body, actionLabel, onAction }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.container}>
       <Text style={styles.title}>{title}</Text>
@@ -22,9 +25,11 @@ export function EmptyState({ title, body, actionLabel, onAction }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { alignItems: 'center', padding: spacing.xl },
-  title: { ...typography.title, color: colors.text, textAlign: 'center', marginBottom: spacing.sm },
-  body: { ...typography.body, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.lg },
-  action: { minWidth: 180 },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: { alignItems: 'center', padding: spacing.xl },
+    title: { ...typography.title, color: c.text, textAlign: 'center', marginBottom: spacing.sm },
+    body: { ...typography.body, color: c.textMuted, textAlign: 'center', marginBottom: spacing.lg },
+    action: { minWidth: 180 },
+  });
+}

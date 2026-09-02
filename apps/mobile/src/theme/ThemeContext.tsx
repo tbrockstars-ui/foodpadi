@@ -33,14 +33,15 @@ interface ThemeContextValue {
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 /**
- * Light ("default") / dark theme choice for the mobile app — mirrors the
- * web settings menu. The value is persisted (SecureStore, localStorage on
- * web) and exposed as `colors`. Screens/components read it via useTheme();
- * anything still importing the static `colors` export stays light until
- * migrated.
+ * Dark (black, the default) / "default" (white) theme choice for the mobile
+ * app — mirrors the web settings menu. Persisted (SecureStore, localStorage
+ * on web) and exposed as `colors`. Screens/components read it via
+ * useTheme(). Nothing is stored yet for a first-run user, so the initial
+ * state below IS the effective app default — black — until they explicitly
+ * pick white.
  */
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [scheme, setSchemeState] = useState<ThemeScheme>('default');
+  const [scheme, setSchemeState] = useState<ThemeScheme>('dark');
 
   useEffect(() => {
     readStored().then((s) => {

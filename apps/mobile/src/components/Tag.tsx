@@ -1,19 +1,28 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius } from '../theme/colors';
+import { radius, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type Tone = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 
-const TONE_STYLES: Record<Tone, { bg: string; fg: string }> = {
-  neutral: { bg: colors.surfaceSunken, fg: colors.textFaint },
-  accent: { bg: colors.secondarySoft, fg: colors.secondary },
-  success: { bg: colors.successSoft, fg: colors.success },
-  warning: { bg: colors.warningSoft, fg: colors.warning },
-  danger: { bg: colors.dangerSoft, fg: colors.danger },
-};
+function toneFor(c: ThemeColors, tone: Tone): { bg: string; fg: string } {
+  switch (tone) {
+    case 'neutral':
+      return { bg: c.surfaceSunken, fg: c.textFaint };
+    case 'success':
+      return { bg: c.successSoft, fg: c.success };
+    case 'warning':
+      return { bg: c.warningSoft, fg: c.warning };
+    case 'danger':
+      return { bg: c.dangerSoft, fg: c.danger };
+    default:
+      return { bg: c.secondarySoft, fg: c.secondary };
+  }
+}
 
 export function Tag({ label, tone = 'accent' }: { label: string; tone?: Tone }) {
-  const { bg, fg } = TONE_STYLES[tone];
+  const { colors } = useTheme();
+  const { bg, fg } = toneFor(colors, tone);
   return (
     <View style={[styles.tag, { backgroundColor: bg }]}>
       <Text style={[styles.text, { color: fg }]}>{label}</Text>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { colors, radius, spacing } from '../theme/colors';
+import { radius, spacing, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 /**
  * The compact, non-frightening disclaimer strip (brief §14) — distinct from
@@ -8,6 +9,8 @@ import { colors, radius, spacing } from '../theme/colors';
  * no warning icon/colour; the point is calm transparency, not alarm.
  */
 export function DisclaimerBanner({ onReadMore }: { onReadMore: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   return (
     <View style={styles.container}>
       <Text style={styles.text}>
@@ -22,12 +25,14 @@ export function DisclaimerBanner({ onReadMore }: { onReadMore: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: colors.surfaceSunken,
-    borderRadius: radius.md,
-    padding: spacing.md,
-  },
-  text: { fontSize: 12, lineHeight: 17, color: colors.textMuted, marginBottom: spacing.xs },
-  link: { fontSize: 12, color: colors.primary, fontWeight: '600' },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: {
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.md,
+      padding: spacing.md,
+    },
+    text: { fontSize: 12, lineHeight: 17, color: c.textMuted, marginBottom: spacing.xs },
+    link: { fontSize: 12, color: c.primary, fontWeight: '600' },
+  });
+}

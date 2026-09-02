@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActivityIndicator, StyleProp, StyleSheet, Text, TouchableOpacity, ViewStyle } from 'react-native';
-import { colors, radius, spacing } from '../theme/colors';
+import { radius, spacing, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type Variant = 'primary' | 'secondary' | 'danger';
 
@@ -19,6 +20,8 @@ interface Props {
  * own near-identical primary/secondary TouchableOpacity + StyleSheet pair.
  */
 export function Button({ label, onPress, variant = 'primary', disabled, loading, style }: Props) {
+  const { colors } = useTheme();
+  const { styles, variantStyles, variantTextStyles } = makeStyles(colors);
   const isDisabled = disabled || loading;
   return (
     <TouchableOpacity
@@ -37,25 +40,29 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading,
   );
 }
 
-const styles = StyleSheet.create({
-  base: {
-    borderRadius: radius.md,
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  disabled: { opacity: 0.4 },
-  label: { fontSize: 16, fontWeight: '600' },
-});
+function makeStyles(c: ThemeColors) {
+  const styles = StyleSheet.create({
+    base: {
+      borderRadius: radius.md,
+      paddingVertical: spacing.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    disabled: { opacity: 0.4 },
+    label: { fontSize: 16, fontWeight: '600' },
+  });
 
-const variantStyles: Record<Variant, ViewStyle> = {
-  primary: { backgroundColor: colors.primary },
-  secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.border },
-  danger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.danger },
-};
+  const variantStyles: Record<Variant, ViewStyle> = {
+    primary: { backgroundColor: c.primary },
+    secondary: { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.border },
+    danger: { backgroundColor: 'transparent', borderWidth: 1, borderColor: c.danger },
+  };
 
-const variantTextStyles: Record<Variant, { color: string }> = {
-  primary: { color: colors.primaryText },
-  secondary: { color: colors.textMuted },
-  danger: { color: colors.danger },
-};
+  const variantTextStyles: Record<Variant, { color: string }> = {
+    primary: { color: c.primaryText },
+    secondary: { color: c.textMuted },
+    danger: { color: c.danger },
+  };
+
+  return { styles, variantStyles, variantTextStyles };
+}

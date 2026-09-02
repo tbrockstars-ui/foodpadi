@@ -1,11 +1,25 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { MealPlanView } from '@foodpadi/shared';
+import type { FoodIdeaView, MealChoice, MealPlanView } from '@foodpadi/shared';
 import { getCuisineImage } from '../../lib/imageAssets';
+import { FoodImage } from '../../components/FoodImage';
 import styles from './plan.module.css';
+import eatNowStyles from '../eat-now/eat-now.module.css';
+
+const SUGGESTION_DEBOUNCE_MS = 300;
+
+const BUDGET_LABEL: Record<FoodIdeaView['budgetTier'], string> = {
+  low: '£',
+  medium: '££',
+  high: '£££',
+};
+
+function formatPence(pence: number): string {
+  return pence % 100 === 0 ? `£${pence / 100}` : `£${(pence / 100).toFixed(2)}`;
+}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
@@ -23,6 +37,49 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
   // the drafted prompt text for each, keyed by item id.
   const [focusOpenId, setFocusOpenId] = useState<string | null>(null);
   const [focusDrafts, setFocusDrafts] = useState<Record<string, string>>({});
+  // Typeahead for the currently-open box only — a dish-name picker instead
+  // of free-typing a hint and finding out only after submitting whether
+  // anything matched. Scoped to one box at a time (only one is ever open),
+  // so this doesn't need to be keyed by item id like focusDrafts is.
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const suggestionsAbortRef = useRef<AbortController | null>(null);
+  // "Find it nearby" for a Get-it day — MVP-simulated the same way Eat Now's
+  // own primary search is: the real /eat-now/search catalogue endpoint
+  // (illustrative distance/time/price, honestly labelled as such), not the
+  // real-geolocation LocalFoodSearch. Only one item's results show at once.
+  const [nearbyOpenId, setNearbyOpenId] = useState<string | null>(null);
+  const [nearbyResults, setNearbyResults] = useState<FoodIdeaView[] | null>(null);
+  const [nearbySearching, setNearbySearching] = useState(false);
+  const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  const focusDraft = focusOpenId ? (focusDrafts[focusOpenId] ?? '') : '';
+
+  // Debounced fetch of suggestions as the user types in the open box.
+  useEffect(() => {
+    if (!focusOpenId || !focusDraft.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      suggestionsAbortRef.current?.abort();
+      const controller = new AbortController();
+      suggestionsAbortRef.current = controller;
+      try {
+        const res = await fetch(`/api/proxy/plan-ahead/meal-ideas?q=${encodeURIComponent(focusDraft.trim())}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as string[];
+        setSuggestions(data);
+      } catch {
+        // Aborted (a newer keystroke superseded this request) or a network
+        // blip — either way, just leave whatever suggestions are already
+        // showing rather than surfacing an error for a background typeahead.
+      }
+    }, SUGGESTION_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusOpenId, focusDraft]);
 
   const readError = async (res: Response, fallback: string) => {
     const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
@@ -46,6 +103,62 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
       router.refresh();
     } finally {
       setBusyItemId(null);
+    }
+  };
+
+  const setMealChoice = async (itemId: string, mealChoice: MealChoice) => {
+    setBusyItemId(itemId);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${plan.id}/items/${itemId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mealChoice }),
+      });
+      if (!res.ok) {
+        setError(await readError(res, 'Could not update that day. Please try again.'));
+        return;
+      }
+      // Switching away from "Get it" hides any nearby results open for it —
+      // nothing to show a search for once the day isn't eat_out any more.
+      if (mealChoice !== 'eat_out' && nearbyOpenId === itemId) {
+        setNearbyOpenId(null);
+        setNearbyResults(null);
+      }
+      router.refresh();
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
+  // MVP-simulated "find it nearby" — reuses Eat Now's existing illustrative
+  // catalogue search (real cuisine/price band, illustrative distance/time/
+  // price) rather than building a separate system for Plan Ahead, per the
+  // brief's own "reuse, don't rebuild" instruction.
+  const findNearby = async (item: MealPlanView['items'][number]) => {
+    if (!item.recipe) return;
+    if (nearbyOpenId === item.id) {
+      setNearbyOpenId(null);
+      return;
+    }
+    setNearbyOpenId(item.id);
+    setNearbyResults(null);
+    setNearbyError(null);
+    setNearbySearching(true);
+    try {
+      const res = await fetch('/api/proxy/eat-now/search', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: item.recipe.title }),
+      });
+      if (!res.ok) {
+        setNearbyError(await readError(res, 'Something went wrong searching for food.'));
+        return;
+      }
+      setNearbyResults((await res.json()) as FoodIdeaView[]);
+    } catch {
+      setNearbyError('Something went wrong searching for food.');
+    } finally {
+      setNearbySearching(false);
     }
   };
 
@@ -129,6 +242,84 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
               ) : (
                 <p className={styles.mealTitle}>Nothing planned for this day</p>
               )}
+
+              {item.recipe ? (
+                <>
+                  <div className={styles.chipWrap}>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={item.mealChoice === 'cook'}
+                      className={`${styles.chip} ${item.mealChoice === 'cook' ? styles.chipSelected : ''}`}
+                      onClick={() => setMealChoice(item.id, 'cook')}
+                      disabled={busyItemId === item.id}
+                    >
+                      Cook it
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={item.mealChoice === 'eat_out'}
+                      className={`${styles.chip} ${item.mealChoice === 'eat_out' ? styles.chipSelected : ''}`}
+                      onClick={() => setMealChoice(item.id, 'eat_out')}
+                      disabled={busyItemId === item.id}
+                    >
+                      Get it
+                    </button>
+                  </div>
+
+                  {item.mealChoice === 'eat_out' ? (
+                    <div className={styles.itemActions}>
+                      <button type="button" className={styles.itemActionText} onClick={() => findNearby(item)}>
+                        {nearbyOpenId === item.id ? 'Hide' : 'Find it nearby'}
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {nearbyOpenId === item.id ? (
+                    <div className={styles.nearbyBlock}>
+                      {nearbySearching ? <p className={styles.mealDate}>Looking nearby…</p> : null}
+                      {nearbyError ? <p className={styles.errorText}>{nearbyError}</p> : null}
+                      {nearbyResults ? (
+                        <>
+                          <p className={eatNowStyles.disclaimerNote}>
+                            Example suggestions from a small curated list — cuisine and price band are real;
+                            distance, delivery time and exact price are illustrative estimates, not live data
+                            from any restaurant.
+                          </p>
+                          {nearbyResults.length === 0 ? (
+                            <p className={eatNowStyles.emptyText}>
+                              Nothing matched nearby. Try replacing this day with something else.
+                            </p>
+                          ) : (
+                            nearbyResults.map((idea) => (
+                              <div key={idea.id} className={eatNowStyles.resultCard}>
+                                <FoodImage
+                                  image={idea.image}
+                                  alt={idea.title}
+                                  className={eatNowStyles.resultImage}
+                                  badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
+                                />
+                                <p className={eatNowStyles.resultTitle}>{idea.title}</p>
+                                <p className={eatNowStyles.resultBody}>{idea.description}</p>
+                                <p className={eatNowStyles.estimateText}>
+                                  ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
+                                  {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
+                                </p>
+                                <div className={eatNowStyles.tagRow}>
+                                  <span className={eatNowStyles.tag}>{idea.cuisine}</span>
+                                  <span className={eatNowStyles.tag}>{BUDGET_LABEL[idea.budgetTier]}</span>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
               <div className={styles.itemActions}>
                 <button
                   type="button"
@@ -141,7 +332,10 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                 <button
                   type="button"
                   className={styles.itemActionText}
-                  onClick={() => setFocusOpenId(focusOpenId === item.id ? null : item.id)}
+                  onClick={() => {
+                    setSuggestions([]);
+                    setFocusOpenId(focusOpenId === item.id ? null : item.id);
+                  }}
                   disabled={busyItemId === item.id}
                 >
                   {focusOpenId === item.id ? 'Cancel' : 'Replace with something specific'}
@@ -164,17 +358,45 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
 
               {focusOpenId === item.id ? (
                 <div className={styles.focusRow}>
-                  <input
-                    className={styles.focusInput}
-                    type="text"
-                    autoFocus
-                    placeholder="e.g. something with fish, a quick pasta"
-                    value={focusDrafts[item.id] ?? ''}
-                    onChange={(e) => setFocusDrafts((cur) => ({ ...cur, [item.id]: e.target.value }))}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined);
-                    }}
-                  />
+                  <div className={styles.focusWrap}>
+                    <input
+                      className={styles.focusInput}
+                      type="text"
+                      autoFocus
+                      placeholder="e.g. pizza, a quick pasta"
+                      autoComplete="off"
+                      value={focusDrafts[item.id] ?? ''}
+                      onChange={(e) => setFocusDrafts((cur) => ({ ...cur, [item.id]: e.target.value }))}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') regenerate(item.id, (focusDrafts[item.id] ?? '').trim() || undefined);
+                        if (e.key === 'Escape') setSuggestions([]);
+                      }}
+                    />
+                    {suggestions.length > 0 ? (
+                      <div className={styles.suggestionsList} role="listbox">
+                        {suggestions.map((title) => (
+                          <button
+                            key={title}
+                            type="button"
+                            role="option"
+                            aria-selected={false}
+                            className={styles.suggestionItem}
+                            // onMouseDown (not onClick) fires before the input's
+                            // onBlur, so the pick registers before the list would
+                            // otherwise vanish out from under the click.
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setFocusDrafts((cur) => ({ ...cur, [item.id]: title }));
+                              setSuggestions([]);
+                              regenerate(item.id, title);
+                            }}
+                          >
+                            {title}
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
                   <button
                     type="button"
                     className={styles.focusButton}

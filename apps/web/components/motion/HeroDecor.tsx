@@ -20,19 +20,27 @@ interface Piece {
 }
 
 // Real, isolated food photography (cutout PNGs, transparent) curated from the
-// project's image/drink set — resized into apps/web/public/decor/. This is a
-// deliberate three-piece composition, not scattered decoration: one large
-// anchor (the salad toss — "decide what to eat", with its own built-in
-// ingredient motion), one warm vibrant accent (the juice, an orange pop
-// against the green banner), and one smaller supporting option (the grilled
-// chicken bowl) peeking in from the edge. Different scales, tilts and float
-// rhythms give the group depth. The old burger / tomato / onion / board
-// cutouts are gone — their assets remain in public/decor/ but are no longer
-// referenced here.
+// project's image/drink set — resized into apps/web/public/decor/. The juice
+// bottle that used to anchor the lower-right is gone (its asset remains in
+// public/decor/ but is no longer referenced) — replaced by the salad bowl as
+// the lower-right corner anchor, with the two burgers set on their own (one
+// on the right edge at mid-height, one in the lower-centre band), plus the
+// tomato & basil accent higher up the right edge. The two left-side accents
+// nearest the logo (olive-oil bottle, grilled-chicken bowl) were removed to
+// keep that side clean around the badge. Different scales, tilts and float
+// rhythms give the group depth; entrance delays are grouped into batches
+// (anchor, then the corner + burgers, then the upper accent, then the herbs)
+// so the whole composition cascades in rather than appearing all at once.
 const PIECES: Piece[] = [
+  // Batch 1 — the left anchor.
   { src: '/decor/salad-toss.png', className: styles.saladToss, floatOffset: 14, floatDuration: 7.5, delay: 0.1, rotate: -3, opacity: 1 },
-  { src: '/decor/juice.png', className: styles.juice, floatOffset: 11, floatDuration: 6.2, delay: 0.24, rotate: 4, opacity: 0.98 },
-  { src: '/decor/bowl-chicken.png', className: styles.bowlChicken, floatOffset: 9, floatDuration: 8.4, delay: 0.38, rotate: 7, opacity: 0.94 },
+  // Batch 2 — the lower-right corner anchor (salad bowl) plus the two
+  // burgers, now placed independently (see the CSS for where each lands).
+  { src: '/decor/salad-bowl.png', className: styles.saladBowl, floatOffset: 10, floatDuration: 7.2, delay: 0.4, rotate: -4, opacity: 1 },
+  { src: '/decor/burger-crispy.png', className: styles.burgerCrispy, floatOffset: 8, floatDuration: 6.6, delay: 0.5, rotate: 6, opacity: 0.97 },
+  { src: '/decor/burger-fries.png', className: styles.burgerFries, floatOffset: 7, floatDuration: 7.8, delay: 0.6, rotate: -6, opacity: 0.95 },
+  // Batch 3 — one further accent higher up the right edge.
+  { src: '/decor/tomato-basil.png', className: styles.tomatoBasil, floatOffset: 8, floatDuration: 7, delay: 0.74, rotate: 5, opacity: 0.96 },
 ];
 
 interface HerbSpec {
@@ -49,12 +57,11 @@ interface HerbSpec {
 // A few real basil sprigs as micro depth accents in the lower band — replaces
 // the old flat SVG leaf confetti. Kept deliberately sparse (clutter is a
 // failure mode here) and low-opacity so they never compete with the text.
-// Fixed hand-placed positions so SSR and client markup match.
+// Fixed hand-placed positions so SSR and client markup match. Batch 4 —
+// the last thing to settle in, after the photographic pieces above.
 const HERBS: HerbSpec[] = [
-  { top: '30%', left: '2%', size: 44, rotate: -18, opacity: 0.62, floatOffset: 7, floatDuration: 6.5, delay: 0.5 },
-  { top: '82%', left: '34%', size: 34, rotate: 24, opacity: 0.5, floatOffset: 6, floatDuration: 7.8, delay: 0.62 },
-  { top: '68%', left: '62%', size: 30, rotate: 40, opacity: 0.5, floatOffset: 7, floatDuration: 7, delay: 0.7 },
-  { top: '20%', left: '90%', size: 38, rotate: -30, opacity: 0.55, floatOffset: 6, floatDuration: 8.2, delay: 0.82 },
+  { top: '82%', left: '34%', size: 34, rotate: 24, opacity: 0.5, floatOffset: 6, floatDuration: 7.8, delay: 1.1 },
+  { top: '20%', left: '90%', size: 38, rotate: -30, opacity: 0.55, floatOffset: 6, floatDuration: 8.2, delay: 1.26 },
 ];
 
 export function HeroDecor() {

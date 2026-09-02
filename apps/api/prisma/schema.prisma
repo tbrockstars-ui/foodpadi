@@ -19,6 +19,10 @@ model User {
   email                    String    @unique
   passwordHash             String?
   authProvider             String    @default("password") // "password" | "apple" | "google"
+  // Personal referral code ("Feed a Friend", docs/REFERRAL_PLAN.md). Minted
+  // lazily the first time the user asks for their invite link — most accounts
+  // never share, so there's no point generating one at registration.
+  referralCode             String?   @unique @map("referral_code")
   createdAt                DateTime  @default(now())
   updatedAt                DateTime  @updatedAt
   deletedAt                DateTime?
@@ -37,6 +41,9 @@ model User {
   mealPlans                MealPlan[]
   shoppingLists            ShoppingList[]
   pantryItems              PantryItem[]
+  referralsMade            Referral[]        @relation("Referrer")
+  referralReceived         Referral?         @relation("Referred")
+  referralMilestones       ReferralMilestone[]
 
   @@map("users")
 }
@@ -173,6 +180,64 @@ model FoodEvent {
   @@index([guestSessionId])
   @@index([eventType])
   @@map("food_events")
+}
+
+// "Feed a Friend" referral attribution (docs/REFERRAL_PLAN.md, Phase 1a). One
+// row per referred person — `referredUserId` is unique, so "reward a referral
+// once, ever" is a database constraint rather than application logic. Derived
+// from real registration + activity events, in the same spirit as FoodEvent
+// (no parallel tracking pixel).
+//
+// status lifecycle:
+//   pending    — friend registered via a referral link, no meaningful action yet
+//   qualified  — friend has since performed a qualifying action (see
+//                referrals/qualifying-events.ts)
+//   rewarded   — reserved: a future paid perk (Plus days / ad-free) was granted
+//                for this referral. Phase 1b rewards are recognition-only
+//                (ReferralMilestone) and do NOT set this — see docs/REFERRAL_PLAN.md.
+model Referral {
+  id             String    @id @default(uuid())
+  referrerUserId String    @map("referrer_user_id")
+  referrer       User      @relation("Referrer", fields: [referrerUserId], references: [id], onDelete: Cascade)
+  referredUserId String    @unique @map("referred_user_id")
+  referred       User      @relation("Referred", fields: [referredUserId], references: [id], onDelete: Cascade)
+  codeUsed       String    @map("code_used")
+  status         String    @default("pending") // "pending" | "qualified" | "rewarded"
+  // SHA-256 of the referred user's signup IP — kept only for manual abuse
+  // review (docs/PRIVACY_DATA_MODEL.md: never store a raw IP). Not used for
+  // any automated blocking in Phase 1a.
+  signupIpHash   String?   @map("signup_ip_hash")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  qualifiedAt    DateTime? @map("qualified_at")
+  rewardedAt     DateTime? @map("rewarded_at")
+
+  @@index([referrerUserId])
+  @@index([status])
+  @@map("referrals")
+}
+
+// "Feed a Friend" Phase 1b — the reward for a successful referral is
+// recognition, not a paid perk (docs/REFERRAL_PLAN.md §3 / strategy §11: keep
+// the marginal cost at zero until unit economics are known). One row per
+// (user, kind, tier) badge earned; `seenAt` gates a once-only celebration in
+// the UI. A real paid reward later becomes a new `kind` here (or its own
+// table) with a grant — nothing about this shape needs to change.
+//
+//   kind = "referrer_tier"      tier = qualified-referral count crossed (1/3/5/10)
+//   kind = "joined_via_friend"  tier = 0, minted for the *referred* user on signup
+model ReferralMilestone {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind      String
+  tier      Int       @default(0)
+  label     String
+  reachedAt DateTime  @default(now()) @map("reached_at")
+  seenAt    DateTime? @map("seen_at")
+
+  @@unique([userId, kind, tier])
+  @@index([userId])
+  @@map("referral_milestones")
 }
 
 // AI-generated (or, later, curated) recipes. No master ingredient catalog

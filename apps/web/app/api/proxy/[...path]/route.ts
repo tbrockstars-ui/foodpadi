@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import {
   ACCESS_COOKIE,
   ACCESS_COOKIE_MAX_AGE,
+  GUEST_COOKIE,
   REFRESH_COOKIE,
   REFRESH_COOKIE_MAX_AGE,
   sessionCookieOptions,
@@ -41,12 +42,18 @@ async function forward(request: NextRequest, path: string[]) {
   const jar = cookies();
   const accessToken = jar.get(ACCESS_COOKIE)?.value;
   const refreshToken = jar.get(REFRESH_COOKIE)?.value;
+  // Fall back to the guest token when there's no real session. The API's
+  // GuestOrAuthGuard routes (Eat Now, Cook Today/Decide, plan preview) accept
+  // it; a JwtAuthGuard-only route (save recipe, generate plan, scan) will
+  // 401 it and the client bounces to signup, which is the intended behaviour.
+  const guestToken = jar.get(GUEST_COOKIE)?.value;
+  const bearer = accessToken ?? guestToken;
   const targetPath = path.join('/');
   const search = request.nextUrl.search;
   const hasBody = !['GET', 'HEAD'].includes(request.method);
   const body = hasBody ? await request.text() : undefined;
 
-  let apiRes = await callApi(targetPath, search, request.method, body, accessToken);
+  let apiRes = await callApi(targetPath, search, request.method, body, bearer);
 
   // Refresh-and-retry once on an expired access token. Skip entirely when
   // there's no refresh token, or when the caller never had an access token

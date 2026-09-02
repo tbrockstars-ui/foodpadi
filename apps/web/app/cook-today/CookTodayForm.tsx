@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { RecipeView } from '@foodpadi/shared';
 import styles from './cook-today.module.css';
+import { MemberBenefitCard } from '../../components/MemberBenefitCard';
+import { guestPrompts } from '../../lib/guestClient';
 
 // Grouped loosely (protein / carb / veg / dairy) for scannability, but kept
 // as one flat tappable list — same simple chip-wrap layout as before, just
@@ -24,9 +26,38 @@ const TIME_OPTIONS: { label: string; value: number | undefined }[] = [
 
 type Step = 'input' | 'results' | 'detail';
 
+// The proxy clears the session cookies and answers 401 when it can't refresh
+// an expired access token. There's nothing to retry client-side — bounce the
+// user through login and bring them back to Cook Today afterwards. A full
+// navigation (not router.push) for the same reason app/login/page.tsx uses
+// one: the App Router client cache can otherwise serve a stale render.
+function redirectToLogin() {
+  window.location.href = `/login?next=${encodeURIComponent('/cook-today')}`;
+}
+
+// NestJS error bodies are JSON ({ message: string | string[], ... }), but a
+// bare 401 from the proxy (or a proxy/runtime error) can be empty or plain
+// text — fall back to that, then to the status code, so the user never sees
+// a contentless "something went wrong".
+async function errorMessageFrom(res: Response, fallback: string): Promise<string> {
+  const raw = await res.text().catch(() => '');
+  try {
+    const data = JSON.parse(raw) as { message?: string | string[] };
+    if (Array.isArray(data.message)) return data.message.join('. ');
+    if (typeof data.message === 'string' && data.message) return data.message;
+  } catch {
+    if (raw.trim()) return raw.trim();
+  }
+  return `${fallback} (error ${res.status})`;
+}
+
 /** Web counterpart to apps/mobile/src/screens/CookTodayScreen.tsx. */
-export function CookTodayForm() {
+export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
   const [step, setStep] = useState<Step>('input');
+  // Guests: shown once per visit under the results, and in place of the
+  // save-recipe flow (which needs an account).
+  const [showResultsBenefit, setShowResultsBenefit] = useState(false);
+  const [showSavePrompt, setShowSavePrompt] = useState(false);
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [customIngredient, setCustomIngredient] = useState('');
   const [timeConstraint, setTimeConstraint] = useState<number | undefined>(undefined);
@@ -36,6 +67,7 @@ export function CookTodayForm() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const toggleIngredient = (name: string) => {
     setIngredients((current) => (current.includes(name) ? current.filter((i) => i !== name) : [...current, name]));
@@ -58,16 +90,22 @@ export function CookTodayForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ingredients, timeConstraintMinutes: timeConstraint, servings: 2 }),
       });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
       if (!res.ok) {
         if (res.status === 503) {
           throw new Error("Cook Today isn't ready yet — the recipe generator isn't configured. Check back soon.");
         }
-        const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
-        const message = Array.isArray(data.message) ? data.message.join('. ') : data.message;
-        throw new Error(message ?? 'Something went wrong finding recipes.');
+        throw new Error(await errorMessageFrom(res, 'Something went wrong finding recipes'));
       }
       setRecipes((await res.json()) as RecipeView[]);
       setStep('results');
+      if (isGuest && !guestPrompts.hasSeen('cook_results')) {
+        setShowResultsBenefit(true);
+        guestPrompts.markSeen('cook_results');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong finding recipes.');
     } finally {
@@ -78,19 +116,36 @@ export function CookTodayForm() {
   const openRecipe = (recipe: RecipeView) => {
     setSelectedRecipe(recipe);
     setSaved(false);
+    setSaveError(null);
     setStep('detail');
   };
 
   const saveRecipe = async () => {
     if (!selectedRecipe) return;
+    if (isGuest) {
+      // Saving needs an account — show the value, don't bounce straight to a
+      // login screen (guest-mode brief §6).
+      setShowSavePrompt(true);
+      return;
+    }
     setSaving(true);
+    setSaveError(null);
     try {
-      await fetch('/api/proxy/cook-today/recipes', {
+      const res = await fetch('/api/proxy/cook-today/recipes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(selectedRecipe),
       });
+      if (res.status === 401) {
+        redirectToLogin();
+        return;
+      }
+      if (!res.ok) {
+        throw new Error(await errorMessageFrom(res, "Couldn't save this recipe"));
+      }
       setSaved(true);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Couldn't save this recipe.");
     } finally {
       setSaving(false);
     }
@@ -136,6 +191,15 @@ export function CookTodayForm() {
         <button type="button" className={styles.primaryButton} onClick={saveRecipe} disabled={saved || saving}>
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save this recipe'}
         </button>
+        {saveError ? <p className={styles.errorText}>{saveError}</p> : null}
+        {showSavePrompt ? (
+          <MemberBenefitCard
+            icon="🔖"
+            title="Want FoodPadi to remember this?"
+            body="Create a free account to save recipes, keep your preferences and open them again on your other devices."
+            ctaLabel="Create free account"
+          />
+        ) : null}
       </div>
     );
   }
@@ -160,6 +224,14 @@ export function CookTodayForm() {
             </button>
           ))
         )}
+        {showResultsBenefit ? (
+          <MemberBenefitCard
+            icon="🔖"
+            title="Don't lose these"
+            body="Create a free account and FoodPadi keeps your recipes so you can cook them again anytime."
+            ctaLabel="Create free account"
+          />
+        ) : null}
         <button type="button" className={styles.secondaryButton} onClick={() => setStep('input')}>
           Start over
         </button>

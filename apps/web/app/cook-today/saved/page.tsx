@@ -17,6 +17,7 @@ export default async function SavedRecipesPage() {
 
   return (
     <main className={shellStyles.container}>
+      <Logo href="/" size={32} className={shellStyles.pageLogo} />
       <BackLink href="/cook-today" label="Cook Today" />
       <h1 className={styles.title}>Saved recipes</h1>
       <SavedRecipesList initialRecipes={recipes} />

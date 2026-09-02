@@ -64,6 +64,7 @@ export function SettingsMenu() {
         onClick={() => setOpen((v) => !v)}
       >
         <GearIcon />
+        <span className={styles.triggerLabel}>Settings</span>
       </button>
 
       {open ? (
@@ -72,11 +73,17 @@ export function SettingsMenu() {
           <Link href="/profile" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Profile
           </Link>
+          <Link href="/profile#avoided-foods" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+            Foods to avoid
+          </Link>
           <Link href="/cook-today/saved" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Saved recipes
           </Link>
           <Link href="/plan/saved" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Saved plans
+          </Link>
+          <Link href="/invite" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+            Invite a friend
           </Link>
 
           <div className={styles.divider} />
@@ -85,19 +92,19 @@ export function SettingsMenu() {
           <div className={styles.segmented} role="group" aria-label="Theme">
             <button
               type="button"
-              className={`${styles.segment} ${theme === 'default' ? styles.segmentActive : ''}`}
-              aria-pressed={theme === 'default'}
-              onClick={() => setTheme('default')}
-            >
-              Default
-            </button>
-            <button
-              type="button"
               className={`${styles.segment} ${theme === 'dark' ? styles.segmentActive : ''}`}
               aria-pressed={theme === 'dark'}
               onClick={() => setTheme('dark')}
             >
-              Dark
+              Black
+            </button>
+            <button
+              type="button"
+              className={`${styles.segment} ${theme === 'default' ? styles.segmentActive : ''}`}
+              aria-pressed={theme === 'default'}
+              onClick={() => setTheme('default')}
+            >
+              White
             </button>
           </div>
 

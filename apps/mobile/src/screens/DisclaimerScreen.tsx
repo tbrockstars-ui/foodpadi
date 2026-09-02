@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { DISCLAIMER_TEXT } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { colors } from '../theme/colors';
+import { type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 export function DisclaimerScreen({ onAcknowledged }: { onAcknowledged: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [submitting, setSubmitting] = useState(false);
 
   const acknowledge = async () => {
@@ -30,12 +33,14 @@ export function DisclaimerScreen({ onAcknowledged }: { onAcknowledged: () => voi
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, paddingTop: 64 },
-  heading: { fontSize: 24, fontWeight: '700', color: colors.text, marginBottom: 16 },
-  scroll: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: 12, backgroundColor: colors.surface },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+  heading: { fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 16 },
+  scroll: { flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: 12, backgroundColor: c.surface },
   scrollContent: { padding: 16 },
-  body: { fontSize: 14, lineHeight: 21, color: colors.text },
-  button: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
-  buttonText: { color: colors.primaryText, fontSize: 17, fontWeight: '600' },
-});
+  body: { fontSize: 14, lineHeight: 21, color: c.text },
+  button: { backgroundColor: c.primary, borderRadius: 12, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
+  buttonText: { color: c.primaryText, fontSize: 17, fontWeight: '600' },
+  });
+}

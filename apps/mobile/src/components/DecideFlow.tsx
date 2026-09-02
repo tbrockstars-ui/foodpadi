@@ -9,7 +9,12 @@ import { Button } from './Button';
 import { Card } from './Card';
 import { FoodImage } from './FoodImage';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './LocalFoodSearch';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { MemberBenefitCard } from './MemberBenefitCard';
+import { ShareNudge } from './ShareNudge';
+import { AdSlot } from './AdSlot';
+import { guestPrompts } from '../lib/guestPrompts';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
 
@@ -22,8 +27,21 @@ const PROMPT_CHIPS = [
   { label: 'Something quick', text: 'Something quick to make' },
   { label: 'Something cheap', text: 'Something cheap and filling' },
   { label: 'Something comforting', text: 'Something comforting' },
+  { label: 'Vegan', text: 'Something vegan' },
   { label: 'Try something new', text: 'Something different from usual' },
 ];
+
+// A "Get it" option carries real dietary tags (option.foodIdea.tags); a
+// "Cook it" option's RecipeView has no tags field at all, so a genuinely
+// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
+// — falls back to the option's own title/reason text, which reliably says
+// so when it's true (the AI/curated titles are written that way already).
+// Matches web's DecideFlow.
+function isVeganOption(option: DecisionOptionView): boolean {
+  if (option.foodIdea?.tags?.includes('vegan')) return true;
+  const haystack = `${option.title} ${option.reason}`.toLowerCase();
+  return haystack.includes('vegan');
+}
 
 /**
  * "FoodPadi decides" — the Understand Context -> Decide layer of the
@@ -33,8 +51,15 @@ const PROMPT_CHIPS = [
  * explained options via POST /decide, rather than making the user pick a
  * mode first. Web counterpart: apps/web/app/DecideFlow.tsx.
  */
-export function DecideFlow() {
+interface DecideFlowProps {
+  /** Guests only — routes the "let FoodPadi remember you" card's CTA to signup. */
+  onRequestLogin?: () => void;
+}
+
+export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const guestSession = useGuestSession();
   // Same precedent as EatNowScreen: guests get a lazy, inline disclaimer
   // gate the first time they touch a feature that needs it, rather than the
@@ -47,13 +72,16 @@ export function DecideFlow() {
   const getToken = async () => (user ? ((await tokenStore.getAccessToken()) ?? '') : guestSession.ensureSession());
 
   const [description, setDescription] = useState('');
-  const [timeMinutes, setTimeMinutes] = useState('');
   const [budgetPounds, setBudgetPounds] = useState('');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [getSearchStage, setGetSearchStage] = useState<LocalFoodSearchStage>('idle');
+  // Guests only: shown under the options once they've decided a couple of
+  // times — demonstrated intent before a prompt (guest-mode brief §12), then
+  // never again this session (§13).
+  const [showBenefit, setShowBenefit] = useState(false);
 
   // Bumped on every decide() call; a response whose id no longer matches is
   // stale (the user changed their selection mid-request) and is discarded so
@@ -94,7 +122,6 @@ export function DecideFlow() {
       const data: DecideResponse = await api.decide(
         {
           description: trimmed,
-          timeMinutes: timeMinutes ? Number(timeMinutes) : undefined,
           budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
         },
         token,
@@ -102,6 +129,14 @@ export function DecideFlow() {
       if (reqId !== requestSeq.current) return; // superseded by a newer selection
       setOptions(data.options);
       setStage(data.options.length > 0 ? 'options' : 'no-options');
+      if (!user && data.options.length > 0 && onRequestLogin) {
+        const count = await guestPrompts.bumpCount('decide_options');
+        const seen = await guestPrompts.hasSeen('decide_options');
+        if (count >= 2 && !seen) {
+          setShowBenefit(true);
+          void guestPrompts.markSeen('decide_options');
+        }
+      }
     } catch (e) {
       if (reqId !== requestSeq.current) return;
       setErrorMessage(
@@ -126,9 +161,8 @@ export function DecideFlow() {
     if (text === description) return;
     setDescription(text);
     // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
-    // any time/budget constraint typed for the previous selection shouldn't
+    // any budget constraint typed for the previous selection shouldn't
     // silently carry over and narrow it. Matches web's DecideFlow.
-    setTimeMinutes('');
     setBudgetPounds('');
     // Picking a chip clears any results already on screen and re-enables
     // "Decide for me" rather than auto-firing a new decide() — the user
@@ -144,6 +178,17 @@ export function DecideFlow() {
   const handleConstraintChange = (setter: (v: string) => void, value: string) => {
     setter(value);
     if (hasResultsShowing) clearResults();
+  };
+
+  const hasSomethingToClear = description.trim().length > 0 || budgetPounds.trim().length > 0 || hasResultsShowing;
+
+  // Resets the whole flow back to blank — the text field, budget, and any
+  // results/error on screen — rather than just the input. Matches web's
+  // DecideFlow.
+  const clearAll = () => {
+    setDescription('');
+    setBudgetPounds('');
+    clearResults();
   };
 
   if (disclaimerShown && needsGuestDisclaimer) {
@@ -162,7 +207,7 @@ export function DecideFlow() {
     <View>
       <TextInput
         style={styles.input}
-        placeholder="What do you have, or what are you after? e.g. chicken and rice"
+        placeholder="Tell me what you want to eat"
         placeholderTextColor={colors.textFaint}
         value={description}
         onChangeText={handleDescriptionChange}
@@ -185,25 +230,19 @@ export function DecideFlow() {
             </Text>
           </TouchableOpacity>
         ))}
+        {hasSomethingToClear ? (
+          <TouchableOpacity style={styles.clearButton} onPress={clearAll} accessibilityRole="button">
+            <Text style={styles.clearButtonText}>✕ Clear</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.constraintsRow}>
         <View style={styles.constraintField}>
-          <TextInput
-            style={[styles.input, styles.constraintInput, timeMinutes ? styles.constraintInputHasSuffix : null]}
-            placeholder="Minutes (optional)"
-            placeholderTextColor={colors.textFaint}
-            keyboardType="number-pad"
-            value={timeMinutes}
-            onChangeText={(v) => handleConstraintChange(setTimeMinutes, v)}
-          />
-          {timeMinutes ? <Text style={styles.constraintAffixSuffix}>mins</Text> : null}
-        </View>
-        <View style={styles.constraintField}>
           {budgetPounds ? <Text style={styles.constraintAffixPrefix}>£</Text> : null}
           <TextInput
             style={[styles.input, styles.constraintInput, budgetPounds ? styles.constraintInputHasPrefix : null]}
-            placeholder="Budget £ (optional)"
+            placeholder="Budget £"
             placeholderTextColor={colors.textFaint}
             keyboardType="decimal-pad"
             value={budgetPounds}
@@ -220,17 +259,31 @@ export function DecideFlow() {
         style={styles.decideButton}
       />
 
-      {stage === 'error' ? <Text style={styles.optionReason}>{errorMessage}</Text> : null}
+      {stage === 'error' ? (
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateIcon}>😕</Text>
+          <Text style={styles.stateMessage}>{errorMessage}</Text>
+          <Button label="Try again" variant="secondary" onPress={() => decide()} style={styles.stateRetry} />
+        </View>
+      ) : null}
       {stage === 'no-options' ? (
-        <Text style={styles.optionReason}>
-          FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
-        </Text>
+        <View style={styles.stateBlock}>
+          <Text style={styles.stateIcon}>🤔</Text>
+          <Text style={styles.stateMessage}>
+            FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
+          </Text>
+        </View>
       ) : null}
 
       {stage === 'options'
         ? options.map((option) => (
             <Card key={option.id} style={styles.optionCard}>
-              <FoodImage image={option.image} alt={option.title} style={styles.optionImage} />
+              <FoodImage
+                image={option.image}
+                alt={option.title}
+                style={styles.optionImage}
+                badge={isVeganOption(option) ? 'Vegan' : undefined}
+              />
               <View style={styles.optionHeader}>
                 <View style={styles.optionHeaderText}>
                   <Text style={styles.optionTitle}>{option.title}</Text>
@@ -243,7 +296,7 @@ export function DecideFlow() {
                       option.type === 'cook' ? styles.optionTypeCookText : styles.optionTypeGetText,
                     ]}
                   >
-                    {option.type === 'cook' ? 'Cook it' : 'Get it'}
+                    {option.type === 'cook' ? 'Cook it' : 'Order now'}
                   </Text>
                 </View>
               </View>
@@ -289,81 +342,112 @@ export function DecideFlow() {
             </Card>
           ))
         : null}
+
+      {stage === 'options' && showBenefit && onRequestLogin ? (
+        <MemberBenefitCard
+          icon="🧠"
+          title="Want suggestions based on what you like?"
+          body="Right now FoodPadi is just exploring ideas. Tell it your cuisines, your budget and what you avoid, and it decides around you."
+          ctaLabel="Personalise FoodPadi"
+          onPress={onRequestLogin}
+        />
+      ) : null}
+
+      {stage === 'options' && !user ? <AdSlot placement="decide_results" /> : null}
+
+      {/* Members: nudge to pass FoodPadi on right after it's proved useful
+          (strategy §4/§5 — referral is a key acquisition channel). */}
+      {stage === 'options' && user ? <ShareNudge context="decision" /> : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
   disclaimerCard: { marginBottom: spacing.lg },
-  disclaimerTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.md },
+  disclaimerTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.md },
   disclaimerBox: {
     maxHeight: 220,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: radius.md,
-    backgroundColor: colors.background,
+    backgroundColor: c.background,
     marginBottom: spacing.md,
   },
   disclaimerBoxContent: { padding: spacing.md },
-  disclaimerText: { fontSize: 13, lineHeight: 20, color: colors.text },
+  disclaimerText: { fontSize: 13, lineHeight: 20, color: c.text },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
     marginBottom: spacing.md,
   },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   promptChip: {
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.pill,
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
   },
-  promptChipSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  promptChipText: { fontSize: 13, color: colors.text },
-  promptChipTextSelected: { color: colors.primary, fontWeight: '600' },
+  promptChipSelected: { borderColor: c.primary, backgroundColor: c.primarySoft },
+  promptChipText: { fontSize: 13, color: c.text },
+  promptChipTextSelected: { color: c.primary, fontWeight: '600' },
+  // Resets the whole flow (text, budget, results) back to blank. Pushed to
+  // the end of the chip row's line via marginLeft:auto, dashed/muted rather
+  // than chip-styled so it doesn't read as one more suggestion to pick.
+  clearButton: {
+    marginLeft: 'auto',
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: c.borderStrong,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+  },
+  clearButtonText: { fontSize: 13, fontWeight: '600', color: c.textMuted },
   constraintsRow: { flexDirection: 'row', gap: spacing.sm },
-  constraintField: { flex: 1, justifyContent: 'center' },
+  // Only the budget field lives here now (Minutes was removed) — a fixed
+  // width rather than flex:1, so it sits left-aligned at roughly its old
+  // size instead of stretching across the whole row.
+  constraintField: { width: 160, justifyContent: 'center' },
   constraintInput: { flex: 1 },
   constraintInputHasPrefix: { paddingLeft: 22 },
-  constraintInputHasSuffix: { paddingRight: 44 },
   constraintAffixPrefix: {
     position: 'absolute',
     left: spacing.lg,
     fontSize: 15,
-    color: colors.textMuted,
-  },
-  constraintAffixSuffix: {
-    position: 'absolute',
-    right: spacing.lg,
-    fontSize: 15,
-    color: colors.textMuted,
+    color: c.textMuted,
   },
   decideButton: { marginTop: spacing.xs, marginBottom: spacing.lg },
+  stateBlock: { alignItems: 'center', paddingVertical: spacing.lg, paddingHorizontal: spacing.md },
+  stateIcon: { fontSize: 32, lineHeight: 36, marginBottom: spacing.sm },
+  stateMessage: { ...typography.body, color: c.textMuted, textAlign: 'center', marginBottom: spacing.md },
+  stateRetry: { alignSelf: 'center', minWidth: 140, paddingVertical: spacing.sm },
   optionCard: { marginBottom: spacing.md },
   optionImage: { marginBottom: spacing.md },
   optionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: spacing.sm },
   optionHeaderText: { flex: 1 },
-  optionTitle: { fontSize: 17, fontWeight: '700', color: colors.text, marginBottom: spacing.xs },
-  optionReason: { ...typography.body, color: colors.textMuted },
+  optionTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  optionReason: { ...typography.body, color: c.textMuted },
   optionTypeBadge: { borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: spacing.md },
-  optionTypeCook: { backgroundColor: colors.primarySoft },
-  optionTypeGet: { backgroundColor: colors.accentSoft },
+  optionTypeCook: { backgroundColor: c.primarySoft },
+  optionTypeGet: { backgroundColor: c.accentSoft },
   optionTypeBadgeText: { fontSize: 12, fontWeight: '700' },
-  optionTypeCookText: { color: colors.primary },
-  optionTypeGetText: { color: colors.accent },
+  optionTypeCookText: { color: c.primary },
+  optionTypeGetText: { color: c.accent },
   optionAction: { marginTop: spacing.md },
-  optionActionText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  optionActionText: { color: c.primary, fontSize: 14, fontWeight: '600' },
   optionDetail: { marginTop: spacing.md },
-  ingredientLine: { ...typography.body, color: colors.text, marginBottom: spacing.xs },
+  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  stepNumber: { fontSize: 13, fontWeight: '700', color: colors.primary, width: 18 },
-  stepText: { ...typography.body, color: colors.text, flex: 1 },
-});
+  stepNumber: { fontSize: 13, fontWeight: '700', color: c.primary, width: 18 },
+  stepText: { ...typography.body, color: c.text, flex: 1 },
+  });
+}

@@ -6,13 +6,13 @@ import styles from './AiThinking.module.css';
 const INGREDIENTS = ['🥕', '🍅', '🍗', '🍽️'];
 
 /**
- * Replaces a plain "Loading…" while FoodPadi's /decide call is in flight —
- * a short, cycling ingredient sequence rather than a spinner, so waiting for
- * a real AI-blended answer still feels like part of the food experience.
- * Purely decorative (aria-hidden); "FoodPadi is thinking…" is the real,
- * screen-reader-visible status text next to it.
+ * Replaces a plain "Loading…" wherever FoodPadi has something brief to wait
+ * for (a /decide call, starting a guest session) — a short, cycling
+ * ingredient sequence rather than a spinner, so waiting still feels like
+ * part of the food experience. Purely decorative (aria-hidden); `label` is
+ * the real, screen-reader-visible status text next to it.
  */
-export function AiThinking() {
+export function AiThinking({ label = 'FoodPadi is thinking…' }: { label?: string }) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -33,7 +33,7 @@ export function AiThinking() {
           </motion.span>
         ))}
       </div>
-      <span className={styles.label}>FoodPadi is thinking…</span>
+      <span className={styles.label}>{label}</span>
     </div>
   );
 }

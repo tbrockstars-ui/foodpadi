@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -11,12 +11,15 @@ import { Card } from '../components/Card';
 import { DisclaimerBanner } from '../components/DisclaimerBanner';
 import { LoadingState } from '../components/LoadingState';
 import { GOAL_LABELS } from '../constants/goalLabels';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Profile'>;
 
-export function ProfileScreen({ navigation }: Props) {
+export function ProfileScreen({ navigation, route }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const { logout } = useAuth();
   const [profile, setProfile] = useState<UserSummary | null>(null);
   const [preferences, setPreferences] = useState<FoodPreferenceItem[]>([]);
@@ -29,6 +32,30 @@ export function ProfileScreen({ navigation }: Props) {
   const [exportedData, setExportedData] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  // Settings' "Foods to avoid" shortcut lands here with scrollTo: 'avoided'
+  // — scroll to that Card once content has laid out, rather than dropping
+  // the user at the top of a long profile scroll view. avoidedSectionY is
+  // filled in by the heading's onLayout below; pendingScroll covers the
+  // (common) case where that layout hasn't happened yet when this runs.
+  const scrollRef = useRef<ScrollView>(null);
+  const avoidedSectionY = useRef(0);
+  const pendingScroll = useRef(false);
+
+  // useFocusEffect rather than a mount-only effect: native-stack can reuse
+  // an already-mounted Profile instance instead of pushing a fresh one when
+  // Settings navigates here a second time, so a plain mount effect would
+  // silently miss that case.
+  useFocusEffect(
+    useCallback(() => {
+      if (route.params?.scrollTo !== 'avoided') return;
+      if (avoidedSectionY.current > 0) {
+        scrollRef.current?.scrollTo({ y: avoidedSectionY.current - spacing.lg, animated: true });
+      } else {
+        pendingScroll.current = true;
+      }
+    }, [route.params?.scrollTo]),
+  );
 
   const load = async () => {
     const [me, prefs, avoidedItems, goalsResponse] = await Promise.all([
@@ -99,7 +126,7 @@ export function ProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
+    <ScrollView ref={scrollRef} style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
       <BackLink label="Home" onPress={() => navigation.goBack()} />
 
       <Text style={styles.title}>Profile</Text>
@@ -112,6 +139,19 @@ export function ProfileScreen({ navigation }: Props) {
           label="View saved plans"
           variant="secondary"
           onPress={() => navigation.navigate('SavedPlans')}
+          style={{ marginTop: spacing.sm }}
+        />
+      </Card>
+
+      <Text style={styles.sectionHeading}>Invite a friend</Text>
+      <Card style={styles.section}>
+        <Text style={styles.emptyText}>
+          Know someone who never knows what to eat? Send them FoodPadi and track who joins.
+        </Text>
+        <Button
+          label="Invite friends"
+          variant="secondary"
+          onPress={() => navigation.navigate('Invite')}
           style={{ marginTop: spacing.sm }}
         />
       </Card>
@@ -169,7 +209,18 @@ export function ProfileScreen({ navigation }: Props) {
         </View>
       </Card>
 
-      <Text style={styles.sectionHeading}>Foods I choose to avoid</Text>
+      <Text
+        style={styles.sectionHeading}
+        onLayout={(e) => {
+          avoidedSectionY.current = e.nativeEvent.layout.y;
+          if (pendingScroll.current) {
+            pendingScroll.current = false;
+            scrollRef.current?.scrollTo({ y: avoidedSectionY.current - spacing.lg, animated: true });
+          }
+        }}
+      >
+        Foods I choose to avoid
+      </Text>
       <Card style={styles.section}>
         <View style={styles.tagList}>
           {avoided.length === 0 ? (
@@ -255,54 +306,56 @@ export function ProfileScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: colors.text },
-  email: { ...typography.body, color: colors.textMuted, marginBottom: spacing.xl },
-  sectionHeading: { ...typography.label, color: colors.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
+  title: { ...typography.display, color: c.text },
+  email: { ...typography.body, color: c.textMuted, marginBottom: spacing.xl },
+  sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },
   section: { marginBottom: spacing.sm },
   tagList: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  emptyText: { ...typography.caption, color: colors.textFaint },
+  emptyText: { ...typography.caption, color: c.textFaint },
   removableTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primarySoft,
+    backgroundColor: c.primarySoft,
     borderRadius: radius.pill,
     paddingVertical: 6,
     paddingHorizontal: spacing.md,
     gap: spacing.xs,
   },
-  removableTagText: { color: colors.primary, fontSize: 13, fontWeight: '600' },
-  removeIcon: { color: colors.primary, fontSize: 13, marginLeft: 4 },
+  removableTagText: { color: c.primary, fontSize: 13, fontWeight: '600' },
+  removeIcon: { color: c.primary, fontSize: 13, marginLeft: 4 },
   addRow: { flexDirection: 'row', gap: spacing.sm },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.background,
+    borderColor: c.border,
+    backgroundColor: c.background,
     borderRadius: radius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: 14,
-    color: colors.text,
+    color: c.text,
   },
   addButton: {
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
-  addButtonText: { color: colors.text, fontWeight: '600' },
+  addButtonText: { color: c.text, fontWeight: '600' },
   exportBox: {
     maxHeight: 220,
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: radius.md,
     padding: spacing.md,
     marginTop: spacing.md,
   },
-  exportText: { fontSize: 11, color: colors.textMuted, fontFamily: 'monospace' },
-  confirmBox: { backgroundColor: colors.dangerSoft, borderRadius: radius.md, padding: spacing.md },
-  confirmText: { ...typography.caption, color: colors.danger, marginBottom: spacing.md, lineHeight: 18 },
+  exportText: { fontSize: 11, color: c.textMuted, fontFamily: 'monospace' },
+  confirmBox: { backgroundColor: c.dangerSoft, borderRadius: radius.md, padding: spacing.md },
+  confirmText: { ...typography.caption, color: c.danger, marginBottom: spacing.md, lineHeight: 18 },
   confirmRow: { flexDirection: 'row', gap: spacing.sm },
-  disclaimerFull: { fontSize: 13, lineHeight: 20, color: colors.text },
-});
+  disclaimerFull: { fontSize: 13, lineHeight: 20, color: c.text },
+  });
+}

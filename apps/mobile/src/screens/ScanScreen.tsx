@@ -4,13 +4,13 @@ import * as ImagePicker from 'expo-image-picker';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DemoScenarioKey, FoodContentIngredientView, ScanImageMediaType, ScannedItemView } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
-import { tokenStore } from '../api/tokenStore';
 import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
 import { Tag } from '../components/Tag';
-import { colors, radius, spacing, typography } from '../theme/colors';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Scan'>;
@@ -63,6 +63,8 @@ function toRows(items: ScannedItemView[]): ReviewRow[] {
 }
 
 export function ScanScreen({ navigation }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [mode, setMode] = useState<Mode>('pantry');
   const [step, setStep] = useState<Step>('intro');
   const [rows, setRows] = useState<ReviewRow[]>([]);
@@ -108,11 +110,10 @@ export function ScanScreen({ navigation }: Props) {
     setStep('loading');
     try {
       if (mode === 'dish') {
-        const token = (await tokenStore.getAccessToken()) ?? '';
-        const result = await api.scanFoodContent(
-          { imageBase64: asset.base64, mediaType: guessMediaType(asset) },
-          token,
-        );
+        const result = await api.scanFoodContent({
+          imageBase64: asset.base64,
+          mediaType: guessMediaType(asset),
+        });
         handleDishResult(result);
       } else {
         const result = await api.scanPhoto({ imageBase64: asset.base64, mediaType: guessMediaType(asset) });
@@ -412,39 +413,40 @@ export function ScanScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: spacing.xl, paddingTop: 56 },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
-  title: { ...typography.display, color: colors.text },
+  title: { ...typography.display, color: c.text },
   modeRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md, marginBottom: spacing.md },
   modeTab: {
     flex: 1,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: radius.pill,
     paddingVertical: 10,
   },
-  modeTabSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  modeTabText: { fontSize: 14, fontWeight: '600', color: colors.textMuted },
-  modeTabTextSelected: { color: colors.primary },
-  dishDisclaimer: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
-  ingredientName: { fontSize: 16, fontWeight: '600', color: colors.text },
-  ingredientNote: { ...typography.caption, color: colors.textFaint, marginTop: spacing.xs },
-  subtitle: { ...typography.body, color: colors.textMuted, marginBottom: spacing.lg },
-  errorText: { color: colors.danger, marginBottom: spacing.lg, fontSize: 14 },
+  modeTabSelected: { borderColor: c.primary, backgroundColor: c.primarySoft },
+  modeTabText: { fontSize: 14, fontWeight: '600', color: c.textMuted },
+  modeTabTextSelected: { color: c.primary },
+  dishDisclaimer: { ...typography.caption, color: c.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+  ingredientName: { fontSize: 16, fontWeight: '600', color: c.text },
+  ingredientNote: { ...typography.caption, color: c.textFaint, marginTop: spacing.xs },
+  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
+  errorText: { color: c.danger, marginBottom: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.lg },
-  sampleHeading: { ...typography.label, color: colors.textFaint, marginTop: spacing.xl, marginBottom: spacing.sm },
+  sampleHeading: { ...typography.label, color: c.textFaint, marginTop: spacing.xl, marginBottom: spacing.sm },
   sampleWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   sampleChip: {
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: spacing.md,
   },
-  sampleChipText: { fontSize: 13, color: colors.textMuted },
+  sampleChipText: { fontSize: 13, color: c.textMuted },
   itemCard: { marginBottom: spacing.sm },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   checkbox: {
@@ -452,32 +454,33 @@ const styles = StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: c.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxChecked: { backgroundColor: colors.primary, borderColor: colors.primary },
-  checkmark: { color: colors.primaryText, fontSize: 13, fontWeight: '700' },
-  itemInput: { ...typography.body, color: colors.text, flex: 1, padding: 0 },
-  itemInputExcluded: { color: colors.textFaint, textDecorationLine: 'line-through' },
-  removeIcon: { color: colors.textFaint, fontSize: 14, paddingHorizontal: spacing.sm },
+  checkboxChecked: { backgroundColor: c.primary, borderColor: c.primary },
+  checkmark: { color: c.primaryText, fontSize: 13, fontWeight: '700' },
+  itemInput: { ...typography.body, color: c.text, flex: 1, padding: 0 },
+  itemInputExcluded: { color: c.textFaint, textDecorationLine: 'line-through' },
+  removeIcon: { color: c.textFaint, fontSize: 14, paddingHorizontal: spacing.sm },
   addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
   addInput: {
     flex: 1,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
+    borderColor: c.border,
+    backgroundColor: c.surface,
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     fontSize: 15,
-    color: colors.text,
+    color: c.text,
   },
   addButton: {
-    backgroundColor: colors.surfaceSunken,
+    backgroundColor: c.surfaceSunken,
     borderRadius: 12,
     paddingHorizontal: spacing.lg,
     justifyContent: 'center',
   },
-  addButtonText: { color: colors.text, fontWeight: '600' },
-});
+  addButtonText: { color: c.text, fontWeight: '600' },
+  });
+}

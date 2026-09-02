@@ -6,6 +6,10 @@ import type { DecideResponse, DecisionOptionView } from '@foodpadi/shared';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './eat-now/LocalFoodSearch';
 import { AiThinking } from '../components/motion/AiThinking';
 import { FoodImage } from '../components/FoodImage';
+import { MemberBenefitCard } from '../components/MemberBenefitCard';
+import { ShareNudge } from '../components/ShareNudge';
+import { AdSlot } from '../components/AdSlot';
+import { guestPrompts } from '../lib/guestClient';
 import styles from './home.module.css';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
@@ -19,18 +23,36 @@ const PROMPT_CHIPS = [
   { label: 'Something quick', text: 'Something quick to make' },
   { label: 'Something cheap', text: 'Something cheap and filling' },
   { label: 'Something comforting', text: 'Something comforting' },
+  { label: 'Vegan', text: 'Something vegan' },
   { label: 'Try something new', text: 'Something different from usual' },
   { label: 'Surprise me', text: 'Surprise me with something different' },
 ];
 
-const OPTION_VARIANTS = {
-  hidden: { opacity: 0, y: 16 },
+// A "Get it" option carries real dietary tags (option.foodIdea.tags); a
+// "Cook it" option's RecipeView has no tags field at all, so a genuinely
+// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
+// — falls back to the option's own title/reason text, which reliably says
+// so when it's true (the AI/curated titles are written that way already).
+function isVeganOption(option: DecisionOptionView): boolean {
+  if (option.foodIdea?.tags?.includes('vegan')) return true;
+  const haystack = `${option.title} ${option.reason}`.toLowerCase();
+  return haystack.includes('vegan');
+}
+
+// A function (not a static object) so it can drop the translateY move and
+// the stagger delay under prefers-reduced-motion — an opacity-only,
+// all-at-once fade instead of cards visibly travelling up the screen one
+// after another (brief §20: "avoid repeated movement").
+const optionVariants = (prefersReducedMotion: boolean) => ({
+  hidden: { opacity: 0, y: prefersReducedMotion ? 0 : 16 },
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { duration: 0.4, delay: i * 0.12, ease: 'easeOut' as const },
+    transition: prefersReducedMotion
+      ? { duration: 0.15 }
+      : { duration: 0.4, delay: i * 0.12, ease: 'easeOut' as const },
   }),
-};
+});
 
 /**
  * "FoodPadi decides" — the Understand Context -> Decide layer of the
@@ -39,12 +61,14 @@ const OPTION_VARIANTS = {
  * Blends real Cook Today + Eat Now results into a small set of explained
  * options via POST /decide, rather than making the user pick a mode first.
  */
-export function DecideFlow() {
+export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
   const [description, setDescription] = useState('');
-  const [timeMinutes, setTimeMinutes] = useState('');
   const [budgetPounds, setBudgetPounds] = useState('');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
+  // Guests only: shown under the options once they've decided a couple of
+  // times (§12), then never again this visit (§13).
+  const [showBenefit, setShowBenefit] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [getSearchStage, setGetSearchStage] = useState<LocalFoodSearchStage>('idle');
@@ -91,7 +115,6 @@ export function DecideFlow() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           description: trimmed,
-          timeMinutes: timeMinutes ? Number(timeMinutes) : undefined,
           budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
         }),
       });
@@ -108,6 +131,13 @@ export function DecideFlow() {
       if (reqId !== requestSeq.current) return;
       setOptions(data.options);
       setStage(data.options.length > 0 ? 'options' : 'no-options');
+      if (isGuest && data.options.length > 0) {
+        const count = guestPrompts.bumpCount('decide_options');
+        if (count >= 2 && !guestPrompts.hasSeen('decide_options')) {
+          setShowBenefit(true);
+          guestPrompts.markSeen('decide_options');
+        }
+      }
     } catch {
       if (reqId !== requestSeq.current) return;
       setErrorMessage("FoodPadi couldn't decide right now. Please try again.");
@@ -119,9 +149,8 @@ export function DecideFlow() {
     if (text === description) return;
     setDescription(text);
     // A chip is a fresh, self-contained prompt ("I'm hungry, surprise me") —
-    // any time/budget constraint typed for the previous selection shouldn't
+    // any budget constraint typed for the previous selection shouldn't
     // silently carry over and narrow it.
-    setTimeMinutes('');
     setBudgetPounds('');
     // Picking a chip clears any results already on screen and re-enables
     // "Decide for me" rather than auto-firing a new decide() — the user
@@ -138,7 +167,6 @@ export function DecideFlow() {
     // Same reasoning as pickChip: typing a new description is a fresh
     // prompt, so a constraint left over from a previous one shouldn't
     // silently narrow it.
-    setTimeMinutes('');
     setBudgetPounds('');
     if (hasResultsShowing) clearResults();
   };
@@ -147,12 +175,23 @@ export function DecideFlow() {
     if (hasResultsShowing) clearResults();
   };
 
+  const hasSomethingToClear = description.trim().length > 0 || budgetPounds.trim().length > 0 || hasResultsShowing;
+
+  // Resets the whole flow back to blank — the text field, budget, and any
+  // results/error on screen — rather than just the input, so it reads as
+  // "start over" and never leaves a stale card sitting under an empty field.
+  const clearAll = () => {
+    setDescription('');
+    setBudgetPounds('');
+    clearResults();
+  };
+
   return (
     <div className={styles.decideSection}>
       <input
         className={styles.decideInput}
         type="text"
-        placeholder="What do you have, or what are you after? e.g. chicken and rice"
+        placeholder="Tell me what you want to eat"
         value={description}
         onChange={(e) => handleDescriptionChange(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && decide()}
@@ -166,26 +205,19 @@ export function DecideFlow() {
             className={`${styles.promptChip} ${description === chip.text ? styles.promptChipSelected : ''}`}
             onClick={() => pickChip(chip.text)}
             whileTap={{ scale: 0.95 }}
-            whileHover={{ scale: 1.03 }}
+            whileHover={prefersReducedMotion ? undefined : { scale: 1.03 }}
           >
             {chip.label}
           </motion.button>
         ))}
+        {hasSomethingToClear ? (
+          <button type="button" className={styles.clearButton} onClick={clearAll}>
+            ✕ Clear
+          </button>
+        ) : null}
       </div>
 
       <div className={styles.constraintsRow}>
-        <div className={styles.constraintField}>
-          <input
-            className={`${styles.constraintInput} ${timeMinutes ? styles.constraintInputHasSuffix : ''}`}
-            type="number"
-            min={5}
-            max={240}
-            placeholder="Minutes (optional)"
-            value={timeMinutes}
-            onChange={(e) => handleConstraintChange(setTimeMinutes, e.target.value)}
-          />
-          {timeMinutes ? <span className={styles.constraintAffixSuffix}>mins</span> : null}
-        </div>
         <div className={styles.constraintField}>
           {budgetPounds ? <span className={styles.constraintAffixPrefix}>£</span> : null}
           <input
@@ -193,7 +225,7 @@ export function DecideFlow() {
             type="number"
             min={0}
             step={0.5}
-            placeholder="Budget £ (optional)"
+            placeholder="Budget £"
             value={budgetPounds}
             onChange={(e) => handleConstraintChange(setBudgetPounds, e.target.value)}
           />
@@ -213,11 +245,34 @@ export function DecideFlow() {
 
       {stage === 'deciding' ? <AiThinking /> : null}
 
-      {stage === 'error' ? <p className={styles.optionReason}>{errorMessage}</p> : null}
+      {stage === 'error' ? (
+        <motion.div
+          className={styles.stateBlock}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className={styles.stateIcon} aria-hidden="true">
+            😕
+          </span>
+          <p className={styles.stateMessage}>{errorMessage}</p>
+          <button type="button" className={styles.stateRetry} onClick={() => decide()}>
+            Try again
+          </button>
+        </motion.div>
+      ) : null}
       {stage === 'no-options' ? (
-        <p className={styles.optionReason}>
-          FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
-        </p>
+        <motion.div
+          className={styles.stateBlock}
+          initial={{ opacity: 0, y: prefersReducedMotion ? 0 : 8 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <span className={styles.stateIcon} aria-hidden="true">
+            🤔
+          </span>
+          <p className={styles.stateMessage}>
+            FoodPadi couldn&apos;t put together a good option for that. Try describing it differently.
+          </p>
+        </motion.div>
       ) : null}
 
       {stage === 'options'
@@ -228,9 +283,15 @@ export function DecideFlow() {
               custom={index}
               initial="hidden"
               animate="visible"
-              variants={OPTION_VARIANTS}
+              variants={optionVariants(!!prefersReducedMotion)}
             >
-              <FoodImage image={option.image} alt={option.title} className={styles.optionImage} eager={index === 0} />
+              <FoodImage
+                image={option.image}
+                alt={option.title}
+                className={styles.optionImage}
+                eager={index === 0}
+                badge={isVeganOption(option) ? 'Vegan' : undefined}
+              />
 
               <div className={styles.optionHeader}>
                 <div>
@@ -242,7 +303,7 @@ export function DecideFlow() {
                     option.type === 'cook' ? styles.optionTypeCook : styles.optionTypeGet
                   }`}
                 >
-                  {option.type === 'cook' ? 'Cook it' : 'Get it'}
+                  {option.type === 'cook' ? 'Cook it' : 'Order now'}
                 </span>
               </div>
 
@@ -285,6 +346,20 @@ export function DecideFlow() {
             </motion.div>
           ))
         : null}
+
+      {isGuest && stage === 'options' && showBenefit ? (
+        <MemberBenefitCard
+          icon="🧠"
+          title="Want suggestions based on what you like?"
+          body="Right now FoodPadi is just exploring ideas. Tell it your cuisines, your budget and what you avoid, and it decides around you."
+          ctaLabel="Personalise FoodPadi"
+        />
+      ) : null}
+      {isGuest && stage === 'options' ? <AdSlot placement="decide_results" /> : null}
+
+      {/* Members: nudge to pass FoodPadi on right after it's proved useful
+          (strategy §4/§5 — referral is a key acquisition channel). */}
+      {!isGuest && stage === 'options' ? <ShareNudge context="decision" /> : null}
     </div>
   );
 }

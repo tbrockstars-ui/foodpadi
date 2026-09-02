@@ -1,8 +1,13 @@
 import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import type { FoodGoal, PlanPreviewResponse } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { curatedPlanForDays } from '../ai/curated-recipes';
+import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
+import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import type { RequestActor } from '../auth/guest-or-auth.guard';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 import { GeneratePlanDto, PlanScope } from './dto/generate-plan.dto';
 import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
@@ -48,6 +53,29 @@ export class PlanAheadService {
     private readonly analytics: AnalyticsService,
   ) {}
 
+  // Favourite cuisines, avoided ingredients and food goals for one user,
+  // shaped for ClaudeService.generatePlanMeals. Same three signals Cook Today
+  // and Eat Now personalise from — pulled together here so generate(),
+  // regenerateItem() and regeneratePlan() all steer identically.
+  private async loadPersonalisation(
+    userId: string,
+  ): Promise<{ favouriteCuisines: string[]; avoidedIngredients: string[]; goalGuidance?: string }> {
+    const [preferences, avoided, goals] = await Promise.all([
+      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
+      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
+      this.prisma.foodGoal.findMany({ where: { userId, isActive: true } }),
+    ]);
+
+    const personalNote = goals.find((g) => g.goalType === 'personal')?.note ?? null;
+
+    return {
+      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
+      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      goalGuidance:
+        goalGuidanceLine({ goalTypes: goals.map((g) => g.goalType as FoodGoal), personalNote }) ?? undefined,
+    };
+  }
+
   private resolveDayCount(dto: GeneratePlanDto): number {
     if (dto.scope === 'custom') {
       if (!dto.customDays) {
@@ -63,27 +91,58 @@ export class PlanAheadService {
     return scope === 'tomorrow' ? addDays(startOfToday(), 1) : startOfToday();
   }
 
+  /**
+   * Guest / signed-out Plan Ahead preview (guest-mode brief §8) — a few
+   * curated dinner ideas for the chosen number of days. No AI (curated pool,
+   * never ClaudeService), nothing persisted. Building a real saved plan with
+   * reminders and per-day edits still needs an account (generate() above).
+   */
+  async preview(days: number, actor: RequestActor): Promise<PlanPreviewResponse> {
+    const clamped = Math.min(Math.max(1, Math.round(days || 3)), 7);
+    const recipes = curatedPlanForDays(clamped)
+      .map((candidate) => sanitizeRecipeCandidate(candidate))
+      .filter((recipe): recipe is RecipeView => recipe !== null);
+
+    await this.analytics.track(
+      'plan_preview_generated',
+      actor.type === 'user' ? { userId: actor.userId } : { guestSessionId: actor.sessionId },
+      { days: clamped, resultCount: recipes.length, guest: actor.type === 'guest' },
+    );
+
+    return { days: recipes.map((recipe, dayIndex) => ({ dayIndex, recipe })) };
+  }
+
   async generate(dto: GeneratePlanDto, userId: string) {
     const days = this.resolveDayCount(dto);
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days,
       budgetPence: dto.budgetPence,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
+      allowGenericFallback: true,
+      // Reuses the same free-text `focus` field the single-day "replace with
+      // something specific" flow already sends — the prompt-building logic
+      // in generatePlanMeals already phrases it correctly for either one day
+      // ("this day") or several ("these days").
+      focus: dto.prompt,
     });
 
-    const validated = raw
+    const sanitized = raw
       .map((candidate) => sanitizeRecipeCandidate(candidate))
       .filter((recipe): recipe is RecipeView => recipe !== null);
+    // The prompt already told Claude to avoid these — this is the hard
+    // backstop for when a multi-day generation lets one slip through
+    // anyway, same guarantee Cook Today and Eat Now already give.
+    const validated = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
 
     if (validated.length === 0) {
-      throw new BadRequestException('Could not generate a meal plan right now. Please try again.');
+      throw new BadRequestException(
+        sanitized.length === 0
+          ? 'Could not generate a meal plan right now. Please try again.'
+          : "Everything FoodPadi came up with matched something you've asked to avoid. Please try again.",
+      );
     }
 
     const startDate = this.startDateForScope(dto.scope);
@@ -119,7 +178,11 @@ export class PlanAheadService {
       include: this.planInclude(),
     });
 
-    await this.analytics.track('plan_ahead_generated', { userId }, { scope: dto.scope, days: validated.length });
+    await this.analytics.track(
+      'plan_ahead_generated',
+      { userId },
+      { scope: dto.scope, days: validated.length, hasPrompt: !!dto.prompt?.trim() },
+    );
 
     return this.serialize(plan);
   }
@@ -163,6 +226,32 @@ export class PlanAheadService {
     await this.analytics.track('plan_ahead_deleted', { userId }, { planId });
   }
 
+  // Powers the "Replace with something specific" typeahead — titles the
+  // user can pick from rather than free-typing a hint and finding out only
+  // after submitting whether anything matched. Source depends on the same
+  // ANTHROPIC_API_KEY branch as generatePlanMeals itself:
+  //  - demo mode: the curated pool regenerateItem will actually search, so
+  //    every suggestion offered is guaranteed to produce a real replacement.
+  //  - real AI mode: the FoodIdea catalog as broad inspiration — the AI can
+  //    honour an arbitrary specific dish fine, this pool doesn't need to be
+  //    a guaranteed-match set the way the demo one does.
+  async searchMealIdeas(query: string): Promise<string[]> {
+    const trimmed = query.trim();
+    if (trimmed.length < 2) return [];
+
+    if (!process.env.ANTHROPIC_API_KEY) {
+      return this.claude.searchCuratedRecipeTitles(trimmed, 6);
+    }
+
+    const rows = await this.prisma.foodIdea.findMany({
+      where: { isActive: true, title: { contains: trimmed, mode: 'insensitive' } },
+      select: { title: true },
+      take: 6,
+      orderBy: { title: 'asc' },
+    });
+    return rows.map((r) => r.title);
+  }
+
   async regenerateItem(planId: string, itemId: string, userId: string, dto: RegeneratePlanItemDto = {}) {
     const plan = await this.ownedPlan(planId, userId);
     const item = plan.items.find((i) => i.id === itemId);
@@ -170,18 +259,17 @@ export class PlanAheadService {
       throw new NotFoundException('Meal plan item not found.');
     }
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days: 1,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
       focus: dto.focus,
     });
-    const [candidate] = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
+    const sanitized = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
+    // Same hard backstop as generate()/regeneratePlan() — don't let a
+    // single-day replacement hand back something the user said to avoid.
+    const [candidate] = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
     if (!candidate) {
       throw new BadRequestException(
         dto.focus
@@ -228,24 +316,26 @@ export class PlanAheadService {
     const plan = await this.ownedPlan(planId, userId);
     const days = Math.min(daysBetweenInclusive(plan.startDate, plan.endDate), MAX_PLAN_DAYS);
 
-    const [preferences, avoided] = await Promise.all([
-      this.prisma.foodPreference.findMany({ where: { userId, deletedAt: null, cuisine: { not: null } } }),
-      this.prisma.avoidedIngredient.findMany({ where: { userId, deletedAt: null } }),
-    ]);
+    const personalisation = await this.loadPersonalisation(userId);
 
     const raw = await this.claude.generatePlanMeals({
       days,
       budgetPence: plan.budgetPence ?? undefined,
-      favouriteCuisines: preferences.map((p) => p.cuisine).filter((c): c is string => !!c),
-      avoidedIngredients: avoided.map((a) => a.ingredientName),
+      ...personalisation,
+      allowGenericFallback: true,
     });
 
-    const validated = raw
+    const sanitized = raw
       .map((candidate) => sanitizeRecipeCandidate(candidate))
       .filter((recipe): recipe is RecipeView => recipe !== null);
+    const validated = dropRecipesWithAvoided(sanitized, personalisation.avoidedIngredients);
 
     if (validated.length === 0) {
-      throw new BadRequestException('Could not rebuild the plan right now. Please try again.');
+      throw new BadRequestException(
+        sanitized.length === 0
+          ? 'Could not rebuild the plan right now. Please try again.'
+          : "Everything FoodPadi came up with matched something you've asked to avoid. Please try again.",
+      );
     }
 
     const startDate = plan.startDate;

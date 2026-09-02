@@ -1,0 +1,25 @@
+.banner {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto var(--space-lg);
+  padding: var(--space-md) 44px var(--space-md) var(--space-lg);
+  background: var(--primary-soft);
+  border: 1px solid var(--primary);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  color: var(--primary-dark);
+}
+
+.close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 1rem;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}

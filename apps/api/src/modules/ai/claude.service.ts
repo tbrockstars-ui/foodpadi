@@ -1,5 +1,6 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import Anthropic from '@anthropic-ai/sdk';
+import { CURATED_RECIPES, curatedPlanForDays, scoreCuratedByHint } from './curated-recipes';
 
 export interface RawRecipeCandidate {
   title: unknown;
@@ -14,6 +15,12 @@ export interface CookTodayGenerationInput {
   ingredients: string[];
   timeConstraintMinutes?: number;
   servings?: number;
+  /** The signed-in user's favourite cuisines (Preferences) — lean toward, don't restrict. */
+  favouriteCuisines?: string[];
+  /** The signed-in user's avoided ingredients (Preferences) — a hard exclusion. */
+  avoidedIngredients?: string[];
+  /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
+  goalGuidance?: string;
 }
 
 export interface PlanGenerationInput {
@@ -22,11 +29,24 @@ export interface PlanGenerationInput {
   favouriteCuisines?: string[];
   avoidedIngredients?: string[];
   /**
-   * Free-text steer for a single-day replacement — e.g. "something with fish",
-   * "a quick pasta", "vegetarian". Used by Plan Ahead's per-day "replace with
-   * something specific" action; ignored for a normal multi-day plan.
+   * Free-text steer, e.g. "something with fish", "Nigerian food this week",
+   * "no rice". Used both by Plan Ahead's per-day "replace with something
+   * specific" action (days=1) and by the initial multi-day plan prompt
+   * (days>1) — the message built below already phrases either case
+   * correctly ("this day" vs "these days").
    */
   focus?: string;
+  /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
+  goalGuidance?: string;
+  /**
+   * Demo mode only (no ANTHROPIC_API_KEY). When true, a `focus` that matches
+   * nothing in the small curated pool falls back to a generic plan rather
+   * than returning nothing — so building a whole plan is never a dead end.
+   * The initial `generate` and the whole-plan `regeneratePlan` set this; the
+   * single-day "replace with something specific" flow leaves it off, since
+   * an honest "couldn't find that" is the right answer there.
+   */
+  allowGenericFallback?: boolean;
 }
 
 export interface RawScannedItem {
@@ -52,241 +72,10 @@ export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
 const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intolerance, or medical condition, and never state or imply a recipe is medically appropriate. You may only describe what ingredients a recipe contains. Do not repeat the same ingredient twice within one recipe's ingredients list. Every recipe must have at least 2 steps and a positive cookTimeMinutes and servings.`;
 
-// MVP fallback: with no ANTHROPIC_API_KEY configured, serve these instead of
-// a 503 so Cook Today / Plan Ahead can be built and demoed end-to-end on a
-// curated dataset. Passes the same Layer 3 validation (recipe-validation.ts)
-// as a real model response. Swap to live AI by setting ANTHROPIC_API_KEY —
-// no code change needed, getClient() below picks it up automatically.
-const CURATED_RECIPES: RawRecipeCandidate[] = [
-  {
-    title: 'One-Pot Chicken & Rice',
-    cookTimeMinutes: 35,
-    servings: 4,
-    cuisine: 'British',
-    ingredients: [
-      { name: 'chicken thighs', quantity: '4', unit: null },
-      { name: 'rice', quantity: '300', unit: 'g' },
-      { name: 'onion', quantity: '1', unit: null },
-      { name: 'garlic', quantity: '2 cloves', unit: null },
-      { name: 'chicken stock', quantity: '600', unit: 'ml' },
-      { name: 'carrot', quantity: '2', unit: null },
-    ],
-    steps: [
-      'Brown the chicken thighs in a large pot, then set aside.',
-      'Soften the onion, garlic and carrot in the same pot.',
-      'Stir in the rice, pour over the stock, and nestle the chicken back in.',
-      'Cover and simmer for 20 minutes until the rice is tender and chicken is cooked through.',
-    ],
-  },
-  {
-    title: 'Tomato & Basil Pasta',
-    cookTimeMinutes: 20,
-    servings: 2,
-    cuisine: 'Italian',
-    ingredients: [
-      { name: 'pasta', quantity: '200', unit: 'g' },
-      { name: 'tinned tomatoes', quantity: '400', unit: 'g' },
-      { name: 'garlic', quantity: '2 cloves', unit: null },
-      { name: 'basil', quantity: 'a handful', unit: null },
-      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
-      { name: 'parmesan', quantity: '30', unit: 'g' },
-    ],
-    steps: [
-      'Cook the pasta in salted boiling water until al dente.',
-      'Fry the garlic gently in olive oil, then add the tinned tomatoes and simmer for 10 minutes.',
-      'Toss the drained pasta through the sauce, top with torn basil and grated parmesan.',
-    ],
-  },
-  {
-    title: 'Chickpea & Spinach Curry',
-    cookTimeMinutes: 30,
-    servings: 3,
-    cuisine: 'Indian',
-    ingredients: [
-      { name: 'chickpeas', quantity: '2 tins', unit: null },
-      { name: 'spinach', quantity: '150', unit: 'g' },
-      { name: 'onion', quantity: '1', unit: null },
-      { name: 'curry powder', quantity: '2', unit: 'tbsp' },
-      { name: 'coconut milk', quantity: '400', unit: 'ml' },
-      { name: 'ginger', quantity: '1 thumb', unit: null },
-    ],
-    steps: [
-      'Soften the onion and ginger, then stir in the curry powder for a minute.',
-      'Add the chickpeas and coconut milk, simmer for 15 minutes.',
-      'Stir through the spinach until wilted, then serve with rice or flatbread.',
-    ],
-  },
-  {
-    title: 'Sheet-Pan Salmon & Veg',
-    cookTimeMinutes: 25,
-    servings: 2,
-    cuisine: 'Mediterranean',
-    ingredients: [
-      { name: 'salmon fillets', quantity: '2', unit: null },
-      { name: 'courgette', quantity: '1', unit: null },
-      { name: 'cherry tomatoes', quantity: '200', unit: 'g' },
-      { name: 'lemon', quantity: '1', unit: null },
-      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
-    ],
-    steps: [
-      'Toss the courgette and cherry tomatoes with olive oil on a baking tray.',
-      'Roast for 10 minutes, then add the salmon fillets and lemon slices on top.',
-      'Roast for a further 12-15 minutes until the salmon is cooked through.',
-    ],
-  },
-  {
-    title: 'Beef & Black Bean Tacos',
-    cookTimeMinutes: 25,
-    servings: 4,
-    cuisine: 'Mexican',
-    ingredients: [
-      { name: 'beef mince', quantity: '400', unit: 'g' },
-      { name: 'black beans', quantity: '1 tin', unit: null },
-      { name: 'taco seasoning', quantity: '1 packet', unit: null },
-      { name: 'tortillas', quantity: '8', unit: null },
-      { name: 'lettuce', quantity: 'a handful', unit: null },
-      { name: 'cheese', quantity: '80', unit: 'g' },
-    ],
-    steps: [
-      'Brown the beef mince in a pan, draining any excess fat.',
-      'Stir in the taco seasoning and black beans, simmer for 5 minutes.',
-      'Warm the tortillas and fill with the beef mixture, lettuce and cheese.',
-    ],
-  },
-  {
-    title: 'Miso Noodle Soup',
-    cookTimeMinutes: 20,
-    servings: 2,
-    cuisine: 'Japanese',
-    ingredients: [
-      { name: 'noodles', quantity: '150', unit: 'g' },
-      { name: 'miso paste', quantity: '2', unit: 'tbsp' },
-      { name: 'spring onion', quantity: '2', unit: null },
-      { name: 'mushroom', quantity: '100', unit: 'g' },
-      { name: 'egg', quantity: '2', unit: null },
-      { name: 'vegetable stock', quantity: '600', unit: 'ml' },
-    ],
-    steps: [
-      'Soft-boil the eggs in a separate pan of simmering water for 6-7 minutes, then cool under cold water and peel.',
-      'Bring the stock to a simmer and whisk in the miso paste.',
-      'Add the mushrooms and cook for 5 minutes, then cook the noodles in the broth.',
-      'Serve topped with the halved soft-boiled eggs and sliced spring onion.',
-    ],
-  },
-  {
-    title: 'Chicken & Avocado Salad',
-    cookTimeMinutes: 15,
-    servings: 2,
-    cuisine: 'International',
-    ingredients: [
-      { name: 'chicken breast', quantity: '2', unit: null },
-      { name: 'mixed salad leaves', quantity: '100', unit: 'g' },
-      { name: 'avocado', quantity: '1', unit: null },
-      { name: 'cherry tomatoes', quantity: '150', unit: 'g' },
-      { name: 'cucumber', quantity: '0.5', unit: null },
-      { name: 'olive oil', quantity: '1', unit: 'tbsp' },
-    ],
-    steps: [
-      'Grill or pan-fry the chicken breast until cooked through, then slice.',
-      'Toss the salad leaves, tomatoes and cucumber with olive oil.',
-      'Top with the sliced chicken and avocado.',
-    ],
-  },
-  {
-    title: 'Greek Salad',
-    cookTimeMinutes: 10,
-    servings: 2,
-    cuisine: 'Mediterranean',
-    ingredients: [
-      { name: 'cucumber', quantity: '1', unit: null },
-      { name: 'tomatoes', quantity: '3', unit: null },
-      { name: 'red onion', quantity: '0.5', unit: null },
-      { name: 'feta cheese', quantity: '150', unit: 'g' },
-      { name: 'olives', quantity: '80', unit: 'g' },
-      { name: 'olive oil', quantity: '2', unit: 'tbsp' },
-    ],
-    steps: [
-      'Chop the cucumber, tomatoes and red onion into chunks.',
-      'Toss with the olives and olive oil.',
-      'Top with crumbled feta and serve.',
-    ],
-  },
-  {
-    title: 'Loaded Jacket Potato',
-    cookTimeMinutes: 60,
-    servings: 2,
-    cuisine: 'British',
-    ingredients: [
-      { name: 'baking potatoes', quantity: '2', unit: null },
-      { name: 'baked beans', quantity: '1', unit: 'tin' },
-      { name: 'cheddar cheese', quantity: '80', unit: 'g' },
-      { name: 'butter', quantity: '1', unit: 'tbsp' },
-    ],
-    steps: [
-      'Prick the potatoes and bake at 200°C for about 50-60 minutes until soft.',
-      'Warm the baked beans.',
-      'Split the potatoes open, top with butter, beans and grated cheese.',
-    ],
-  },
-  {
-    title: 'Chicken & Vegetable Stir Fry',
-    cookTimeMinutes: 20,
-    servings: 2,
-    cuisine: 'Chinese',
-    ingredients: [
-      { name: 'chicken breast', quantity: '2', unit: null },
-      { name: 'mixed stir-fry vegetables', quantity: '300', unit: 'g' },
-      { name: 'soy sauce', quantity: '2', unit: 'tbsp' },
-      { name: 'garlic', quantity: '2 cloves', unit: null },
-      { name: 'ginger', quantity: '1 thumb', unit: null },
-      { name: 'rice', quantity: '200', unit: 'g' },
-    ],
-    steps: [
-      'Cook the rice according to packet instructions.',
-      'Slice the chicken and stir-fry in a hot pan or wok until cooked through.',
-      'Add the garlic, ginger and vegetables, stir-fry for 3-4 minutes.',
-      'Stir in the soy sauce and serve over the cooked rice.',
-    ],
-  },
-  {
-    title: 'Veggie Bean Chilli',
-    cookTimeMinutes: 30,
-    servings: 4,
-    cuisine: 'Mexican',
-    ingredients: [
-      { name: 'kidney beans', quantity: '2 tins', unit: null },
-      { name: 'tinned tomatoes', quantity: '400', unit: 'g' },
-      { name: 'onion', quantity: '1', unit: null },
-      { name: 'pepper', quantity: '1', unit: null },
-      { name: 'chilli powder', quantity: '1', unit: 'tbsp' },
-      { name: 'rice', quantity: '250', unit: 'g' },
-    ],
-    steps: [
-      'Cook the rice according to packet instructions.',
-      'Soften the onion and pepper, then stir in the chilli powder.',
-      'Add the kidney beans and tinned tomatoes, simmer for 20 minutes.',
-      'Serve with the cooked rice.',
-    ],
-  },
-  {
-    title: 'Egg Fried Rice',
-    cookTimeMinutes: 15,
-    servings: 2,
-    cuisine: 'Chinese',
-    ingredients: [
-      { name: 'cooked rice', quantity: '300', unit: 'g' },
-      { name: 'egg', quantity: '2', unit: null },
-      { name: 'frozen peas', quantity: '100', unit: 'g' },
-      { name: 'spring onion', quantity: '2', unit: null },
-      { name: 'soy sauce', quantity: '1', unit: 'tbsp' },
-    ],
-    steps: [
-      'Scramble the eggs in a hot pan or wok, then set aside.',
-      'Fry the rice and peas for a few minutes until hot through.',
-      'Stir the egg back in with the soy sauce and spring onion.',
-    ],
-  },
-];
+// The curated recipe pool (CURATED_RECIPES) and its keyword matcher now live
+// in ./curated-recipes.ts — shared with the guest path, which must never call
+// a live model (see that file). This service still uses them for its own
+// no-ANTHROPIC_API_KEY demo fallback, unchanged.
 
 const COOK_TODAY_SYSTEM_PROMPT = `You are the recipe-generation component inside FoodPadi, a UK food companion app. You are called only for the "Cook Today" feature: a user has told you what ingredients they have, and optionally a time limit and serving count.
 
@@ -296,6 +85,9 @@ Rules you must follow:
 - Return between 2 and 3 recipes.
 - Prefer recipes that use mostly the ingredients the user listed. You may assume common pantry staples (salt, pepper, oil, water) are available even if not listed, but do not assume specialty or allergen-relevant ingredients (dairy, nuts, gluten-containing items, etc.) are available unless the user listed them or a very close equivalent.
 - If a time constraint is given, every recipe's cookTimeMinutes must be at or under that limit.
+- If a favourite-cuisine list is given, lean toward it where it fits the ingredients, but don't force every recipe into those cuisines.
+- If an avoided-ingredients list is given, do not include any of those ingredients in any recipe.
+- If food goals are given, treat them as soft steering only — never state or imply a recipe is healthy, medical, or weight-loss related.
 - ${SAFETY_RULES}`;
 
 const PLAN_AHEAD_SYSTEM_PROMPT = `You are the meal-planning component inside FoodPadi, a UK food companion app. You are called only for the "Plan Ahead" feature: a user wants a dinner planned for each of several days.
@@ -309,6 +101,7 @@ Rules you must follow:
 - If a favourite-cuisine list is given, lean toward it but don't restrict every meal to only those cuisines.
 - If an avoided-ingredients list is given, do not include any of those ingredients in any recipe.
 - If a weekly budget is given, treat it as a soft steering hint toward simpler, less expensive ingredients — you have no real pricing data, so never state or imply an exact cost.
+- If food goals are given, treat them as soft steering only — never state or imply a plan is healthy, medical, or weight-loss related.
 - ${SAFETY_RULES}`;
 
 const SCAN_SYSTEM_PROMPT = `You are the food-recognition component inside FoodPadi, a UK food companion app. You are shown a photo of food — a fridge, cupboard, shopping bag, or receipt — and must identify what food and drink items are visible.
@@ -349,12 +142,6 @@ export class ClaudeService {
     return this.client;
   }
 
-  // `hint` is free text describing what the user actually asked for (their
-  // ingredients/description) — without it, this always returned the same
-  // first few recipes regardless of the request (e.g. "salad" got chicken &
-  // rice). Simple keyword-in-title-or-ingredient matching, same idea as
-  // EatNowService's matcher but far smaller in scope: this is a fallback
-  // demo dataset, not a search engine.
   private curatedFallback(count: number, hint?: string): RawRecipeCandidate[] {
     this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
 
@@ -362,28 +149,40 @@ export class ClaudeService {
       return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
     }
 
-    const words = hint
-      .toLowerCase()
-      .split(/[^a-z0-9]+/)
-      .filter((w) => w.length >= 3);
-
-    const scored = CURATED_RECIPES.map((recipe) => {
-      const haystack = `${recipe.title} ${(recipe.ingredients as { name: string }[]).map((i) => i.name).join(' ')}`.toLowerCase();
-      const score = words.reduce((s, w) => (haystack.includes(w) ? s + 1 : s), 0);
-      return { recipe, score };
-    });
-
-    const matched = scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score);
-
     // Deliberately NOT topped up to `count` when matches are thin or absent
     // — a real hint (e.g. "spicy pizza") with zero curated recipes about
     // pizza should return nothing here rather than pad with unrelated
-    // filler (this dataset is a dozen fixed dev recipes and was backfilling
-    // with completely unrelated dishes whenever nothing matched). DecideService
-    // already handles a short/empty cook-option list by leaning on Eat Now's
-    // "get it" results instead, so an honest empty result is the safer
-    // failure mode than a confidently wrong one.
-    return matched.slice(0, count).map((s) => s.recipe);
+    // filler. DecideService already handles a short/empty cook-option list by
+    // leaning on Eat Now's "get it" results instead, so an honest empty
+    // result is the safer failure mode than a confidently wrong one. (The
+    // guest path uses pickCuratedRecipes in ./curated-recipes.ts, which DOES
+    // top up — a guest with no "get it" fallback must never see nothing.)
+    return scoreCuratedByHint(hint).slice(0, count).map((s) => s.recipe);
+  }
+
+  // Plan Ahead's demo fallback. Unlike curatedFallback above, this ALWAYS
+  // returns exactly `days` recipes: a whole meal plan failing to generate
+  // just because a free-text steer ("Nigerian food") doesn't keyword-match
+  // the curated pool is a dead end for the feature, not an honest-empty
+  // result. Shared with the guest Plan Ahead preview (curated-recipes.ts).
+  private curatedPlanFallback(days: number, hint?: string): RawRecipeCandidate[] {
+    this.logger.warn(`ANTHROPIC_API_KEY not set — serving a ${days}-day curated plan.`);
+    return curatedPlanForDays(days, hint);
+  }
+
+  // Used only for the "Replace with something specific" typeahead — the
+  // titles a demo-mode (no ANTHROPIC_API_KEY) search can offer as picks that
+  // are *guaranteed* to succeed, since curatedFallback matches against this
+  // exact same pool. Picking a title the search never offered (an arbitrary
+  // free-typed hint) can still legitimately come back empty — this just
+  // stops that from being the *only* path, which is what the "type and
+  // submit blind" UX was doing before.
+  searchCuratedRecipeTitles(query: string, limit: number): string[] {
+    if (!query.trim()) return [];
+    return scoreCuratedByHint(query)
+      .slice(0, limit)
+      .map((s) => s.recipe.title)
+      .filter((t): t is string => typeof t === 'string');
   }
 
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {
@@ -395,6 +194,11 @@ export class ClaudeService {
       `Ingredients I have: ${input.ingredients.join(', ')}.`,
       input.timeConstraintMinutes ? `I have at most ${input.timeConstraintMinutes} minutes to cook.` : null,
       input.servings ? `I need ${input.servings} servings.` : null,
+      input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,
+      input.avoidedIngredients?.length
+        ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.`
+        : null,
+      input.goalGuidance ?? null,
     ]
       .filter(Boolean)
       .join(' ');
@@ -404,10 +208,14 @@ export class ClaudeService {
 
   async generatePlanMeals(input: PlanGenerationInput): Promise<RawRecipeCandidate[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-      // A focused single-day replace ("something with fish") keyword-matches
-      // the curated set the same way Cook Today's hint does; a plain plan
-      // request has nothing to match on and takes the round-robin path.
-      return this.curatedFallback(input.days, input.focus);
+      // Building a whole plan (generate / regeneratePlan) must never come
+      // back empty just because a free-text steer doesn't match the curated
+      // dev set — curatedPlanFallback always returns `days` recipes. The
+      // single-day "replace with something specific" flow keeps the honest
+      // curatedFallback, so an unmatched request there says so.
+      return input.allowGenericFallback
+        ? this.curatedPlanFallback(input.days, input.focus)
+        : this.curatedFallback(input.days, input.focus);
     }
 
     const userMessage = [
@@ -418,6 +226,7 @@ export class ClaudeService {
       input.favouriteCuisines?.length ? `Favourite cuisines: ${input.favouriteCuisines.join(', ')}.` : null,
       input.avoidedIngredients?.length ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.` : null,
       input.budgetPence ? `Weekly food budget is roughly £${(input.budgetPence / 100).toFixed(2)}.` : null,
+      input.goalGuidance ?? null,
     ]
       .filter(Boolean)
       .join(' ');

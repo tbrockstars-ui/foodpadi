@@ -1,0 +1,72 @@
+.card {
+  position: relative;
+  margin-top: var(--space-lg);
+  padding: var(--space-lg);
+  padding-right: 40px;
+  background: var(--primary-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.text {
+  margin: 0 0 var(--space-md);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  padding: 0 var(--space-lg);
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  border: none;
+}
+
+.whatsapp {
+  background: #25d366;
+  color: #05231a;
+}
+
+.copy {
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text);
+}
+
+.copy.copied {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.dismiss:hover {
+  color: var(--text);
+  background: var(--surface-sunken);
+}

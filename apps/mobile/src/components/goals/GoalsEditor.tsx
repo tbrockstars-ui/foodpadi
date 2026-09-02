@@ -13,7 +13,8 @@ import { api } from '../../api/client';
 import { GOAL_LABELS } from '../../constants/goalLabels';
 import { Button } from '../Button';
 import { GoalCard } from '../GoalCard';
-import { colors, spacing, typography } from '../../theme/colors';
+import { spacing, typography, type ThemeColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 
 const SELECTABLE_GOALS = FOOD_GOALS.filter((g) => g !== 'none');
 
@@ -36,6 +37,8 @@ interface Props {
  * behaviour (and its edge cases) only needs to exist once.
  */
 export function GoalsEditor({ initialGoals, initialPrimary, initialNote, onDone, onSkip, onCancel, continueLabel }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [phase, setPhase] = useState<'select' | 'primary'>('select');
   const [selected, setSelected] = useState<FoodGoal[]>(initialGoals ?? []);
   const [primary, setPrimary] = useState<FoodGoal | null>(initialPrimary ?? null);
@@ -270,35 +273,37 @@ export function GoalsEditor({ initialGoals, initialPrimary, initialNote, onDone,
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  heading: { ...typography.title, color: colors.text, marginBottom: spacing.xs },
-  supporting: { ...typography.caption, color: colors.textMuted, marginBottom: spacing.xs },
-  counter: { ...typography.caption, color: colors.textFaint, marginBottom: spacing.md },
-  limitMessage: { ...typography.caption, color: colors.warning, marginBottom: spacing.sm },
-  options: { flexGrow: 0, marginBottom: spacing.md },
-  noteBox: {
-    backgroundColor: colors.surfaceSunken,
-    borderRadius: 12,
-    padding: spacing.md,
-    marginTop: -spacing.xs,
-    marginBottom: spacing.sm,
-  },
-  noteLabel: { ...typography.subtitle, color: colors.text, marginBottom: spacing.sm },
-  noteInput: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 8,
-    padding: spacing.sm,
-    fontSize: 14,
-    color: colors.text,
-    minHeight: 44,
-  },
-  noteHelper: { ...typography.caption, color: colors.textFaint, marginTop: spacing.sm },
-  noteCounter: { ...typography.caption, color: colors.textFaint, textAlign: 'right', marginTop: spacing.xs },
-  noneHelper: { ...typography.caption, color: colors.textMuted, marginTop: -spacing.xs, marginBottom: spacing.sm },
-  errorBox: { backgroundColor: colors.dangerSoft, borderRadius: 12, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
-  errorText: { ...typography.caption, color: colors.danger },
-  buttonRow: { flexDirection: 'row', gap: spacing.md },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    container: { flex: 1 },
+    heading: { ...typography.title, color: c.text, marginBottom: spacing.xs },
+    supporting: { ...typography.caption, color: c.textMuted, marginBottom: spacing.xs },
+    counter: { ...typography.caption, color: c.textFaint, marginBottom: spacing.md },
+    limitMessage: { ...typography.caption, color: c.warning, marginBottom: spacing.sm },
+    options: { flexGrow: 0, marginBottom: spacing.md },
+    noteBox: {
+      backgroundColor: c.surfaceSunken,
+      borderRadius: 12,
+      padding: spacing.md,
+      marginTop: -spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    noteLabel: { ...typography.subtitle, color: c.text, marginBottom: spacing.sm },
+    noteInput: {
+      backgroundColor: c.surface,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: 8,
+      padding: spacing.sm,
+      fontSize: 14,
+      color: c.text,
+      minHeight: 44,
+    },
+    noteHelper: { ...typography.caption, color: c.textFaint, marginTop: spacing.sm },
+    noteCounter: { ...typography.caption, color: c.textFaint, textAlign: 'right', marginTop: spacing.xs },
+    noneHelper: { ...typography.caption, color: c.textMuted, marginTop: -spacing.xs, marginBottom: spacing.sm },
+    errorBox: { backgroundColor: c.dangerSoft, borderRadius: 12, padding: spacing.md, marginBottom: spacing.md, gap: spacing.sm },
+    errorText: { ...typography.caption, color: c.danger },
+    buttonRow: { flexDirection: 'row', gap: spacing.md },
+  });
+}

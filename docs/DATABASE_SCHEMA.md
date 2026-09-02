@@ -15,7 +15,7 @@ household_members (id, household_id FK->households, user_id FK->users, role, joi
 
 ```
 food_preferences (id, user_id FK->users, cuisine, liked_meal, disliked_ingredient, texture_dislike, cooking_style, source ['explicit'|'inferred'], created_at, updated_at, deleted_at)
-food_goals (id, user_id FK->users, goal_type ENUM['balanced_meals','support_fitness','maintain_weight','reduce_spending','reduce_waste','home_cooked','explore_cuisines','personal','none'], created_at, updated_at)
+food_goals (id, user_id FK->users, goal_type ENUM['balanced_meals','eat_more_plants','quick_meals','reduce_spending','reduce_waste','home_cooked','explore_cuisines','cook_for_others','support_fitness','maintain_weight','personal','none'], created_at, updated_at)
 avoided_ingredients (id, user_id FK->users, ingredient_id FK->ingredients, note NULLABLE /* free text, treated as potentially sensitive */, created_at, deleted_at)
 ```
 

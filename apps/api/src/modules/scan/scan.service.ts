@@ -2,7 +2,6 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ClaudeService } from '../ai/claude.service';
-import { RequestActor } from '../auth/guest-or-auth.guard';
 import { demoScenario, demoScenarioForPhoto } from './demo-scan-analyzer';
 import { demoFoodContentForPhoto } from './demo-food-content-analyzer';
 import { AddPantryItemsDto } from './dto/add-pantry-items.dto';
@@ -17,10 +16,6 @@ export interface ScanPhotoResult {
 
 export interface ScanFoodContentResult extends FoodContentView {
   demo: boolean;
-}
-
-function actorToAnalyticsFields(actor: RequestActor) {
-  return actor.type === 'user' ? { userId: actor.userId } : { guestSessionId: actor.sessionId };
 }
 
 @Injectable()
@@ -72,12 +67,12 @@ export class ScanService {
 
   /**
    * "What's in this dish?" — identifies a prepared dish and its likely
-   * ingredient composition from one photo, so a customer can see the
-   * possible combination of what's in it. Read-only (nothing persisted,
-   * unlike scanPhoto above which feeds into addPantryItems) — guest-
-   * accessible for the same reason /decide and /local-food-search are.
+   * ingredient composition from one photo. Read-only (nothing persisted),
+   * but it is a paid vision-model call, so it is account-only: guests are
+   * turned away at FoodContentController's JwtAuthGuard and never reach here
+   * (guest-mode brief §2 — zero Anthropic calls for guests).
    */
-  async scanFoodContent(dto: ScanFoodContentDto, actor: RequestActor): Promise<ScanFoodContentResult> {
+  async scanFoodContent(dto: ScanFoodContentDto, userId: string): Promise<ScanFoodContentResult> {
     const demoModeEnabled = process.env.SCAN_DEMO_MODE === 'true';
     const raw = demoModeEnabled
       ? demoFoodContentForPhoto(dto.imageBase64)
@@ -86,7 +81,7 @@ export class ScanService {
 
     const content = sanitizeFoodContent(raw);
 
-    await this.analytics.track('scan_food_content_completed', actorToAnalyticsFields(actor), {
+    await this.analytics.track('scan_food_content_completed', { userId }, {
       ingredientCount: content.ingredients.length,
       identified: content.dishName.length > 0,
       demo,

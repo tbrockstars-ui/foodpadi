@@ -5,6 +5,9 @@ import styles from './Logo.module.css';
 interface LogoProps {
   /** Diameter of the circular mark, in px. */
   size?: number;
+  /** Wordmark font size in px. Defaults to the CSS value (19px); pass this to
+      keep the lockup balanced when `size` is larger than usual. */
+  wordmarkSize?: number;
   /** Show the "FoodPadi" wordmark next to the mark. */
   withWordmark?: boolean;
   /** Use light text for the wordmark (hero sits on the dark-green background). */
@@ -20,9 +23,16 @@ interface LogoProps {
  * optionally with the wordmark beside it. Shared between the landing page's
  * hero top bar and the login page so both use the same asset consistently.
  */
-export function Logo({ size = 44, withWordmark = true, onDark = false, href, className }: LogoProps) {
-  const content = (
-    <span className={`${styles.logo} ${onDark ? styles.onDark : ''} ${className ?? ''}`}>
+export function Logo({
+  size = 44,
+  wordmarkSize,
+  withWordmark = true,
+  onDark = false,
+  href,
+  className,
+}: LogoProps) {
+  const inner = (
+    <>
       <Image
         src="/decor/logo.png"
         alt="FoodPadi"
@@ -32,17 +42,32 @@ export function Logo({ size = 44, withWordmark = true, onDark = false, href, cla
         style={{ width: size, height: size }}
         priority
       />
-      {withWordmark ? <span className={styles.wordmark}>FoodPadi</span> : null}
-    </span>
+      {withWordmark ? (
+        <span
+          className={styles.wordmark}
+          style={wordmarkSize ? { fontSize: wordmarkSize } : undefined}
+        >
+          FoodPadi
+        </span>
+      ) : null}
+    </>
   );
 
+  // The linked form is a block-level flex row (not an inline <a>), so when a
+  // page renders <Logo> above a <BackLink> they stack on separate lines
+  // instead of colliding side by side. `className` (e.g. shellStyles.pageLogo,
+  // which adds the gap below) therefore goes on the link itself.
   if (href) {
     return (
-      <Link href={href} aria-label="FoodPadi home">
-        {content}
+      <Link
+        href={href}
+        aria-label="FoodPadi home"
+        className={`${styles.logoLink} ${onDark ? styles.onDark : ''} ${className ?? ''}`}
+      >
+        {inner}
       </Link>
     );
   }
 
-  return content;
+  return <span className={`${styles.logo} ${onDark ? styles.onDark : ''} ${className ?? ''}`}>{inner}</span>;
 }

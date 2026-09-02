@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
-import { colors, radius, shadow, spacing } from '../theme/colors';
+import { radius, shadow, spacing, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 interface Props {
   children: React.ReactNode;
@@ -14,6 +15,8 @@ interface Props {
  * `{ backgroundColor: surface, borderRadius, ...shadow.card }` object.
  */
 export function Card({ children, onPress, style, raised }: Props) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const cardStyle = [styles.base, raised && shadow.raised, !raised && shadow.card, style];
 
   if (onPress) {
@@ -26,10 +29,12 @@ export function Card({ children, onPress, style, raised }: Props) {
   return <View style={cardStyle}>{children}</View>;
 }
 
-const styles = StyleSheet.create({
-  base: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-  },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    base: {
+      backgroundColor: c.surface,
+      borderRadius: radius.lg,
+      padding: spacing.lg,
+    },
+  });
+}

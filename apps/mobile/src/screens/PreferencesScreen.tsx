@@ -3,7 +3,8 @@ import { StyleSheet, Text, View } from 'react-native';
 import { api } from '../api/client';
 import { Button } from '../components/Button';
 import { Chip } from '../components/Chip';
-import { colors, spacing } from '../theme/colors';
+import { spacing, type ThemeColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
 // A starting set of cuisines, not an exhaustive list — this is deliberately
 // small and skippable (docs/FOODPADI_ONBOARDING_SPEC.md, docs/
@@ -27,6 +28,8 @@ const CUISINES = [
 ] as const;
 
 export function PreferencesScreen({ onDone }: { onDone: () => void }) {
+  const { colors } = useTheme();
+  const styles = makeStyles(colors);
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -81,10 +84,12 @@ export function PreferencesScreen({ onDone }: { onDone: () => void }) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 24, paddingTop: 64 },
-  heading: { fontSize: 22, fontWeight: '700', color: colors.text, marginBottom: 8 },
-  subtitle: { fontSize: 14, color: colors.textMuted, marginBottom: 20, lineHeight: 20 },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+  heading: { fontSize: 22, fontWeight: '700', color: c.text, marginBottom: 8 },
+  subtitle: { fontSize: 14, color: c.textMuted, marginBottom: 20, lineHeight: 20 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, flexGrow: 1, alignContent: 'flex-start' },
   buttonRow: { flexDirection: 'row', gap: spacing.md, marginTop: 20 },
-});
+  });
+}
