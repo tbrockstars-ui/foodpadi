@@ -203,7 +203,9 @@ export class ClaudeService {
       .filter(Boolean)
       .join(' ');
 
-    return this.callForRecipes(COOK_TODAY_SYSTEM_PROMPT, userMessage, 1500);
+    return this.callForRecipes(COOK_TODAY_SYSTEM_PROMPT, userMessage, 1500, () =>
+      this.curatedFallback(3, input.ingredients.join(' ')),
+    );
   }
 
   async generatePlanMeals(input: PlanGenerationInput): Promise<RawRecipeCandidate[]> {
@@ -231,7 +233,11 @@ export class ClaudeService {
       .filter(Boolean)
       .join(' ');
 
-    return this.callForRecipes(PLAN_AHEAD_SYSTEM_PROMPT, userMessage, 400 + input.days * 500);
+    return this.callForRecipes(PLAN_AHEAD_SYSTEM_PROMPT, userMessage, 400 + input.days * 500, () =>
+      input.allowGenericFallback
+        ? this.curatedPlanFallback(input.days, input.focus)
+        : this.curatedFallback(input.days, input.focus),
+    );
   }
 
   // No curated fallback here, unlike the two methods above — a specific
@@ -317,38 +323,47 @@ export class ClaudeService {
     return parsed as RawFoodContentResult;
   }
 
+  /**
+   * `fallback` is the same curated result the no-ANTHROPIC_API_KEY branch of
+   * each caller already returns. It's invoked here whenever a live call fails
+   * for ANY reason at runtime — key present but rejected, no credit, model
+   * access denied, a network blip, or a garbled response — so Cook Today and
+   * Plan Ahead degrade to deterministic curated content (like Eat Now) rather
+   * than 500ing. The provider error is logged for diagnosis.
+   */
   private async callForRecipes(
     systemPrompt: string,
     userMessage: string,
     maxTokens: number,
+    fallback: () => RawRecipeCandidate[],
   ): Promise<RawRecipeCandidate[]> {
-    const client = this.getClient();
-    const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
-
-    const response = await client.messages.create({
-      model,
-      max_tokens: maxTokens,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    });
-
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new ServiceUnavailableException('The recipe generator returned an empty response.');
-    }
-
-    let parsed: { recipes?: unknown };
     try {
-      parsed = JSON.parse(textBlock.text);
-    } catch {
-      this.logger.error(`Failed to parse model output as JSON: ${textBlock.text.slice(0, 500)}`);
-      throw new ServiceUnavailableException('The recipe generator returned an unexpected format.');
-    }
+      const client = this.getClient();
+      const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
 
-    if (!Array.isArray(parsed.recipes)) {
-      throw new ServiceUnavailableException('The recipe generator returned an unexpected format.');
-    }
+      const response = await client.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMessage }],
+      });
 
-    return parsed.recipes as RawRecipeCandidate[];
+      const textBlock = response.content.find((block) => block.type === 'text');
+      if (!textBlock || textBlock.type !== 'text') {
+        throw new Error('empty model response');
+      }
+
+      const parsed = JSON.parse(textBlock.text) as { recipes?: unknown };
+      if (!Array.isArray(parsed.recipes)) {
+        throw new Error('model response was not a recipes array');
+      }
+
+      return parsed.recipes as RawRecipeCandidate[];
+    } catch (err) {
+      this.logger.warn(
+        `Live recipe generation failed (${(err as Error).message}) — serving curated content instead.`,
+      );
+      return fallback();
+    }
   }
 }
