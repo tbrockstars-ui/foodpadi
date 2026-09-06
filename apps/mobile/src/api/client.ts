@@ -3,11 +3,20 @@ import type {
   AddPantryItemsRequest,
   AddPantryItemsResponse,
   AddShoppingListItemRequest,
+  AskCookingQuestionRequest,
+  AskCookingQuestionResponse,
   AuthResponse,
   AvoidedIngredientItem,
+  CheckCookingStepRequest,
+  CheckCookingStepResponse,
+  CompanionActionRequest,
+  CompanionPreferencesView,
+  CompanionSuggestionResponse,
   ConfirmPasswordResetRequest,
+  CreateFeedbackRequest,
   DecideRequest,
   DecideResponse,
+  FeedbackView,
   FoodGoalsResponse,
   FoodIdeaView,
   FoodPreferenceItem,
@@ -15,6 +24,7 @@ import type {
   GeneratePlanRequest,
   GuestSessionResponse,
   ImportRecipeRequest,
+  LocalFoodSearchInteractionType,
   LocalFoodSearchRequest,
   LocalFoodSearchResponse,
   LoginRequest,
@@ -36,6 +46,8 @@ import type {
   SetFoodGoalsRequest,
   ShoppingListView,
   TrackGoalEventRequest,
+  UpdateCompanionPreferencesRequest,
+  UpdateFeedbackRequest,
   UpdateMealPlanItemRequest,
   UpdateShoppingListItemRequest,
   UpsertFoodPreferenceRequest,
@@ -58,8 +70,13 @@ class ApiError extends Error {
 // returns an array of per-field messages.
 function extractErrorMessage(rawBody: string): string | null {
   if (!rawBody) return null;
+  const trimmed = rawBody.trim();
+  // A CDN / gateway error (Render 502/503, Cloudflare 520-524) returns a full
+  // HTML page, not our JSON error shape. Never surface markup as a "message"
+  // — the caller falls back to its own friendly line instead.
+  if (trimmed.startsWith('<')) return null;
   try {
-    const parsed = JSON.parse(rawBody) as { message?: string | string[] };
+    const parsed = JSON.parse(trimmed) as { message?: string | string[] };
     if (Array.isArray(parsed.message)) {
       return parsed.message.join('. ');
     }
@@ -68,7 +85,9 @@ function extractErrorMessage(rawBody: string): string | null {
     }
     return null;
   } catch {
-    return rawBody;
+    // A plain-text non-JSON body — keep it only if it's short enough to be a
+    // real message, not a dumped document or stack trace.
+    return trimmed.length <= 200 ? trimmed : null;
   }
 }
 
@@ -141,7 +160,12 @@ async function request<T>(
 
   if (!response.ok) {
     const rawBody = await response.text();
-    throw new ApiError(response.status, extractErrorMessage(rawBody) ?? response.statusText);
+    const message =
+      extractErrorMessage(rawBody) ??
+      (response.status >= 500
+        ? 'FoodPadi is having a problem right now. Please try again in a moment.'
+        : response.statusText || `Request failed (${response.status})`);
+    throw new ApiError(response.status, message);
   }
 
   if (response.status === 204) {
@@ -155,7 +179,18 @@ async function request<T>(
   if (!rawBody) {
     return null as T;
   }
-  return JSON.parse(rawBody) as T;
+  try {
+    return JSON.parse(rawBody) as T;
+  } catch {
+    // A 2xx that isn't JSON — almost always an HTML page from a proxy /
+    // tunnel / captive portal sitting in front of the API. Treat it as a
+    // failure with a clean message rather than throwing a raw parse error
+    // that a screen might render verbatim.
+    throw new ApiError(
+      response.status,
+      'FoodPadi got an unexpected response from the server. Please try again in a moment.',
+    );
+  }
 }
 
 export const api = {
@@ -217,10 +252,32 @@ export const api = {
   generateCookTodayRecipes: (payload: GenerateRecipesRequest, token: string) =>
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
-    request('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
+    request<SavedRecipeView>('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
   listSavedRecipes: () => request<SavedRecipeView[]>('/cook-today/recipes', { auth: true }),
   deleteSavedRecipe: (id: string) =>
     request<void>(`/cook-today/recipes/${id}`, { method: 'DELETE', auth: true }),
+  // Favorites engine (read side) — recipes with the heart on OR a 5-star COOK
+  // rating (see CookTodayService.listFavorites). Web counterpart: the
+  // /favorites route + LikeHeart.tsx.
+  listFavoriteRecipes: () =>
+    request<SavedRecipeView[]>('/cook-today/recipes/favorites', { auth: true }),
+  toggleRecipeFavorite: (id: string, isFavorite: boolean) =>
+    request<{ isFavorite: boolean }>(`/cook-today/recipes/${id}/favorite`, {
+      method: 'PATCH',
+      body: { isFavorite },
+      auth: true,
+    }),
+  // "Recently cooked" engine, write side — called once a guided cooking
+  // session reaches its last step (web counterpart: apps/web/app/cook-today/
+  // CookingSession.tsx). See CookTodayService.markCooked.
+  markRecipeCooked: (id: string) =>
+    request<{ lastCookedAt: string }>(`/cook-today/recipes/${id}/cooked`, { method: 'POST', auth: true }),
+  // Guided-cooking "how did it go?" rating — member-only, matches
+  // FeedbackController's JwtAuthGuard (guests get no persistent Memory).
+  submitFeedback: (payload: CreateFeedbackRequest) =>
+    request<FeedbackView>('/feedback', { method: 'POST', body: payload, auth: true }),
+  updateFeedback: (id: string, payload: UpdateFeedbackRequest) =>
+    request<FeedbackView>(`/feedback/${id}`, { method: 'PATCH', body: payload, auth: true }),
   importRecipe: (payload: ImportRecipeRequest) =>
     request<RecipeView>('/recipe-import', { method: 'POST', body: payload, auth: true }),
   searchEatNow: (payload: SearchEatNowRequest, token: string) =>
@@ -231,6 +288,20 @@ export const api = {
     request<DecideResponse>('/decide', { method: 'POST', body: payload, token }),
   localFoodSearch: (payload: LocalFoodSearchRequest, token: string) =>
     request<LocalFoodSearchResponse>('/local-food-search', { method: 'POST', body: payload, token }),
+  // "Find Near Me" brief §16 — client-only interactions the server can't
+  // otherwise observe (a permission prompt's outcome, tapping a maps/order
+  // link). Fire-and-forget, same precedent as trackGoalEvent/trackReferralShare:
+  // a broken analytics call must never surface to the user or block the flow.
+  trackLocalFoodSearchInteraction: (
+    interactionType: LocalFoodSearchInteractionType,
+    metadata: Record<string, unknown> | undefined,
+    token: string,
+  ) =>
+    request<void>('/local-food-search/interaction', {
+      method: 'POST',
+      body: { interactionType, metadata },
+      token,
+    }).catch(() => undefined),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
   // Guest-or-auth, AI-free preview of Plan Ahead — a few curated dinner ideas
@@ -287,6 +358,27 @@ export const api = {
     request<ScanFoodContentResponse>('/scan/food-content', { method: 'POST', body: payload, auth: true }),
   addPantryItems: (payload: AddPantryItemsRequest) =>
     request<AddPantryItemsResponse>('/pantry/items', { method: 'POST', body: payload, auth: true }),
+  // FoodPadi Memory & Companion (Home card) — members only, and never called
+  // for a guest (HomeScreen gates this). A failed suggestion fetch or action
+  // must never break Home, so callers treat rejection as "nothing to show".
+  getCompanionSuggestion: () =>
+    request<CompanionSuggestionResponse>('/companion/suggestion', { auth: true }),
+  sendCompanionAction: (id: string, action: CompanionActionRequest['action']) =>
+    request<void>(`/companion/suggestion/${id}/action`, { method: 'POST', body: { action }, auth: true }).catch(
+      () => undefined,
+    ),
+  getCompanionPreferences: () =>
+    request<CompanionPreferencesView>('/companion/preferences', { auth: true }),
+  updateCompanionPreferences: (payload: UpdateCompanionPreferencesRequest) =>
+    request<CompanionPreferencesView>('/companion/preferences', { method: 'PATCH', body: payload, auth: true }),
+  resetCompanionMemory: () =>
+    request<void>('/companion/memory/reset', { method: 'POST', auth: true }),
+  // Guided-cooking assistant — member-only (JwtAuthGuard), same posture as
+  // scanPhoto/scanFoodContent: a guest must never trigger a paid AI call.
+  checkCookingStep: (payload: CheckCookingStepRequest) =>
+    request<CheckCookingStepResponse>('/cooking-assistant/check-step', { method: 'POST', body: payload, auth: true }),
+  askCookingQuestion: (payload: AskCookingQuestionRequest) =>
+    request<AskCookingQuestionResponse>('/cooking-assistant/ask', { method: 'POST', body: payload, auth: true }),
 };
 
 export { ApiError };

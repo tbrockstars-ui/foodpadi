@@ -16,6 +16,23 @@
   font-size: 14px;
 }
 
+.errorText {
+  color: var(--danger);
+  margin: 0 0 var(--space-md);
+  font-size: 14px;
+}
+
+.retryLink {
+  display: inline-block;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-lg);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
 .group {
   margin-bottom: var(--space-sm);
 }

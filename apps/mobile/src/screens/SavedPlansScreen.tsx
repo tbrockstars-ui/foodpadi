@@ -1,14 +1,16 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { MealPlanView, PlanScope } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
+import { FadeInView } from '../components/motion/FadeInView';
 import { LoadingState } from '../components/LoadingState';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { Tag } from '../components/Tag';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -74,8 +76,8 @@ export function SavedPlansScreen({ navigation }: Props) {
   if (plans === null) {
     if (loadFailed) {
       return (
-        <ScrollView style={styles.container}>
-          <BackLink label="Back" onPress={() => navigation.goBack()} />
+        <Screen>
+          <ScreenHeader title="Saved plans" onBack={() => navigation.goBack()} />
           <EmptyState
             title="Couldn't load your saved plans"
             body="Check your connection and try again."
@@ -85,26 +87,26 @@ export function SavedPlansScreen({ navigation }: Props) {
               void load();
             }}
           />
-        </ScrollView>
+        </Screen>
       );
     }
     return <LoadingState message="Loading your saved plans…" />;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Saved plans</Text>
+    <Screen scroll>
+      <ScreenHeader title="Saved plans" onBack={() => navigation.goBack()} />
 
       {plans.length === 0 ? (
         <Text style={styles.emptyText}>
           No plans yet — create one in Plan Ahead and it&apos;ll be saved here automatically.
         </Text>
       ) : (
-        plans.map((plan) => {
+        plans.map((plan, index) => {
           const expanded = expandedId === plan.id;
           return (
-            <Card key={plan.id} style={styles.planCard}>
+            <FadeInView key={plan.id} delay={index * 40}>
+            <Card style={styles.planCard}>
               <TouchableOpacity onPress={() => setExpandedId(expanded ? null : plan.id)}>
                 <Text style={styles.planTitle}>
                   {formatDate(plan.startDate)} – {formatDate(plan.endDate)}
@@ -144,20 +146,19 @@ export function SavedPlansScreen({ navigation }: Props) {
                 </View>
               ) : null}
             </Card>
+            </FadeInView>
           );
         })
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.lg },
   emptyText: { ...typography.body, color: c.textMuted },
   planCard: { marginBottom: spacing.md },
-  planTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  planTitle: { ...typography.title, color: c.text, marginBottom: spacing.xs },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: c.border },
   dayRow: { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },

@@ -8,3 +8,30 @@
   display: flex;
   margin-bottom: var(--space-xl);
 }
+
+/* Content column for every AppShell-wrapped page (Cook, Plan, Pantry,
+   Discover, Favorites, Profile, saved lists, shopping list). Centred with
+   its own max-width rather than hugging the sidebar — a left-flush 640px
+   column reads as "sidebar, content, huge empty area" on anything wider
+   than a laptop; centring it instead turns that dead zone into balanced
+   breathing space on both sides (matches .container's own centred
+   treatment). 880px keeps a meal card's thumbnail+text+button row, an
+   ingredient-chip cloud, and stacked settings sections all comfortable
+   without stretching a single-column list into an awkwardly wide row. */
+.shellPage {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 48px 40px 104px;
+}
+
+@media (max-width: 1024px) {
+  .shellPage {
+    padding: 40px 32px 96px;
+  }
+}
+
+@media (max-width: 640px) {
+  .shellPage {
+    padding: 24px 16px 80px;
+  }
+}

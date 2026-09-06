@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import { Button } from './Button';
+import { FadeInView } from './motion/FadeInView';
 
 interface Props {
   title: string;
@@ -15,13 +16,13 @@ export function EmptyState({ title, body, actionLabel, onAction }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   return (
-    <View style={styles.container}>
+    <FadeInView style={styles.container}>
       <Text style={styles.title}>{title}</Text>
       {body ? <Text style={styles.body}>{body}</Text> : null}
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} style={styles.action} />
       ) : null}
-    </View>
+    </FadeInView>
   );
 }
 

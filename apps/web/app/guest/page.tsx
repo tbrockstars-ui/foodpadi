@@ -2,8 +2,13 @@ import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../../lib/serverApi';
 import { getGuestState, hasGuestSession } from '../../lib/guestSession';
-import { HomeHub } from '../HomeHub';
+import { HomeHub, type HomeIdeasSearchParams } from '../HomeHub';
 import { GuestAutoStart } from './GuestAutoStart';
+
+// Mirrors page.tsx's firstParam — a repeated query key becomes an array.
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
 
 /**
  * Dedicated guest entry point. This is what "Try FoodPadi" (nav, hero,
@@ -15,7 +20,17 @@ import { GuestAutoStart } from './GuestAutoStart';
  * still sees their guest Home, not the marketing page) — this route is
  * additive, not a replacement for that.
  */
-export default async function GuestPage() {
+export default async function GuestPage({
+  searchParams,
+}: {
+  searchParams?: { mood?: string | string[]; maxTime?: string | string[]; maxBudget?: string | string[] };
+}) {
+  const ideasSearchParams: HomeIdeasSearchParams = {
+    mood: firstParam(searchParams?.mood),
+    maxTime: firstParam(searchParams?.maxTime),
+    maxBudget: firstParam(searchParams?.maxBudget),
+  };
+
   if (isAuthenticated()) {
     // A real account should never be shown the guest experience — send them
     // to their actual Home instead (same disclaimer/onboarding gate as `/`).
@@ -34,7 +49,13 @@ export default async function GuestPage() {
   }
 
   if (hasGuestSession()) {
-    return <HomeHub guest guestDisclaimerAcknowledged={getGuestState()?.disclaimerAcknowledged ?? false} />;
+    return (
+      <HomeHub
+        guest
+        guestDisclaimerAcknowledged={getGuestState()?.disclaimerAcknowledged ?? false}
+        ideasSearchParams={ideasSearchParams}
+      />
+    );
   }
 
   // No session yet — someone landed on /guest directly (a shared link, a

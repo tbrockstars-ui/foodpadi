@@ -77,6 +77,19 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  // Added in the declutter pass — the gap between major page sections, so
+  // whitespace between groups reads as deliberate rhythm rather than a
+  // random assortment of one-off margins.
+  xxxl: 48,
+};
+
+// Shared page-layout constants — introduced with the <Screen>/<ScreenHeader>
+// primitives so every screen indents its content by the same amount and a
+// tablet/wide viewport doesn't stretch text to an unreadable measure.
+export const layout = {
+  screenX: spacing.xl,
+  sectionGap: spacing.xl,
+  maxContentWidth: 560,
 };
 
 export const radius = {
@@ -107,10 +120,19 @@ export const shadow = {
 };
 
 export const typography = {
-  display: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.4 },
-  title: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.2 },
+  // lineHeight added in the declutter pass so long titles (recipe / food
+  // names) wrap onto a second line with comfortable leading instead of
+  // cramped default spacing. Values/weights are unchanged.
+  display: { fontSize: 28, fontWeight: '700' as const, letterSpacing: -0.4, lineHeight: 34 },
+  title: { fontSize: 20, fontWeight: '700' as const, letterSpacing: -0.2, lineHeight: 26 },
+  // A confident, full-size section header (Settings already hand-rolled this
+  // — now a shared token). Use for grouped-navigation section titles.
+  heading: { fontSize: 22, fontWeight: '700' as const, letterSpacing: -0.2, lineHeight: 28 },
   subtitle: { fontSize: 15, fontWeight: '500' as const },
   body: { fontSize: 15, fontWeight: '400' as const, lineHeight: 22 },
   caption: { fontSize: 13, fontWeight: '400' as const },
   label: { fontSize: 12, fontWeight: '600' as const, letterSpacing: 0.4 },
+  // Small all-caps eyebrow above a group of content. Distinct from `label`
+  // (used inline) — this one is always a standalone section marker.
+  overline: { fontSize: 12, fontWeight: '700' as const, letterSpacing: 0.6 },
 };

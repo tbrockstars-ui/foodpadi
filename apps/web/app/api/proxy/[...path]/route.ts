@@ -9,7 +9,11 @@ import {
   sessionCookieOptions,
 } from '../../../../lib/session';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4310';
+// 127.0.0.1, not "localhost": the NestJS API binds 0.0.0.0 (IPv4 only), and
+// on Windows "localhost" frequently resolves to ::1 first — an upstream fetch
+// that lands on IPv6 gets ECONNREFUSED and the client only sees a generic
+// "couldn't do that right now" fallback.
+const API_URL = process.env.API_URL ?? 'http://127.0.0.1:4310';
 
 /**
  * Generic authenticated proxy so client components never need per-endpoint
@@ -53,7 +57,21 @@ async function forward(request: NextRequest, path: string[]) {
   const hasBody = !['GET', 'HEAD'].includes(request.method);
   const body = hasBody ? await request.text() : undefined;
 
-  let apiRes = await callApi(targetPath, search, request.method, body, bearer);
+  let apiRes: Response;
+  try {
+    apiRes = await callApi(targetPath, search, request.method, body, bearer);
+  } catch (e) {
+    // The NestJS API is unreachable (down, restarting, or a DNS/port miss).
+    // Without this catch the Route Handler throws, Next answers with an
+    // opaque HTML 500, and every client falls back to its vaguest error
+    // ("We couldn't find nearby food right now" and the like). A clean JSON
+    // 503 with a message lets the client show something honest instead.
+    console.error(`[api-proxy] upstream fetch to ${API_URL}/${targetPath} failed:`, e);
+    return NextResponse.json(
+      { message: 'The server is temporarily unavailable. Please try again in a moment.' },
+      { status: 503 },
+    );
+  }
 
   // Refresh-and-retry once on an expired access token. Skip entirely when
   // there's no refresh token, or when the caller never had an access token

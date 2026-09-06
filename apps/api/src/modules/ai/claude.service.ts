@@ -70,6 +70,27 @@ export interface RawFoodContentResult {
 
 export type ScanImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
+export interface CookingStepCheckInput {
+  imageBase64: string;
+  mediaType: ScanImageMediaType;
+  recipeTitle: string;
+  stepText: string;
+}
+
+export interface RawCookingStepCheck {
+  observation: unknown;
+  suggestion: unknown;
+  safetyNote: unknown;
+}
+
+export interface CookingQuestionInput {
+  recipeTitle: string;
+  ingredients: string[];
+  steps: string[];
+  currentStepIndex: number;
+  question: string;
+}
+
 const SAFETY_RULES = `Never claim a recipe is "safe" for any allergy, intolerance, or medical condition, and never state or imply a recipe is medically appropriate. You may only describe what ingredients a recipe contains. Do not repeat the same ingredient twice within one recipe's ingredients list. Every recipe must have at least 2 steps and a positive cookTimeMinutes and servings.`;
 
 // The curated recipe pool (CURATED_RECIPES) and its keyword matcher now live
@@ -124,6 +145,35 @@ Rules you must follow:
 - Set "note" to a short phrase (e.g. "commonly used, not directly visible") for any ingredient you are inferring rather than actually seeing — oils, stock, seasoning, sauces mixed through the dish, etc. Set it to null for anything clearly visible.
 - Never state or imply certainty about hidden ingredients, allergens, or exact quantities — you are estimating, not verifying.
 - If you cannot identify any food in the photo, return {"dishName": "", "ingredients": []}.`;
+
+// "Is this ready?" guided-cooking vision check. The critical constraint here
+// (unlike the two recognition prompts above) is safety, not accuracy: a
+// photo can show visible cues like colour/texture but can never verify
+// whether meat, poultry, fish or eggs have reached a safe internal
+// temperature. "safetyNote" is mandatory on every response specifically so
+// the UI always has something honest to show alongside any visual read —
+// see FoodPadi's existing DISCLAIMER_TEXT/safety-notice pattern.
+const COOKING_STEP_CHECK_SYSTEM_PROMPT = `You are the visual cooking-assistant component inside FoodPadi, a UK food companion app. A user is following a recipe step by step and has photographed their pan/pot/oven mid-cooking, asking "is this ready?" for the CURRENT step only.
+
+Rules you must follow:
+- Return ONLY valid JSON, no prose before or after it, matching exactly this shape:
+  {"observation": string, "suggestion": string, "safetyNote": string}
+- "observation" describes only what is visibly true in the photo relevant to this step (colour, texture, size, browning, bubbling, wilting, etc.) — e.g. "The onions look soft and lightly golden at the edges." Do not describe anything you cannot actually see.
+- "suggestion" is a short, non-authoritative read on whether the visible cues match what this step describes — phrased as guidance, never a guarantee (e.g. "That matches what this step is looking for — you can move on when you're ready" or "It looks like it could use a few more minutes before the next step").
+- "safetyNote" MUST be included on every response. For steps involving meat, poultry, fish, seafood or eggs, it must say that visual appearance alone cannot confirm food safety and the user should check it is cooked through (no pink/translucent flesh, juices run clear, or use a food thermometer) rather than relying on colour alone. For steps with no food-safety-critical ingredient, a short neutral safety note is still fine (e.g. "Always use a timer as a backup — appearance alone can be misleading.").
+- Never state or imply that a photo can confirm food is "safe to eat," "fully cooked," or "done" in a food-safety sense — you may only describe appearance and give non-authoritative guidance.
+- If the photo doesn't show anything relevant to this cooking step, say so honestly in "observation" rather than guessing.`;
+
+// Recipe Q&A for the guided-cooking session (voice or typed). Deliberately
+// text-only (no image) and scoped tightly to the current recipe/step so it
+// can't drift into general medical/nutrition advice.
+const COOKING_QA_SYSTEM_PROMPT = `You are the cooking-assistant component inside FoodPadi, a UK food companion app. A user is mid-way through cooking a specific recipe and has asked a short question — via voice or text — about the current step. You are given the recipe, its steps, which step they're on, and their question.
+
+Rules you must follow:
+- Answer in plain text, 1-3 short sentences, conversational — this may be read aloud, so avoid lists, headings, or markdown.
+- Only answer questions related to cooking this recipe: substitutions, quantities, technique, timing, or clarifying the current step. For anything else (or anything requiring medical/allergy/nutrition advice), politely say you can only help with cooking this recipe and suggest they check with a suitable source.
+- ${SAFETY_RULES}
+- Never state or imply a substitution is safe for any allergy or medical condition — you may only describe how a substitution would likely affect taste, texture, or cooking time.`;
 
 @Injectable()
 export class ClaudeService {
@@ -240,24 +290,33 @@ export class ClaudeService {
     );
   }
 
-  // No curated fallback here, unlike the two methods above — a specific
-  // user's photo can't be honestly faked with generic placeholder content
-  // the way a generic recipe suggestion can. Gates on ANTHROPIC_API_KEY via
-  // getClient() and throws a plain 503 if it's unset.
-  async analyzeFoodPhoto(imageBase64: string, mediaType: ScanImageMediaType): Promise<RawScannedItem[]> {
+  // Shared plumbing for every vision call (analyzeFoodPhoto/analyzeFoodContent/
+  // checkCookingStep): build the image+text user message, extract the text
+  // block, and JSON.parse it. No curated fallback for any caller of this —
+  // a specific user's photo can't be honestly faked with generic placeholder
+  // content the way a generic recipe suggestion can. Gates on
+  // ANTHROPIC_API_KEY via getClient() and throws a plain 503 if it's unset.
+  private async callVision<T>(
+    systemPrompt: string,
+    userText: string,
+    imageBase64: string,
+    mediaType: ScanImageMediaType,
+    maxTokens: number,
+    unexpectedFormatMessage: string,
+  ): Promise<T> {
     const client = this.getClient();
     const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
 
     const response = await client.messages.create({
       model,
-      max_tokens: 1024,
-      system: SCAN_SYSTEM_PROMPT,
+      max_tokens: maxTokens,
+      system: systemPrompt,
       messages: [
         {
           role: 'user',
           content: [
             { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-            { type: 'text', text: 'What food or drink items can you identify in this photo?' },
+            { type: 'text', text: userText },
           ],
         },
       ],
@@ -268,13 +327,23 @@ export class ClaudeService {
       throw new ServiceUnavailableException('The scanner returned an empty response.');
     }
 
-    let parsed: { items?: unknown };
     try {
-      parsed = JSON.parse(textBlock.text);
+      return JSON.parse(textBlock.text) as T;
     } catch {
-      this.logger.error(`Failed to parse scan output as JSON: ${textBlock.text.slice(0, 500)}`);
-      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
+      this.logger.error(`Failed to parse vision output as JSON: ${textBlock.text.slice(0, 500)}`);
+      throw new ServiceUnavailableException(unexpectedFormatMessage);
     }
+  }
+
+  async analyzeFoodPhoto(imageBase64: string, mediaType: ScanImageMediaType): Promise<RawScannedItem[]> {
+    const parsed = await this.callVision<{ items?: unknown }>(
+      SCAN_SYSTEM_PROMPT,
+      'What food or drink items can you identify in this photo?',
+      imageBase64,
+      mediaType,
+      1024,
+      'The scanner returned an unexpected format.',
+    );
 
     if (!Array.isArray(parsed.items)) {
       throw new ServiceUnavailableException('The scanner returned an unexpected format.');
@@ -283,44 +352,76 @@ export class ClaudeService {
     return parsed.items as RawScannedItem[];
   }
 
-  // Same no-curated-fallback rationale as analyzeFoodPhoto above.
   async analyzeFoodContent(imageBase64: string, mediaType: ScanImageMediaType): Promise<RawFoodContentResult> {
-    const client = this.getClient();
-    const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
-
-    const response = await client.messages.create({
-      model,
-      max_tokens: 1024,
-      system: FOOD_CONTENT_SYSTEM_PROMPT,
-      messages: [
-        {
-          role: 'user',
-          content: [
-            { type: 'image', source: { type: 'base64', media_type: mediaType, data: imageBase64 } },
-            { type: 'text', text: 'What dish is this, and what is it likely made of?' },
-          ],
-        },
-      ],
-    });
-
-    const textBlock = response.content.find((block) => block.type === 'text');
-    if (!textBlock || textBlock.type !== 'text') {
-      throw new ServiceUnavailableException('The scanner returned an empty response.');
-    }
-
-    let parsed: { dishName?: unknown; ingredients?: unknown };
-    try {
-      parsed = JSON.parse(textBlock.text);
-    } catch {
-      this.logger.error(`Failed to parse food-content output as JSON: ${textBlock.text.slice(0, 500)}`);
-      throw new ServiceUnavailableException('The scanner returned an unexpected format.');
-    }
+    const parsed = await this.callVision<{ dishName?: unknown; ingredients?: unknown }>(
+      FOOD_CONTENT_SYSTEM_PROMPT,
+      'What dish is this, and what is it likely made of?',
+      imageBase64,
+      mediaType,
+      1024,
+      'The scanner returned an unexpected format.',
+    );
 
     if (typeof parsed.dishName !== 'string' || !Array.isArray(parsed.ingredients)) {
       throw new ServiceUnavailableException('The scanner returned an unexpected format.');
     }
 
     return parsed as RawFoodContentResult;
+  }
+
+  // Guided-cooking "is this ready?" check. Same no-curated-fallback
+  // rationale as the scan methods above.
+  async checkCookingStep(input: CookingStepCheckInput): Promise<RawCookingStepCheck> {
+    const userText = `Recipe: "${input.recipeTitle}". Current step: "${input.stepText}". Here is a photo of what I have right now — is this on track for this step?`;
+
+    const parsed = await this.callVision<{ observation?: unknown; suggestion?: unknown; safetyNote?: unknown }>(
+      COOKING_STEP_CHECK_SYSTEM_PROMPT,
+      userText,
+      input.imageBase64,
+      input.mediaType,
+      512,
+      'The cooking check returned an unexpected format.',
+    );
+
+    if (
+      typeof parsed.observation !== 'string' ||
+      typeof parsed.suggestion !== 'string' ||
+      typeof parsed.safetyNote !== 'string'
+    ) {
+      throw new ServiceUnavailableException('The cooking check returned an unexpected format.');
+    }
+
+    return parsed as RawCookingStepCheck;
+  }
+
+  // Guided-cooking recipe Q&A (voice or typed). Text-only, no curated
+  // fallback — same rationale as the vision methods: a specific question
+  // about a specific recipe can't be honestly faked with generic content.
+  async answerCookingQuestion(input: CookingQuestionInput): Promise<string> {
+    const client = this.getClient();
+    const model = process.env.ANTHROPIC_MODEL ?? 'claude-sonnet-5';
+
+    const userMessage = [
+      `Recipe: "${input.recipeTitle}".`,
+      `Ingredients: ${input.ingredients.join(', ')}.`,
+      `Steps: ${input.steps.map((s, i) => `${i + 1}) ${s}`).join(' ')}`,
+      `The user is currently on step ${input.currentStepIndex + 1}.`,
+      `Their question: "${input.question}"`,
+    ].join(' ');
+
+    const response = await client.messages.create({
+      model,
+      max_tokens: 300,
+      system: COOKING_QA_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: userMessage }],
+    });
+
+    const textBlock = response.content.find((block) => block.type === 'text');
+    if (!textBlock || textBlock.type !== 'text' || !textBlock.text.trim()) {
+      throw new ServiceUnavailableException('FoodPadi didn\'t have an answer for that just now.');
+    }
+
+    return textBlock.text.trim();
   }
 
   /**

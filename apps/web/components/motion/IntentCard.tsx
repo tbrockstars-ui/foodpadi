@@ -12,6 +12,10 @@ interface IntentCardProps {
   subtitle: string;
   image: ImageAsset;
   accent: 'right-now' | 'cooking' | 'plan-ahead';
+  /** Optional CTA text rendered as a pill at the card's foot (e.g. "Get
+      started"). Purely a label — the whole card is one Link either way, so
+      clicking the pill behaves exactly like clicking anywhere else on it. */
+  cta?: string;
 }
 
 /**
@@ -21,7 +25,7 @@ interface IntentCardProps {
  * lift/zoom (whileHover + whileTap), since hover-only feedback is invisible
  * on mobile, which is most of FoodPadi's real usage.
  */
-export function IntentCard({ href, badge, label, subtitle, image, accent }: IntentCardProps) {
+export function IntentCard({ href, badge, label, subtitle, image, accent, cta }: IntentCardProps) {
   const prefersReducedMotion = useReducedMotion();
 
   return (
@@ -42,6 +46,14 @@ export function IntentCard({ href, badge, label, subtitle, image, accent }: Inte
       </motion.div>
       <p className={styles.label}>{label}</p>
       <p className={styles.subtitle}>{subtitle}</p>
+      {cta ? (
+        <span className={styles.cta}>
+          {cta}
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M6 3.5 10.5 8 6 12.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+      ) : null}
     </Link>
   );
 }

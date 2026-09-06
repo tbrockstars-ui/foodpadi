@@ -1,37 +1,18 @@
 .container {
-  max-width: 1200px;
+  /* Centred with its own max-width — hugging the sidebar's full remaining
+     width used to leave the two-column grid below stretched thin against
+     an enormous right-hand gap on wide monitors. 1280px keeps hubGrid's
+     wide-left/rail-right layout comfortable while turning the leftover
+     space into balanced margins instead of one huge dead zone. */
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 42px 24px 104px;
+  padding: 48px 40px 104px;
 }
 
-.topBar {
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  gap: 18px;
-  margin-bottom: 24px;
-  flex-wrap: wrap;
-}
-
-.headerLinks {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  flex-shrink: 0;
-  margin-right: auto;
-}
-
-.logoutLink {
-  background: none;
-  border: none;
-  color: var(--primary);
-  font-size: 15px;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 6px 0;
-  font-family: inherit;
-  text-decoration: none;
-  white-space: nowrap;
+@media (max-width: 1024px) {
+  .container {
+    padding: 40px 32px 96px;
+  }
 }
 
 .header {
@@ -75,11 +56,6 @@
     padding-right: 16px;
   }
 
-  .topBar {
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-
   .heading {
     font-size: clamp(2.2rem, 10vw, 3.1rem);
     gap: 8px;
@@ -90,32 +66,15 @@
   }
 }
 
-.primaryGrid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 22px;
-  align-items: stretch;
-}
-
 @media (max-width: 640px) {
   .container {
     padding-left: 16px;
     padding-right: 16px;
   }
 
-  .topBar {
-    gap: 12px;
-    margin-bottom: 18px;
-  }
-
   .heading {
     font-size: clamp(2.1rem, 10vw, 3rem);
     gap: 8px;
-  }
-
-  .headerLinks {
-    flex-wrap: wrap;
-    gap: 10px 16px;
   }
 
   .primaryGrid {
@@ -160,7 +119,9 @@
 .supportFab {
   position: fixed;
   right: 24px;
-  bottom: 24px;
+  /* Clears AppShell's now-docked footer bar (~56px tall) rather than
+     overlapping it. */
+  bottom: 80px;
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -298,9 +259,17 @@
   border-color: var(--primary);
 }
 
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
 .decideInput {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   box-sizing: border-box;
   border: 1px solid var(--border);
   background: var(--surface-sunken);
@@ -309,13 +278,40 @@
   font-size: 16px;
   color: var(--text);
   font-family: inherit;
-  margin-bottom: var(--space-md);
 }
 
 .decideInput:focus {
   outline: none;
   border-color: var(--primary);
   background: var(--surface);
+}
+
+.searchButton {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 52px;
+  padding: 0 22px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.searchButton span {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.searchButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .constraintsRow {
@@ -331,6 +327,13 @@
      width, so it reads as one left-aligned field, not a full-width one. */
   flex: 0 1 auto;
   width: min(220px, 100%);
+}
+
+/* "Decide for me" on its own row under Budget, rather than crowded onto the
+   same row as it — left-aligned under the budget field, not stretched full
+   width, so it reads as the row's one action rather than a banner. */
+.decideButtonRow {
+  margin-bottom: var(--space-md);
 }
 
 .constraintInput {
@@ -358,21 +361,17 @@
   pointer-events: none;
 }
 
-.decideButton {
+.findNearMeButton {
   border: none;
   border-radius: var(--radius-md);
   background: var(--primary);
   color: var(--primary-text);
-  padding: 12px 20px;
-  font-size: 15px;
+  padding: 10px 18px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
-}
-
-.decideButton:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
+  margin-top: var(--space-md);
 }
 
 /* Error / no-options states (brief §24) — a small centred block with an
@@ -440,26 +439,6 @@
   margin: 0;
 }
 
-.optionTypeBadge {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-}
-
-.optionTypeCook {
-  background: var(--primary-soft);
-  color: var(--primary);
-}
-
-.optionTypeGet {
-  background: var(--secondary-soft);
-  color: var(--secondary);
-}
-
 .optionAction {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -477,37 +456,6 @@
   margin-top: var(--space-lg);
   padding-top: var(--space-lg);
   border-top: 1px solid var(--border);
-}
-
-.ingredientLine {
-  font-size: 14px;
-  color: var(--text);
-  margin: 0 0 4px;
-}
-
-.stepRow {
-  display: flex;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-}
-
-.stepNumber {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--primary-soft);
-  color: var(--primary);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-  line-height: 22px;
-}
-
-.stepText {
-  font-size: 14px;
-  color: var(--text);
-  line-height: 1.5;
 }
 
 /* --- Home hub two-column layout -----------------------------------------
@@ -532,7 +480,10 @@
 
 @media (min-width: 900px) {
   .hubGrid {
-    grid-template-columns: minmax(0, 1.65fr) minmax(300px, 1fr);
+    /* Aside capped at 420px (not 1fr) so the right rail stays a sensible
+       card width instead of stretching wide alongside the container's
+       larger max-width. */
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 420px);
     column-gap: 40px;
   }
 
@@ -547,16 +498,6 @@
     grid-template-columns: 1fr;
     gap: var(--space-md);
   }
-
-  .hubAside .secondaryRow {
-    margin-top: var(--space-lg);
-    text-align: left;
-  }
-}
-
-/* Top bar now holds just the logo (left) and the settings menu (right). */
-.topBar {
-  justify-content: space-between;
 }
 
 /* Support FAB: give the icon an explicit contrasting colour so it stays
@@ -564,3 +505,404 @@
 .supportFab {
   color: var(--background);
 }
+
+/* --- "Ideas for you" — static sample cards, see lib/homePlaceholders.ts --- */
+
+.ideasHeader {
+  margin-top: var(--space-xl);
+}
+
+.ideasHeading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+}
+
+.ideasSubtext {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 4px 0 var(--space-md);
+}
+
+.ideasGrid {
+  display: grid;
+  /* auto-fit (not auto-fill): empty tracks collapse to 0 so the existing
+     cards stretch to fill the row on a wide column, instead of auto-fill's
+     empty trailing tracks leaving them narrow and left-bunched. Still wraps
+     to fewer columns on narrow screens via the minmax floor. */
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-md);
+}
+
+.ideaCard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.ideaTitleButton {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ideaImageWrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin-bottom: 8px;
+  cursor: pointer;
+}
+
+.ideaImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.ideaBadges {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.ideaBadge {
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+/* Same green "dietary fact" treatment as FoodImage.module.css's badge
+   (DecideFlow / Eat Now / Plan Ahead) — one consistent look for "Vegan"
+   everywhere it appears, distinct from the primary-coloured "Best match". */
+.ideaBadgeVegan {
+  background: var(--success);
+  color: #fff;
+}
+
+.ideaHeart {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+}
+
+.ideaTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.ideaMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 6px;
+}
+
+/* The parenthetical "(~£3–6)" estimate is a hedged range, not a claimed
+   exact cost — kept visually secondary to the £/££/£££ band itself. */
+.ideaPrice {
+  color: var(--text-faint);
+}
+
+.ideaMatch {
+  display: inline-block;
+  background: var(--success-soft);
+  color: var(--success);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.ideaModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 50;
+}
+
+.ideaModal {
+  background: var(--surface);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: var(--space-lg);
+  position: relative;
+}
+
+@media (min-width: 640px) {
+  .ideaModalBackdrop {
+    align-items: center;
+  }
+  .ideaModal {
+    border-radius: var(--radius-lg);
+  }
+}
+
+.ideaModalClose {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  z-index: 1;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ideaModalImage {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-md);
+}
+
+.ideaModalTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+
+.ideaModalHeading {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: var(--space-lg) 0 var(--space-sm);
+}
+
+.ideaModalSection {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+}
+
+.ideaModalLine {
+  font-size: 14px;
+  color: var(--text);
+  margin: 0 0 6px;
+  line-height: 1.5;
+}
+
+.ideaModalStepRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: 8px;
+}
+
+.ideaModalStepNumber {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+  line-height: 22px;
+}
+
+.ideaModalCta {
+  display: inline-block;
+  margin-top: var(--space-sm);
+  color: var(--primary);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+/* --- "Quick actions" row --- */
+
+.quickActionsHeading {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+  margin: var(--space-xl) 0 var(--space-md);
+}
+
+.quickActionsGrid {
+  display: grid;
+  /* auto-fit, same reasoning as .ideasGrid above — 4 cards should stretch
+     to fill a wide row rather than leaving empty auto-fill tracks. */
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-sm);
+}
+
+.quickActionCard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  text-decoration: none;
+  color: inherit;
+}
+
+.quickActionCardDisabled {
+  opacity: 0.6;
+}
+
+.quickActionIcon {
+  width: 20px;
+  height: 20px;
+  margin-bottom: 4px;
+}
+
+.quickActionEmoji {
+  font-size: 18px;
+  margin-bottom: 4px;
+}
+
+.quickActionLabel {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.quickActionSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* --- "Recently cooked" — static sample list, see lib/homePlaceholders.ts --- */
+
+.recentCard {
+  margin-top: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.recentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.recentHeading {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0;
+}
+
+.recentViewAll {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.recentRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 8px 0;
+}
+
+.recentRow + .recentRow {
+  border-top: 1px solid var(--border);
+}
+
+.recentThumbWrap {
+  position: relative;
+  flex-shrink: 0;
+  display: block;
+}
+
+.recentThumb {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  display: block;
+}
+
+/* Same "Vegan" fact this dish gets everywhere else (FoodImage.module.css's
+   .badge, IdeaCard's .ideaBadgeVegan) — shrunk to a corner mark since the
+   thumbnail itself is too small for a legible text pill. */
+.recentThumbVegan {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  line-height: 1;
+  background: var(--success);
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+
+.recentBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.recentTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recentWhen {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 2px 0 0;
+}
+
+.recentEmpty {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin: 4px 0 2px;
+  line-height: 1.5;
+}
+

@@ -4,6 +4,7 @@ import { Suspense, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../components/Button';
+import { EyeIcon } from '../../components/EyeIcon';
 import { Logo } from '../../components/Logo';
 import { GoogleSignInButton } from '../GoogleSignInButton';
 import styles from '../auth.module.css';
@@ -28,6 +29,7 @@ function LoginForm() {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -73,7 +75,7 @@ function LoginForm() {
     <main className={styles.container}>
       <div className={styles.card}>
         <div className={styles.brandStage}>
-          <Logo withWordmark={false} size={185} className={styles.brandBadge} />
+          <Logo withWordmark={false} size={222} priority className={styles.brandBadge} />
         </div>
         <h1 className={styles.title}>FoodPadi</h1>
         <p className={styles.subtitle}>Your food companion that plans with you, not for you.</p>
@@ -87,14 +89,25 @@ function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
-          <input
-            className={styles.input}
-            type="password"
-            placeholder="Password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className={styles.inputWrap}>
+            <input
+              className={styles.input}
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className={styles.passwordToggle}
+              aria-pressed={showPassword}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              onClick={() => setShowPassword((s) => !s)}
+            >
+              <EyeIcon off={showPassword} />
+            </button>
+          </div>
           {password.length > 0 && !passwordLongEnough ? <p className={styles.hint}>At least 8 characters</p> : null}
           {error ? <p className={styles.error}>{error}</p> : null}
 

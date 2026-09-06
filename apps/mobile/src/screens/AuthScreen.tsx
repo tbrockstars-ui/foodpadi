@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Feather } from '@expo/vector-icons';
 import { useAuth } from '../auth/AuthContext';
 import { useGoogleSignIn } from '../auth/useGoogleSignIn';
 import { ApiError } from '../api/client';
 import { Button } from '../components/Button';
 import { type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import { useScreenInsets } from '../theme/useScreenInsets';
 
 interface Props {
   onForgotPassword: () => void;
@@ -16,11 +18,14 @@ interface Props {
 export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const ins = useScreenInsets();
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [guestLoading, setGuestLoading] = useState(false);
@@ -64,7 +69,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
       <Image source={require('../../assets/logo.png')} style={styles.logo} accessibilityIgnoresInvertColors />
       <Text style={styles.title}>FoodPadi</Text>
       <Text style={styles.subtitle}>Your food companion that plans with you, not for you.</Text>
@@ -81,30 +86,52 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
         onChangeText={setEmail}
         accessibilityLabel="Email address"
       />
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor={colors.textMuted}
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-        accessibilityLabel="Password"
-      />
+      <View style={styles.inputWrap}>
+        <TextInput
+          style={[styles.input, styles.inputWithToggle]}
+          placeholder="Password"
+          placeholderTextColor={colors.textMuted}
+          secureTextEntry={!showPassword}
+          value={password}
+          onChangeText={setPassword}
+          accessibilityLabel="Password"
+        />
+        <TouchableOpacity
+          style={styles.passwordToggle}
+          onPress={() => setShowPassword((s) => !s)}
+          accessibilityRole="button"
+          accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Feather name={showPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
       {password.length > 0 && !passwordLongEnough ? (
         <Text style={styles.hint}>At least 8 characters</Text>
       ) : null}
 
       {mode === 'register' ? (
         <>
-          <TextInput
-            style={styles.input}
-            placeholder="Confirm password"
-            placeholderTextColor={colors.textMuted}
-            secureTextEntry
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            accessibilityLabel="Confirm password"
-          />
+          <View style={styles.inputWrap}>
+            <TextInput
+              style={[styles.input, styles.inputWithToggle]}
+              placeholder="Confirm password"
+              placeholderTextColor={colors.textMuted}
+              secureTextEntry={!showConfirmPassword}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              accessibilityLabel="Confirm password"
+            />
+            <TouchableOpacity
+              style={styles.passwordToggle}
+              onPress={() => setShowConfirmPassword((s) => !s)}
+              accessibilityRole="button"
+              accessibilityLabel={showConfirmPassword ? 'Hide password' : 'Show password'}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Feather name={showConfirmPassword ? 'eye-off' : 'eye'} size={20} color={colors.textMuted} />
+            </TouchableOpacity>
+          </View>
           {confirmPassword.length > 0 && confirmPassword !== password ? (
             <Text style={styles.hint}>Passwords don&apos;t match</Text>
           ) : null}
@@ -181,8 +208,8 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: 24, justifyContent: 'center' },
-  logo: { width: 84, height: 84, alignSelf: 'center', marginBottom: 16 },
+  container: { flex: 1, backgroundColor: c.background, paddingHorizontal: 24, justifyContent: 'center' },
+  logo: { width: 101, height: 101, alignSelf: 'center', marginBottom: 16 }, // 84 + 20%
   title: { fontSize: 32, fontWeight: '700', color: c.text, textAlign: 'center' },
   subtitle: { fontSize: 15, color: c.textMuted, textAlign: 'center', marginTop: 8, marginBottom: 32 },
   input: {
@@ -195,6 +222,17 @@ function makeStyles(c: ThemeColors) {
     fontSize: 16,
     marginBottom: 12,
     color: c.text,
+  },
+  inputWrap: { position: 'relative' },
+  inputWithToggle: { paddingRight: 44 },
+  passwordToggle: {
+    position: 'absolute',
+    top: 0,
+    bottom: 12,
+    right: 4,
+    width: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   primaryButton: { marginTop: 8 },
   googleButton: {

@@ -1,0 +1,25 @@
+.title {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--text);
+  margin: 0 0 var(--space-sm);
+}
+
+.lede {
+  color: var(--text-muted);
+  font-size: 15px;
+  line-height: 1.5;
+  margin: 0 0 var(--space-lg);
+  max-width: 480px;
+}
+
+.cta {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-weight: 700;
+  font-size: 15px;
+  padding: 12px 22px;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}

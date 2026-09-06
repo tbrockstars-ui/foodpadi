@@ -9,7 +9,7 @@ export default async function PreferencesPage() {
 
   return (
     <main className={shellStyles.container}>
-      <Logo href="/" size={32} className={shellStyles.pageLogo} />
+      <Logo href="/" size={38} className={shellStyles.pageLogo} />
       <PreferencesForm />
     </main>
   );

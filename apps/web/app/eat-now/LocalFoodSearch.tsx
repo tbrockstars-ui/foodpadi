@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { FoodProviderResult, LocalFoodSearchResponse } from '@foodpadi/shared';
 import { SearchingNearby } from '../../components/motion/SearchingNearby';
+import { trackLocalFoodSearchInteraction as track } from '../../lib/localFoodSearchTracking';
 import styles from './eat-now.module.css';
 
 export type LocalFoodSearchStage =
@@ -58,6 +59,17 @@ export function LocalFoodSearch({
   // fix this in your browser's site settings".
   const [permissionBlocked, setPermissionBlocked] = useState(false);
 
+  // "Place viewed" (brief §16) — this list of cards *is* the place detail
+  // view here (no separate "open details" step), so a result actually
+  // rendering to the user is the honest moment to record it.
+  useEffect(() => {
+    if (stage !== 'results') return;
+    for (const provider of results) {
+      track('place_viewed', { providerId: provider.id, name: provider.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage]);
+
   const runSearch = async (body: { latitude?: number; longitude?: number; locationText?: string }) => {
     setStage('searching');
     setErrorMessage(null);
@@ -98,6 +110,7 @@ export function LocalFoodSearch({
     setPermissionBlocked(false);
     navigator.geolocation.getCurrentPosition(
       (position) => {
+        track('location_permission_granted');
         runSearch({ latitude: position.coords.latitude, longitude: position.coords.longitude });
       },
       (error) => {
@@ -106,6 +119,7 @@ export function LocalFoodSearch({
         // specifically means the browser has this site blocked and will keep
         // silently failing forever without ever re-prompting — worth telling
         // the user that directly, since "try again" won't help on its own.
+        track('location_permission_denied');
         setPermissionBlocked(error.code === error.PERMISSION_DENIED);
         setStage('manual-location');
       },
@@ -116,6 +130,7 @@ export function LocalFoodSearch({
   const searchManualLocation = () => {
     const trimmed = manualLocation.trim();
     if (!trimmed) return;
+    track('manual_location_used', { locationText: trimmed });
     runSearch({ locationText: trimmed });
   };
 
@@ -214,6 +229,9 @@ export function LocalFoodSearch({
 
       {stage === 'results' ? (
         <>
+          {/* Ties the results unambiguously back to the food that was
+              actually searched (brief §8) — never a generic "near you". */}
+          <h2 className={styles.nearbyHeading}>{query} Near You</h2>
           {source === 'openstreetmap' ? (
             <p className={styles.attributionNote} translate="no">
               Results from OpenStreetMap · © OpenStreetMap contributors
@@ -233,15 +251,31 @@ export function LocalFoodSearch({
               {provider.distanceText ? <p className={styles.providerMeta}>{provider.distanceText}</p> : null}
               {provider.address ? <p className={styles.providerMeta}>{provider.address}</p> : null}
               {provider.phone ? <p className={styles.providerMeta}>{provider.phone}</p> : null}
+              {/* Raw OSM value, shown as-is — never interpreted into an "open
+                  now"/"closed" claim (brief §7/§8: never fabricate opening
+                  status; only ever shown when the source actually has it). */}
+              {provider.openingHours ? <p className={styles.providerMeta}>{provider.openingHours}</p> : null}
 
               <div className={styles.providerActions}>
                 {provider.bookingUrl ? (
-                  <a className={styles.providerActionLink} href={provider.bookingUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className={styles.providerActionLink}
+                    href={provider.bookingUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track('external_ordering_clicked', { providerId: provider.id, kind: 'booking' })}
+                  >
                     Book now
                   </a>
                 ) : null}
                 {provider.orderUrl ? (
-                  <a className={styles.providerActionLink} href={provider.orderUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className={styles.providerActionLink}
+                    href={provider.orderUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track('external_ordering_clicked', { providerId: provider.id, kind: 'order' })}
+                  >
                     Order online
                   </a>
                 ) : null}
@@ -256,7 +290,13 @@ export function LocalFoodSearch({
                   </a>
                 ) : null}
                 {provider.mapsUrl ? (
-                  <a className={styles.providerActionLink} href={provider.mapsUrl} target="_blank" rel="noopener noreferrer">
+                  <a
+                    className={styles.providerActionLink}
+                    href={provider.mapsUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => track('directions_clicked', { providerId: provider.id })}
+                  >
                     Maps
                   </a>
                 ) : null}

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RecipeView } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { LoadingState } from '../components/LoadingState';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { Section } from '../components/Section';
 import { Tag } from '../components/Tag';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -59,33 +61,32 @@ export function ImportRecipeScreen({ navigation }: Props) {
 
   if (step === 'preview' && recipe) {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <BackLink label="Try another link" onPress={() => setStep('input')} />
-        <Text style={styles.title}>{recipe.title}</Text>
+      <Screen scroll>
+        <ScreenHeader title={recipe.title} onBack={() => setStep('input')} backLabel="Try another link" />
         <View style={styles.tagRow}>
           <Tag label={`${recipe.cookTimeMinutes} min`} />
           <Tag label={`${recipe.servings} servings`} />
           {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
         </View>
 
-        <Text style={styles.sectionHeading}>Ingredients</Text>
-        <Card style={styles.section}>
-          {recipe.ingredients.map((ingredient, index) => (
-            <Text key={index} style={styles.ingredientLine}>
-              {[ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ')}
-            </Text>
-          ))}
-        </Card>
+        <Section title="Ingredients">
+          <Card>
+            {recipe.ingredients.map((ingredient, index) => (
+              <Text key={index} style={styles.ingredientLine}>
+                {[ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ')}
+              </Text>
+            ))}
+          </Card>
+        </Section>
 
-        <Text style={styles.sectionHeading}>Steps</Text>
-        <Card style={styles.section}>
+        <Section title="Steps">
           {recipe.steps.map((stepText, index) => (
             <View key={index} style={styles.stepRow}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
               <Text style={styles.stepText}>{stepText}</Text>
             </View>
           ))}
-        </Card>
+        </Section>
 
         <Button
           label={saved ? 'Saved to your recipes' : 'Save this recipe'}
@@ -94,15 +95,17 @@ export function ImportRecipeScreen({ navigation }: Props) {
           loading={saving}
           style={styles.actionSpacing}
         />
-      </ScrollView>
+      </Screen>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Import a recipe</Text>
-      <Text style={styles.subtitle}>Paste a link to a recipe page and we'll pull it in.</Text>
+    <Screen scroll>
+      <ScreenHeader
+        title="Import a recipe"
+        subtitle="Paste a link to a recipe page and we'll pull it in."
+        onBack={() => navigation.goBack()}
+      />
 
       <TextInput
         style={styles.urlInput}
@@ -121,15 +124,12 @@ export function ImportRecipeScreen({ navigation }: Props) {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <Button label="Find the recipe" onPress={preview} disabled={!url.trim()} style={styles.actionSpacing} />
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
   urlInput: {
     borderWidth: 1,
     borderColor: c.border,
@@ -142,9 +142,7 @@ function makeStyles(c: ThemeColors) {
   },
   errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
   actionSpacing: { marginTop: spacing.xl },
-  sectionHeading: { ...typography.label, color: c.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
-  section: { marginBottom: spacing.sm },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.lg },
   ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
   stepRow: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
   stepNumber: {

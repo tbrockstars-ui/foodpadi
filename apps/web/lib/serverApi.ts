@@ -15,13 +15,19 @@ export class ApiError extends Error {
 // mirrors apps/mobile/src/api/client.ts's extractErrorMessage.
 function extractErrorMessage(rawBody: string): string | null {
   if (!rawBody) return null;
+  const trimmed = rawBody.trim();
+  // A CDN / gateway error (Render 502/503, Cloudflare 520-524) returns a full
+  // HTML page, not our JSON error shape — never surface markup as a message.
+  if (trimmed.startsWith('<')) return null;
   try {
-    const parsed = JSON.parse(rawBody) as { message?: string | string[] };
+    const parsed = JSON.parse(trimmed) as { message?: string | string[] };
     if (Array.isArray(parsed.message)) return parsed.message.join('. ');
     if (typeof parsed.message === 'string') return parsed.message;
     return null;
   } catch {
-    return rawBody;
+    // Plain-text non-JSON body — keep it only if it's short enough to be a
+    // real message, not a dumped document or stack trace.
+    return trimmed.length <= 200 ? trimmed : null;
   }
 }
 
@@ -65,6 +71,23 @@ export function isGuest(): boolean {
 
 export function requireSession(nextPath: string): void {
   if (!isAuthenticated()) {
+    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+  }
+}
+
+/**
+ * Call from a protected page's `catch` block. A 401 from serverFetch means
+ * the stored session is stale (access token expired) rather than a network
+ * problem — `requireSession` let the request through because the cookie is
+ * still *present*, and middleware only refreshes once it's gone. Bounce
+ * through login (which re-auths or uses the refresh token) instead of
+ * leaving the user on a dead-end "check your connection" screen they can
+ * never clear. Must be called from the catch block itself, not inside the
+ * try — `redirect()` throws a NEXT_REDIRECT that a surrounding `catch {}`
+ * would swallow.
+ */
+export function redirectToLoginIfUnauthorized(error: unknown, nextPath: string): void {
+  if (error instanceof ApiError && error.status === 401) {
     redirect(`/login?next=${encodeURIComponent(nextPath)}`);
   }
 }

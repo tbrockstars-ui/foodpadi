@@ -25,7 +25,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div className={styles.shell}>
       <aside className={styles.sidebar}>
         <div className={styles.sidebarBrand}>
-          <Logo withWordmark={false} size={28} />
+          <Logo withWordmark={false} size={34} />
           <span>FoodPadi admin</span>
         </div>
         <AdminSidebarNav />

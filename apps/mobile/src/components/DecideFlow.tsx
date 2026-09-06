@@ -1,6 +1,14 @@
-import React, { useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { DISCLAIMER_TEXT, type DecideResponse, type DecisionOptionView } from '@foodpadi/shared';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import {
+  LayoutAnimation,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { DISCLAIMER_TEXT, isVeganFood, type DecideResponse, type DecisionOptionView } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
@@ -12,6 +20,8 @@ import { LocalFoodSearch, type LocalFoodSearchStage } from './LocalFoodSearch';
 import { MemberBenefitCard } from './MemberBenefitCard';
 import { ShareNudge } from './ShareNudge';
 import { AdSlot } from './AdSlot';
+import { FadeInView } from './motion/FadeInView';
+import { useReduceMotion } from './motion/useReduceMotion';
 import { guestPrompts } from '../lib/guestPrompts';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -32,15 +42,11 @@ const PROMPT_CHIPS = [
 ];
 
 // A "Get it" option carries real dietary tags (option.foodIdea.tags); a
-// "Cook it" option's RecipeView has no tags field at all, so a genuinely
-// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
-// — falls back to the option's own title/reason text, which reliably says
-// so when it's true (the AI/curated titles are written that way already).
-// Matches web's DecideFlow.
+// "Cook it" option's RecipeView has no tags field at all — isVeganFood
+// (packages/shared) falls back to the option's own title/reason text for
+// that case. Matches web's DecideFlow.
 function isVeganOption(option: DecisionOptionView): boolean {
-  if (option.foodIdea?.tags?.includes('vegan')) return true;
-  const haystack = `${option.title} ${option.reason}`.toLowerCase();
-  return haystack.includes('vegan');
+  return isVeganFood({ tags: option.foodIdea?.tags, title: option.title, reason: option.reason });
 }
 
 /**
@@ -56,11 +62,32 @@ interface DecideFlowProps {
   onRequestLogin?: () => void;
 }
 
-export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
+/** Imperative handle for CompanionCard's "decide"-targeted CTAs (Usual Time,
+ * Goal Support, Variety) — they stay on Home rather than navigating anywhere,
+ * so they fill/focus the DecideFlow already on screen instead. */
+export interface DecideFlowHandle {
+  focusWithPrompt: (promptFill?: string) => void;
+}
+
+export const DecideFlow = forwardRef<DecideFlowHandle, DecideFlowProps>(function DecideFlow(
+  { onRequestLogin } = {},
+  ref,
+) {
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const guestSession = useGuestSession();
+  const reduceMotion = useReduceMotion();
+  const inputRef = useRef<TextInput>(null);
+
+  // Smooth the expand/collapse of an option's recipe / "find it nearby"
+  // detail (visual-redesign brief §19 — ~220ms, no bounce), honouring the
+  // OS reduce-motion setting.
+  const toggleExpanded = (id: string) => {
+    if (!reduceMotion) LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setGetSearchStage('idle');
+    setExpandedId((current) => (current === id ? null : id));
+  };
   // Same precedent as EatNowScreen: guests get a lazy, inline disclaimer
   // gate the first time they touch a feature that needs it, rather than the
   // whole app being blocked upfront — this is the entry point most guests
@@ -102,11 +129,14 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
     setGetSearchStage('idle');
   };
 
-  const decide = async (overrideDescription?: string) => {
+  const decide = async (overrideDescription?: string, explicitToken?: string) => {
     const trimmed = (overrideDescription ?? description).trim();
     if (trimmed.length < 3) return;
 
-    if (needsGuestDisclaimer) {
+    // Skip the local disclaimer gate when we were handed a token that was just
+    // acknowledged — the local `guestSession.disclaimerAcknowledged` in this
+    // closure hasn't updated yet.
+    if (needsGuestDisclaimer && !explicitToken) {
       setDisclaimerShown(true);
       return;
     }
@@ -117,19 +147,36 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
     setExpandedId(null);
     setOptions([]); // clear the previous selection's results immediately
     setGetSearchStage('idle');
+    const payload = {
+      description: trimmed,
+      budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
+    };
     try {
-      const token = await getToken();
-      const data: DecideResponse = await api.decide(
-        {
-          description: trimmed,
-          budgetPence: budgetPounds ? Math.round(Number(budgetPounds) * 100) : undefined,
-        },
-        token,
-      );
+      let data: DecideResponse;
+      try {
+        data = await api.decide(payload, explicitToken ?? (await getToken()));
+      } catch (e) {
+        // Guest token expired (401) or isn't disclaimer-acknowledged (403) —
+        // recover once, passing the rotated token straight through rather than
+        // re-resolving a stale one via getToken().
+        if (!user && e instanceof ApiError && e.status === 401) {
+          data = await api.decide(payload, await guestSession.recoverSession());
+        } else if (!user && e instanceof ApiError && e.status === 403) {
+          data = await api.decide(payload, await guestSession.acknowledgeDisclaimer());
+        } else {
+          throw e;
+        }
+      }
       if (reqId !== requestSeq.current) return; // superseded by a newer selection
-      setOptions(data.options);
-      setStage(data.options.length > 0 ? 'options' : 'no-options');
-      if (!user && data.options.length > 0 && onRequestLogin) {
+      // "Find Near Me" brief §14/§15 — Decide's results are "find it nearby"
+      // only now; a "cook" option would need re-selecting the food into a
+      // whole different flow, which the brief explicitly rules out. Filtered
+      // here rather than in the request itself, so /decide's own contract,
+      // tests, and Cook Today's separate tab are all untouched.
+      const getOptions = data.options.filter((o) => o.type === 'get');
+      setOptions(getOptions);
+      setStage(getOptions.length > 0 ? 'options' : 'no-options');
+      if (!user && getOptions.length > 0 && onRequestLogin) {
         const count = await guestPrompts.bumpCount('decide_options');
         const seen = await guestPrompts.hasSeen('decide_options');
         if (count >= 2 && !seen) {
@@ -149,9 +196,9 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
   const acknowledgeDisclaimer = async () => {
     setAcknowledging(true);
     try {
-      await guestSession.acknowledgeDisclaimer();
+      const token = await guestSession.acknowledgeDisclaimer();
       setDisclaimerShown(false);
-      await decide();
+      await decide(undefined, token);
     } finally {
       setAcknowledging(false);
     }
@@ -170,6 +217,13 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
     // the new selection before running it, not an immediate re-run.
     clearResults();
   };
+
+  useImperativeHandle(ref, () => ({
+    focusWithPrompt: (promptFill) => {
+      if (promptFill) pickChip(promptFill);
+      inputRef.current?.focus();
+    },
+  }));
 
   const handleDescriptionChange = (value: string) => {
     setDescription(value);
@@ -206,6 +260,7 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
   return (
     <View>
       <TextInput
+        ref={inputRef}
         style={styles.input}
         placeholder="Tell me what you want to eat"
         placeholderTextColor={colors.textFaint}
@@ -276,8 +331,9 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
       ) : null}
 
       {stage === 'options'
-        ? options.map((option) => (
-            <Card key={option.id} style={styles.optionCard}>
+        ? options.map((option, index) => (
+            <FadeInView key={option.id} delay={index * 40}>
+              <Card style={styles.optionCard}>
               <FoodImage
                 image={option.image}
                 alt={option.title}
@@ -289,57 +345,42 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
                   <Text style={styles.optionTitle}>{option.title}</Text>
                   <Text style={styles.optionReason}>{option.reason}</Text>
                 </View>
-                <View style={[styles.optionTypeBadge, option.type === 'cook' ? styles.optionTypeCook : styles.optionTypeGet]}>
-                  <Text
-                    style={[
-                      styles.optionTypeBadgeText,
-                      option.type === 'cook' ? styles.optionTypeCookText : styles.optionTypeGetText,
-                    ]}
-                  >
-                    {option.type === 'cook' ? 'Cook it' : 'Order now'}
-                  </Text>
-                </View>
               </View>
 
-              {expandedId === option.id && option.type === 'get' && getSearchBusy ? null : (
-                <TouchableOpacity
-                  style={styles.optionAction}
+              {/* "Find Near Me" — the one CTA a Decide result has. Tapping it
+                  immediately searches for this already-selected food near the
+                  user (LocalFoodSearch's autoStart below); it never re-asks
+                  what food to look for. */}
+              {expandedId === option.id ? (
+                getSearchBusy ? null : (
+                  <TouchableOpacity
+                    style={styles.optionAction}
+                    onPress={() => toggleExpanded(option.id)}
+                    accessibilityRole="button"
+                  >
+                    <Text style={styles.optionActionText}>Hide</Text>
+                  </TouchableOpacity>
+                )
+              ) : (
+                <Button
+                  label="Find Near Me"
                   onPress={() => {
-                    setGetSearchStage('idle');
-                    setExpandedId(expandedId === option.id ? null : option.id);
+                    void getToken().then((token) =>
+                      api.trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title }, token),
+                    );
+                    toggleExpanded(option.id);
                   }}
-                  accessibilityRole="button"
-                >
-                  <Text style={styles.optionActionText}>
-                    {expandedId === option.id ? 'Hide' : option.type === 'cook' ? 'Show recipe' : 'Find it nearby'}
-                  </Text>
-                </TouchableOpacity>
+                  style={styles.findNearMeButton}
+                />
               )}
 
-              {expandedId === option.id && option.type === 'cook' && option.recipe ? (
-                <View style={styles.optionDetail}>
-                  {option.recipe.ingredients.map((ing, i) => (
-                    <Text key={i} style={styles.ingredientLine}>
-                      {ing.quantity ? `${ing.quantity} ` : ''}
-                      {ing.unit ? `${ing.unit} ` : ''}
-                      {ing.name}
-                    </Text>
-                  ))}
-                  {option.recipe.steps.map((step, i) => (
-                    <View key={i} style={styles.stepRow}>
-                      <Text style={styles.stepNumber}>{i + 1}</Text>
-                      <Text style={styles.stepText}>{step}</Text>
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-
-              {expandedId === option.id && option.type === 'get' ? (
+              {expandedId === option.id ? (
                 <View style={styles.optionDetail}>
                   <LocalFoodSearch query={option.title} getToken={getToken} autoStart onStageChange={setGetSearchStage} />
                 </View>
               ) : null}
-            </Card>
+              </Card>
+            </FadeInView>
           ))
         : null}
 
@@ -360,7 +401,7 @@ export function DecideFlow({ onRequestLogin }: DecideFlowProps = {}) {
       {stage === 'options' && user ? <ShareNudge context="decision" /> : null}
     </View>
   );
-}
+});
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
@@ -436,18 +477,9 @@ function makeStyles(c: ThemeColors) {
   optionHeaderText: { flex: 1 },
   optionTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
   optionReason: { ...typography.body, color: c.textMuted },
-  optionTypeBadge: { borderRadius: radius.pill, paddingVertical: 4, paddingHorizontal: spacing.md },
-  optionTypeCook: { backgroundColor: c.primarySoft },
-  optionTypeGet: { backgroundColor: c.accentSoft },
-  optionTypeBadgeText: { fontSize: 12, fontWeight: '700' },
-  optionTypeCookText: { color: c.primary },
-  optionTypeGetText: { color: c.accent },
   optionAction: { marginTop: spacing.md },
   optionActionText: { color: c.primary, fontSize: 14, fontWeight: '600' },
+  findNearMeButton: { marginTop: spacing.md },
   optionDetail: { marginTop: spacing.md },
-  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
-  stepRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
-  stepNumber: { fontSize: 13, fontWeight: '700', color: c.primary, width: 18 },
-  stepText: { ...typography.body, color: c.text, flex: 1 },
   });
 }

@@ -81,3 +81,72 @@ describe('CookTodayService.generate — guest never triggers AI', () => {
     expect(recipes[0].title).toBe('AI Chicken Bowl');
   });
 });
+
+describe('CookTodayService favorites engine', () => {
+  let prisma: {
+    recipe: { findUnique: jest.Mock; update: jest.Mock; findMany: jest.Mock };
+    foodFeedback: { findMany: jest.Mock };
+  };
+  let analytics: { track: jest.Mock };
+  let service: CookTodayService;
+
+  beforeEach(() => {
+    prisma = {
+      recipe: { findUnique: jest.fn(), update: jest.fn(), findMany: jest.fn().mockResolvedValue([]) },
+      foodFeedback: { findMany: jest.fn().mockResolvedValue([]) },
+    };
+    analytics = { track: jest.fn() };
+    service = new CookTodayService(
+      {} as unknown as ClaudeService,
+      prisma as unknown as PrismaService,
+      analytics as unknown as AnalyticsService,
+    );
+  });
+
+  describe('toggleFavorite', () => {
+    it('sets isFavorite on a recipe the user owns', async () => {
+      prisma.recipe.findUnique.mockResolvedValue({ id: 'r1', createdByUserId: 'u1', deletedAt: null });
+      const result = await service.toggleFavorite('r1', 'u1', { isFavorite: true });
+      expect(prisma.recipe.update).toHaveBeenCalledWith({ where: { id: 'r1' }, data: { isFavorite: true } });
+      expect(result).toEqual({ isFavorite: true });
+    });
+
+    it("rejects toggling another user's recipe", async () => {
+      prisma.recipe.findUnique.mockResolvedValue({ id: 'r1', createdByUserId: 'someone-else', deletedAt: null });
+      await expect(service.toggleFavorite('r1', 'u1', { isFavorite: true })).rejects.toThrow();
+      expect(prisma.recipe.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects toggling a recipe that does not exist', async () => {
+      prisma.recipe.findUnique.mockResolvedValue(null);
+      await expect(service.toggleFavorite('missing', 'u1', { isFavorite: true })).rejects.toThrow();
+    });
+  });
+
+  describe('listFavorites', () => {
+    it('includes hearted and 5-star-rated recipes in one query', async () => {
+      prisma.foodFeedback.findMany.mockResolvedValue([{ entityId: 'loved-by-rating' }]);
+      await service.listFavorites('u1');
+      expect(prisma.foodFeedback.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: 'u1', entityType: 'RECIPE', rating: { gte: 5 } }),
+        }),
+      );
+      expect(prisma.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            createdByUserId: 'u1',
+            OR: [{ isFavorite: true }, { id: { in: ['loved-by-rating'] } }],
+          }),
+        }),
+      );
+    });
+
+    it('still queries correctly with no 5-star feedback at all', async () => {
+      await service.listFavorites('u1');
+      expect(prisma.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.objectContaining({ OR: [{ isFavorite: true }, { id: { in: [] } }] }) }),
+      );
+    });
+  });
+});

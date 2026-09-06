@@ -45,10 +45,17 @@ export function useGoogleSignIn(onError: (message: string) => void): GoogleSignI
   const { loginWithGoogle } = useAuth();
   const [busy, setBusy] = useState(false);
 
+  // expo-auth-session 57's `useAuthRequest` hard-throws at render if the
+  // current platform's client id is missing ("iosClientId must be defined"),
+  // before our `available` gate below can hide the button. iOS hasn't been
+  // configured here yet (app.json's googleAuth.iosClientId is ""), so fall
+  // back to the web client id purely to satisfy that invariant — the button
+  // stays hidden on iOS (and in Expo Go) via `platformClientId` below, so
+  // this value is never actually used for a request.
   const [request, response, promptAsync] = Google.useAuthRequest({
     webClientId: cfg.webClientId,
     androidClientId: cfg.androidClientId,
-    iosClientId: cfg.iosClientId || undefined,
+    iosClientId: cfg.iosClientId || cfg.webClientId,
   });
 
   useEffect(() => {

@@ -15,35 +15,39 @@ datasource db {
 }
 
 model User {
-  id                       String    @id @default(uuid())
-  email                    String    @unique
-  passwordHash             String?
-  authProvider             String    @default("password") // "password" | "apple" | "google"
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String?
+  authProvider String    @default("password") // "password" | "apple" | "google"
   // Personal referral code ("Feed a Friend", docs/REFERRAL_PLAN.md). Minted
   // lazily the first time the user asks for their invite link — most accounts
   // never share, so there's no point generating one at registration.
-  referralCode             String?   @unique @map("referral_code")
-  createdAt                DateTime  @default(now())
-  updatedAt                DateTime  @updatedAt
-  deletedAt                DateTime?
+  referralCode String?   @unique @map("referral_code")
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
-  profile                  UserProfile?
-  foodGoals                FoodGoal[]
-  foodPreferences          FoodPreference[]
-  avoidedIngredients       AvoidedIngredient[]
-  householdMemberships     HouseholdMember[]
-  createdHouseholds        Household[]        @relation("HouseholdCreator")
-  refreshTokens            RefreshToken[]
-  passwordResetTokens      PasswordResetToken[]
-  aiMemory                 AiMemory[]
-  recipes                  Recipe[]
-  foodEvents               FoodEvent[]
-  mealPlans                MealPlan[]
-  shoppingLists            ShoppingList[]
-  pantryItems              PantryItem[]
-  referralsMade            Referral[]        @relation("Referrer")
-  referralReceived         Referral?         @relation("Referred")
-  referralMilestones       ReferralMilestone[]
+  profile              UserProfile?
+  foodGoals            FoodGoal[]
+  foodPreferences      FoodPreference[]
+  avoidedIngredients   AvoidedIngredient[]
+  householdMemberships HouseholdMember[]
+  createdHouseholds    Household[]           @relation("HouseholdCreator")
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  aiMemory             AiMemory[]
+  recipes              Recipe[]
+  foodEvents           FoodEvent[]
+  mealPlans            MealPlan[]
+  shoppingLists        ShoppingList[]
+  pantryItems          PantryItem[]
+  referralsMade        Referral[]            @relation("Referrer")
+  referralReceived     Referral?             @relation("Referred")
+  referralMilestones   ReferralMilestone[]
+  foodPatterns         FoodPattern[]
+  companionSuggestions CompanionSuggestion[]
+  companionPreference  CompanionPreference?
+  foodFeedback         FoodFeedback[]
 
   @@map("users")
 }
@@ -62,13 +66,13 @@ model UserProfile {
 }
 
 model RefreshToken {
-  id         String    @id @default(uuid())
-  userId     String    @map("user_id")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash  String    @unique @map("token_hash")
-  expiresAt  DateTime  @map("expires_at")
-  revokedAt  DateTime? @map("revoked_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
   @@map("refresh_tokens")
 }
@@ -132,18 +136,18 @@ model FoodGoal {
 }
 
 model FoodPreference {
-  id                String    @id @default(uuid())
-  userId            String    @map("user_id")
-  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  cuisine           String?
-  likedMeal         String?   @map("liked_meal")
-  dislikedIngredient String?  @map("disliked_ingredient")
-  textureDislike    String?   @map("texture_dislike")
-  cookingStyle      String?   @map("cooking_style")
-  source            String    @default("explicit") // "explicit" | "inferred"
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
-  deletedAt         DateTime? @map("deleted_at")
+  id                 String    @id @default(uuid())
+  userId             String    @map("user_id")
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cuisine            String?
+  likedMeal          String?   @map("liked_meal")
+  dislikedIngredient String?   @map("disliked_ingredient")
+  textureDislike     String?   @map("texture_dislike")
+  cookingStyle       String?   @map("cooking_style")
+  source             String    @default("explicit") // "explicit" | "inferred"
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  deletedAt          DateTime? @map("deleted_at")
 
   @@map("food_preferences")
 }
@@ -168,13 +172,13 @@ model AvoidedIngredient {
 // set, never neither — guest activity (Eat Now/Cook Today) is tracked
 // separately from account activity until/unless the guest converts.
 model FoodEvent {
-  id             String    @id @default(uuid())
-  userId         String?   @map("user_id")
-  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  guestSessionId String?   @map("guest_session_id")
-  eventType      String    @map("event_type")
+  id             String   @id @default(uuid())
+  userId         String?  @map("user_id")
+  user           User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  guestSessionId String?  @map("guest_session_id")
+  eventType      String   @map("event_type")
   metadata       Json?
-  occurredAt     DateTime  @default(now()) @map("occurred_at")
+  occurredAt     DateTime @default(now()) @map("occurred_at")
 
   @@index([userId])
   @@index([guestSessionId])
@@ -258,17 +262,29 @@ model Recipe {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
   deletedAt       DateTime? @map("deleted_at")
+  // Set (and overwritten on every re-cook) when the owner finishes a guided
+  // Cook Today session for this recipe — apps/web CookingSession /
+  // apps/mobile CookingSessionScreen's "Finish Cooking" step, independent of
+  // whether they go on to rate it. Home's "Recently cooked" engine
+  // (HomeService.getRecentlyCooked) is the only reader.
+  lastCookedAt    DateTime? @map("last_cooked_at")
+  // Explicit "loved" flag — the heart on a recipe card (LikeHeart.tsx).
+  // The Favorites engine (CookTodayService.listFavorites) shows a recipe
+  // here OR because it has a 5-star FoodFeedback rating — this flag alone
+  // doesn't decide favourite status, it's one of two signals.
+  isFavorite      Boolean   @default(false) @map("is_favorite")
 
-  ingredients     RecipeIngredient[]
-  mealPlanItems   MealPlanItem[]
+  ingredients   RecipeIngredient[]
+  mealPlanItems MealPlanItem[]
 
+  @@index([createdByUserId, lastCookedAt])
   @@map("recipes")
 }
 
 model RecipeIngredient {
-  id       String @id @default(uuid())
-  recipeId String @map("recipe_id")
-  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  id       String  @id @default(uuid())
+  recipeId String  @map("recipe_id")
+  recipe   Recipe  @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   name     String
   quantity String?
   unit     String?
@@ -284,7 +300,7 @@ model MealPlan {
   id          String    @id @default(uuid())
   userId      String    @map("user_id")
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scope       String    // "today" | "3day" | "week" | "custom"
+  scope       String // "today" | "3day" | "week" | "custom"
   startDate   DateTime  @map("start_date")
   endDate     DateTime  @map("end_date")
   budgetPence Int?      @map("budget_pence")
@@ -389,15 +405,15 @@ model WaitlistSignup {
 // confirms the reviewed list — this table only ever holds confirmed rows,
 // never raw scan output. `source` distinguishes how an item was added.
 model PantryItem {
-  id         String    @id @default(uuid())
-  userId     String    @map("user_id")
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String
-  quantity   String?
-  unit       String?
-  source     String    @default("manual") // "manual" | "scan_photo"
-  createdAt  DateTime  @default(now()) @map("created_at")
-  deletedAt  DateTime? @map("deleted_at")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  quantity  String?
+  unit      String?
+  source    String    @default("manual") // "manual" | "scan_photo"
+  createdAt DateTime  @default(now()) @map("created_at")
+  deletedAt DateTime? @map("deleted_at")
 
   @@index([userId])
   @@map("pantry_items")
@@ -473,4 +489,110 @@ model FoodImageCache {
   retrievedAt      DateTime @default(now()) @map("retrieved_at")
 
   @@map("food_image_cache")
+}
+
+// ---------------------------------------------------------------------------
+// FoodPadi Memory & Companion — a deterministic behavioural-intelligence
+// layer over FoodPadi's own decision events (docs: the Memory & Companion
+// brief). Members only — a guest never gets a row in any of these three
+// tables (guest-mode brief §16: no persistent behavioural profiling for
+// guests). Deliberately food-decision facts only: no medical, location or
+// unrelated-activity inference (see PatternService).
+
+// One recomputed row per detected behaviour, upserted by (userId,
+// patternType, patternKey) — e.g. ('meal_time', 'weekday_dinner'),
+// ('day_routine', 'friday'), ('meal_repetition', 'Jollof Rice'). Recomputed
+// lazily inside CompanionService.getSuggestion(), not on a schedule — see
+// PatternService. `status` flips to "stale" once confidence decays below the
+// floor; stale patterns are excluded from candidate generation but kept
+// (not deleted) so a returning behaviour picks up its evidence history
+// again instead of starting from zero.
+model FoodPattern {
+  id              String   @id @default(uuid())
+  userId          String   @map("user_id")
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  patternType     String   @map("pattern_type")
+  patternKey      String   @map("pattern_key")
+  patternValue    String   @map("pattern_value")
+  confidence      Float    @default(0)
+  evidenceCount   Int      @default(0) @map("evidence_count")
+  firstObservedAt DateTime @map("first_observed_at")
+  lastObservedAt  DateTime @map("last_observed_at")
+  status          String   @default("active") @map("status") // "active" | "stale"
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, patternType, patternKey])
+  @@index([userId, status])
+  @@map("food_patterns")
+}
+
+// One row per suggestion actually generated and shown — the record
+// suppression rules, negative-feedback learning and analytics all read from.
+// `generatedAt`/`deliveredAt` are set together: returning a suggestion to the
+// client from GET /companion/suggestion *is* delivering it.
+model CompanionSuggestion {
+  id             String    @id @default(uuid())
+  userId         String    @map("user_id")
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  suggestionType String    @map("suggestion_type") // "usual_time" | "use_what_you_have" | "goal_support" | "variety" | "routine" | "plan_support"
+  reason         String
+  score          Float
+  metadata       Json?
+  generatedAt    DateTime  @default(now()) @map("generated_at")
+  deliveredAt    DateTime? @map("delivered_at")
+  openedAt       DateTime? @map("opened_at")
+  action         String? // "opened" | "accepted" | "dismissed" | "not_useful" | "do_not_remind"
+  actionedAt     DateTime? @map("actioned_at")
+
+  @@index([userId, generatedAt])
+  @@index([userId, suggestionType])
+  @@map("companion_suggestions")
+}
+
+// Per-user Companion controls (guest-mode brief §13 "user control"). One row,
+// created lazily with defaults on first read — see CompanionService.
+model CompanionPreference {
+  userId               String   @id @map("user_id")
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled              Boolean  @default(true)
+  notificationsEnabled Boolean  @default(true) @map("notifications_enabled")
+  // Suggestion types the user has explicitly asked never to see again
+  // ("Don't remind me"), excluded from candidate generation until reset.
+  mutedTypes           String[] @map("muted_types")
+  maxDailySuggestions  Int      @default(1) @map("max_daily_suggestions")
+  maxWeeklySuggestions Int      @default(3) @map("max_weekly_suggestions")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  @@map("companion_preferences")
+}
+
+// Explicit user feedback (Feedback & Rating brief) — a star rating plus
+// optional quick tags/comment, given at most one occasion per row so
+// cooking/eating the same recipe repeatedly and rating it each time
+// accumulates real cumulative evidence rather than overwriting one row.
+// Deliberately NOT unique-constrained per (user, entity) for that reason.
+// Feeds PatternService's 'recipe_feedback'/'cuisine_feedback'/
+// 'plan_satisfaction' detectors — explicit feedback is stronger evidence
+// than the passive behavioural signals the other detectors use, weighted
+// accordingly there rather than by a second confidence system here.
+// Never read for allergy/medical inference — avoided_ingredients remains
+// the only hard exclusion; feedback only ever adjusts soft ranking.
+model FoodFeedback {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  entityType String    @map("entity_type") // "RECIPE" | "MEAL" | "PLAN"
+  entityId   String    @map("entity_id")   // Recipe.id | FoodIdea.id | MealPlan.id
+  context    String                        // "EAT_NOW" | "COOK" | "PLAN" | "DECIDE" | "ORDER" | "OTHER"
+  rating     Int                           // 1-5
+  tags       String[]                      // quick-tag keys, e.g. ["loved_it", "would_make_again"]
+  comment    String?
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+  deletedAt  DateTime? @map("deleted_at")
+
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@map("food_feedback")
 }

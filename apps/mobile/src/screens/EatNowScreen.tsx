@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { DISCLAIMER_TEXT, FoodIdeaView } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
@@ -7,14 +7,16 @@ import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
 import { AdSlot } from '../components/AdSlot';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { FoodImage } from '../components/FoodImage';
 import { LoadingState } from '../components/LoadingState';
 import { LocalFoodSearch } from '../components/LocalFoodSearch';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { Tag } from '../components/Tag';
-import { spacing, typography, type ThemeColors } from '../theme/colors';
+import { FadeInView } from '../components/motion/FadeInView';
+import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
@@ -66,6 +68,13 @@ export function EatNowScreen({ navigation, route }: Props) {
         // fresh guest session and retrying once before giving up.
         if (!user && !explicitToken && e instanceof ApiError && e.status === 401) {
           found = await api.searchEatNow({ query: searchQuery, maxPricePence }, await guestSession.recoverSession());
+        } else if (!user && !explicitToken && e instanceof ApiError && e.status === 403) {
+          // Guest token isn't disclaimer-acknowledged — acknowledge and retry
+          // once with the rotated token.
+          found = await api.searchEatNow(
+            { query: searchQuery, maxPricePence },
+            await guestSession.acknowledgeDisclaimer(),
+          );
         } else {
           throw e;
         }
@@ -117,13 +126,18 @@ export function EatNowScreen({ navigation, route }: Props) {
 
   if (step === 'disclaimer') {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Before you start</Text>
+      <Screen>
+        <ScreenHeader title="Before you start" />
         <ScrollView style={styles.disclaimerBox} contentContainerStyle={{ padding: spacing.lg }}>
           <Text style={styles.disclaimerText}>{DISCLAIMER_TEXT}</Text>
         </ScrollView>
-        <Button label="I understand" onPress={acknowledgeDisclaimer} loading={acknowledging} style={styles.actionSpacing} />
-      </View>
+        <Button
+          label="I understand"
+          onPress={acknowledgeDisclaimer}
+          loading={acknowledging}
+          style={styles.actionSpacing}
+        />
+      </Screen>
     );
   }
 
@@ -133,12 +147,13 @@ export function EatNowScreen({ navigation, route }: Props) {
 
   if (step === 'results') {
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <BackLink label={params?.whyLabel ? 'Home' : 'Try another search'} onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>A few ideas</Text>
-        {params?.whyLabel ? (
-          <Text style={styles.whyText}>Because you're after: {params.whyLabel}</Text>
-        ) : null}
+      <Screen scroll>
+        <ScreenHeader
+          title="A few ideas"
+          subtitle={params?.whyLabel ? `Because you're after: ${params.whyLabel}` : undefined}
+          onBack={() => (params?.whyLabel ? navigation.goBack() : setStep('search'))}
+          backLabel={params?.whyLabel ? 'Home' : 'New search'}
+        />
         <Text style={styles.disclaimerNote}>
           Example suggestions from a small curated list — cuisine and price band are real; distance,
           delivery time and exact price are illustrative estimates, not live data from any restaurant.
@@ -147,31 +162,34 @@ export function EatNowScreen({ navigation, route }: Props) {
         {results.length === 0 ? (
           <View>
             <Text style={styles.emptyText}>
-              I couldn't find a good match with all those preferences. Try removing one, or search for
-              something else.
+              I couldn&apos;t find a good match with all those preferences. Try removing one, or search
+              for something else.
             </Text>
             <Button label="Try again" variant="secondary" onPress={() => setStep('search')} style={styles.actionSpacing} />
           </View>
         ) : (
-          results.map((idea) => (
-            <Card key={idea.id} style={styles.resultCard}>
-              <FoodImage
-                image={idea.image}
-                alt={idea.title}
-                style={styles.resultImage}
-                badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
-              />
-              <Text style={styles.resultTitle}>{idea.title}</Text>
-              <Text style={styles.resultBody}>{idea.description}</Text>
-              <Text style={styles.estimateText}>
-                ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
-                {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
-              </Text>
-              <View style={styles.tagRow}>
-                <Tag label={idea.cuisine} />
-                <Tag label={BUDGET_LABEL[idea.budgetTier]} />
-              </View>
-            </Card>
+          results.map((idea, index) => (
+            <FadeInView key={idea.id} delay={index * 40}>
+              <Card style={styles.resultCard}>
+                <FoodImage
+                  image={idea.image}
+                  alt={idea.title}
+                  style={styles.resultImage}
+                  badge={idea.tags.includes('vegan') ? 'Vegan' : undefined}
+                />
+                <Text style={styles.resultTitle}>{idea.title}</Text>
+                <Text style={styles.resultBody}>{idea.description}</Text>
+                <Text style={styles.estimateText}>
+                  ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
+                  {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
+                </Text>
+                <Text style={styles.illustrativeTag}>Example only — not a specific place</Text>
+                <View style={styles.tagRow}>
+                  <Tag label={idea.cuisine} />
+                  <Tag label={BUDGET_LABEL[idea.budgetTier]} />
+                </View>
+              </Card>
+            </FadeInView>
           ))
         )}
 
@@ -181,15 +199,18 @@ export function EatNowScreen({ navigation, route }: Props) {
             <AdSlot placement="eat_now_results" />
           </>
         ) : null}
-      </ScrollView>
+      </Screen>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Home" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>What are you after?</Text>
-      <Text style={styles.subtitle}>Tell us what you fancy — a dish, a cuisine, anything.</Text>
+    <Screen scroll>
+      <ScreenHeader
+        title="What are you after?"
+        subtitle="Tell us what you fancy — a dish, a cuisine, anything."
+        onBack={() => navigation.goBack()}
+        backLabel="Home"
+      />
 
       <TextInput
         style={styles.searchInput}
@@ -208,44 +229,55 @@ export function EatNowScreen({ navigation, route }: Props) {
       <Button label="Find food" onPress={search} disabled={!query.trim()} style={styles.actionSpacing} />
 
       <LocalFoodSearch query={query} getToken={getToken} />
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
-  whyText: { ...typography.body, color: c.primary, marginBottom: spacing.sm, fontWeight: '600' },
-  disclaimerNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
-  guestNudge: { ...typography.caption, color: c.textFaint, textAlign: 'center', marginTop: spacing.lg },
-  emptyText: { ...typography.body, color: c.textMuted, marginBottom: spacing.md },
-  searchInput: {
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.surface,
-    borderRadius: 12,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 15,
-    color: c.text,
-  },
-  errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
-  actionSpacing: { marginTop: spacing.xl },
-  resultCard: { marginBottom: spacing.md },
-  resultImage: { marginBottom: spacing.md },
-  resultTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
-  resultBody: { ...typography.body, color: c.textMuted, marginBottom: spacing.sm },
-  estimateText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.sm },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  disclaimerBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: 16,
-    backgroundColor: c.surface,
-  },
-  disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
+    disclaimerNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.lg, lineHeight: 18 },
+    guestNudge: { ...typography.caption, color: c.textFaint, textAlign: 'center', marginTop: spacing.lg },
+    emptyText: { ...typography.body, color: c.textMuted, marginBottom: spacing.md },
+    searchInput: {
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      fontSize: 15,
+      color: c.text,
+    },
+    errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
+    actionSpacing: { marginTop: spacing.xl },
+    resultCard: { marginBottom: spacing.md },
+    resultImage: { marginBottom: spacing.md },
+    resultTitle: { ...typography.title, color: c.text, marginBottom: spacing.xs },
+    resultBody: { ...typography.body, color: c.textMuted, marginBottom: spacing.sm },
+    estimateText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.sm },
+    // Sits right on the illustrative card, not just the disclaimer text
+    // above the list — see the matching comment in web's eat-now.module.css.
+    illustrativeTag: {
+      alignSelf: 'flex-start',
+      fontSize: 11,
+      fontWeight: '600',
+      color: c.textFaint,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: c.border,
+      borderRadius: radius.pill,
+      paddingVertical: 2,
+      paddingHorizontal: 10,
+      marginBottom: spacing.sm,
+    },
+    tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    disclaimerBox: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.lg,
+      backgroundColor: c.surface,
+    },
+    disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
   });
 }

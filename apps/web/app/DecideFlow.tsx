@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { motion, useReducedMotion } from 'framer-motion';
-import type { DecideResponse, DecisionOptionView } from '@foodpadi/shared';
+import { isVeganFood, type DecideResponse, type DecisionOptionView } from '@foodpadi/shared';
 import { LocalFoodSearch, type LocalFoodSearchStage } from './eat-now/LocalFoodSearch';
 import { AiThinking } from '../components/motion/AiThinking';
 import { FoodImage } from '../components/FoodImage';
@@ -10,6 +11,7 @@ import { MemberBenefitCard } from '../components/MemberBenefitCard';
 import { ShareNudge } from '../components/ShareNudge';
 import { AdSlot } from '../components/AdSlot';
 import { guestPrompts } from '../lib/guestClient';
+import { trackLocalFoodSearchInteraction } from '../lib/localFoodSearchTracking';
 import styles from './home.module.css';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
@@ -29,14 +31,12 @@ const PROMPT_CHIPS = [
 ];
 
 // A "Get it" option carries real dietary tags (option.foodIdea.tags); a
-// "Cook it" option's RecipeView has no tags field at all, so a genuinely
-// vegan recipe (e.g. "Vegan Lentil Dahl") would never match on tags alone
-// — falls back to the option's own title/reason text, which reliably says
-// so when it's true (the AI/curated titles are written that way already).
+// "Cook it" option's RecipeView has no tags field at all — isVeganFood
+// (packages/shared) falls back to the option's own title/reason text for
+// that case, which reliably says so when it's true (the AI/curated titles
+// are written that way already).
 function isVeganOption(option: DecisionOptionView): boolean {
-  if (option.foodIdea?.tags?.includes('vegan')) return true;
-  const haystack = `${option.title} ${option.reason}`.toLowerCase();
-  return haystack.includes('vegan');
+  return isVeganFood({ tags: option.foodIdea?.tags, title: option.title, reason: option.reason });
 }
 
 // A function (not a static object) so it can drop the translateY move and
@@ -62,8 +62,17 @@ const optionVariants = (prefersReducedMotion: boolean) => ({
  * options via POST /decide, rather than making the user pick a mode first.
  */
 export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
-  const [description, setDescription] = useState('');
-  const [budgetPounds, setBudgetPounds] = useState('');
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Seeded from the URL (once, on first render) rather than always starting
+  // blank — otherwise loading e.g. "/?mood=vegan" directly (a shared link,
+  // or just refreshing) would show vegan-filtered Ideas-for-you for one
+  // instant, then the sync effect below sees this component's own
+  // description as blank and immediately deletes ?mood= again, silently
+  // reverting the very state that got the user here.
+  const [description, setDescription] = useState(() => searchParams.get('mood') ?? '');
+  const [budgetPounds, setBudgetPounds] = useState(() => searchParams.get('maxBudget') ?? '');
   const [stage, setStage] = useState<Stage>('idle');
   const [options, setOptions] = useState<DecisionOptionView[]>([]);
   // Guests only: shown under the options once they've decided a couple of
@@ -83,6 +92,33 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
   // there's nothing meaningful to collapse back to yet.
   const getSearchBusy = getSearchStage === 'asking-permission' || getSearchStage === 'searching';
   const handleGetSearchStageChange = useCallback((s: LocalFoodSearchStage) => setGetSearchStage(s), []);
+
+  // Reflects the current description/budget into the URL's ?mood=&maxBudget=
+  // — the same query params HomeHub.tsx's "Ideas for you" already reads
+  // server-side (see loadIdeaCards/ideasSearchParams there); this is the
+  // wiring that comment says wasn't connected yet. Debounced so typing
+  // doesn't fire a navigation on every keystroke, and doesn't touch
+  // /decide's own request at all — Ideas-for-you re-ranks independently of
+  // whether "Decide for me" has been pressed.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString());
+      const mood = description.trim();
+      if (mood) params.set('mood', mood);
+      else params.delete('mood');
+
+      const budget = Math.round(Number(budgetPounds));
+      if (budgetPounds.trim() && Number.isFinite(budget) && budget > 0) params.set('maxBudget', String(budget));
+      else params.delete('maxBudget');
+
+      const qs = params.toString();
+      const next = qs ? `${pathname}?${qs}` : pathname;
+      const current = searchParams.toString() ? `${pathname}?${searchParams.toString()}` : pathname;
+      if (next !== current) router.replace(next, { scroll: false });
+    }, 500);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [description, budgetPounds]);
 
   // Wipe any options/error/empty-state currently on screen back to the blank
   // slate. Used whenever the inputs change so a stale result set for the
@@ -129,9 +165,13 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
       }
       const data = (await res.json()) as DecideResponse;
       if (reqId !== requestSeq.current) return;
-      setOptions(data.options);
-      setStage(data.options.length > 0 ? 'options' : 'no-options');
-      if (isGuest && data.options.length > 0) {
+      // "Find Near Me" brief §14/§15 — Decide's results are "find it nearby"
+      // only now; filtered here rather than in the request itself, so
+      // /decide's own contract and tests are untouched.
+      const getOptions = data.options.filter((o) => o.type === 'get');
+      setOptions(getOptions);
+      setStage(getOptions.length > 0 ? 'options' : 'no-options');
+      if (isGuest && getOptions.length > 0) {
         const count = guestPrompts.bumpCount('decide_options');
         if (count >= 2 && !guestPrompts.hasSeen('decide_options')) {
           setShowBenefit(true);
@@ -188,14 +228,16 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
 
   return (
     <div className={styles.decideSection}>
-      <input
-        className={styles.decideInput}
-        type="text"
-        placeholder="Tell me what you want to eat"
-        value={description}
-        onChange={(e) => handleDescriptionChange(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && decide()}
-      />
+      <div className={styles.searchBar}>
+        <input
+          className={styles.decideInput}
+          type="text"
+          placeholder="Tell me what you want to eat…"
+          value={description}
+          onChange={(e) => handleDescriptionChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && decide()}
+        />
+      </div>
 
       <div className={styles.chipRow}>
         {PROMPT_CHIPS.map((chip) => (
@@ -231,17 +273,19 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
           />
         </div>
       </div>
-      <motion.button
-        type="button"
-        className={styles.decideButton}
-        onClick={() => decide()}
-        disabled={description.trim().length < 3 || stage === 'deciding'}
-        whileHover={prefersReducedMotion ? undefined : { y: -2, boxShadow: '0 8px 20px rgba(47,107,79,0.35)' }}
-        whileTap={{ scale: 0.97 }}
-        transition={{ type: 'tween', duration: 0.15 }}
-      >
-        {stage === 'deciding' ? 'Deciding…' : '✨ Decide for me'}
-      </motion.button>
+
+      <div className={styles.decideButtonRow}>
+        <motion.button
+          type="button"
+          className={styles.searchButton}
+          onClick={() => decide()}
+          disabled={description.trim().length < 3 || stage === 'deciding'}
+          whileHover={prefersReducedMotion ? undefined : { scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          <span aria-hidden="true">✨</span> {stage === 'deciding' ? 'Deciding…' : 'Decide for me'}
+        </motion.button>
+      </div>
 
       {stage === 'deciding' ? <AiThinking /> : null}
 
@@ -298,47 +342,40 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
                   <p className={styles.optionTitle}>{option.title}</p>
                   <p className={styles.optionReason}>{option.reason}</p>
                 </div>
-                <span
-                  className={`${styles.optionTypeBadge} ${
-                    option.type === 'cook' ? styles.optionTypeCook : styles.optionTypeGet
-                  }`}
-                >
-                  {option.type === 'cook' ? 'Cook it' : 'Order now'}
-                </span>
               </div>
 
-              {expandedId === option.id && option.type === 'get' && getSearchBusy ? null : (
+              {/* "Find Near Me" — the one CTA a Decide result has. Clicking
+                  it immediately searches for this already-selected food near
+                  the user (LocalFoodSearch's autoStart below); it never
+                  re-asks what food to look for. */}
+              {expandedId === option.id ? (
+                getSearchBusy ? null : (
+                  <button
+                    type="button"
+                    className={styles.optionAction}
+                    onClick={() => {
+                      setGetSearchStage('idle');
+                      setExpandedId(null);
+                    }}
+                  >
+                    Hide
+                  </button>
+                )
+              ) : (
                 <button
                   type="button"
-                  className={styles.optionAction}
+                  className={styles.findNearMeButton}
                   onClick={() => {
+                    trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title });
                     setGetSearchStage('idle');
-                    setExpandedId(expandedId === option.id ? null : option.id);
+                    setExpandedId(option.id);
                   }}
                 >
-                  {expandedId === option.id ? 'Hide' : option.type === 'cook' ? 'Show recipe' : 'Find it nearby'}
+                  Find Near Me
                 </button>
               )}
 
-              {expandedId === option.id && option.type === 'cook' && option.recipe ? (
-                <div className={styles.optionDetail}>
-                  {option.recipe.ingredients.map((ing, i) => (
-                    <p key={i} className={styles.ingredientLine}>
-                      {ing.quantity ? `${ing.quantity} ` : ''}
-                      {ing.unit ? `${ing.unit} ` : ''}
-                      {ing.name}
-                    </p>
-                  ))}
-                  {option.recipe.steps.map((step, i) => (
-                    <div key={i} className={styles.stepRow}>
-                      <span className={styles.stepNumber}>{i + 1}</span>
-                      <span className={styles.stepText}>{step}</span>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              {expandedId === option.id && option.type === 'get' ? (
+              {expandedId === option.id ? (
                 <div className={styles.optionDetail}>
                   <LocalFoodSearch query={option.title} autoStart onStageChange={handleGetSearchStageChange} />
                 </div>

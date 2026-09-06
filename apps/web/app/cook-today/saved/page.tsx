@@ -1,8 +1,8 @@
+import Link from 'next/link';
 import type { SavedRecipeView } from '@foodpadi/shared';
 import { requireSession, serverFetch } from '../../../lib/serverApi';
 import { SavedRecipesList } from './SavedRecipesList';
-import { BackLink } from '../../../components/BackLink';
-import { Logo } from '../../../components/Logo';
+import { AppShell } from '../../../components/AppShell';
 import shellStyles from '../../app-shell.module.css';
 import styles from '../cook-today.module.css';
 
@@ -13,14 +13,30 @@ import styles from '../cook-today.module.css';
  */
 export default async function SavedRecipesPage() {
   requireSession('/cook-today/saved');
-  const recipes = await serverFetch<SavedRecipeView[]>('/cook-today/recipes');
+
+  let recipes: SavedRecipeView[] | null = null;
+  try {
+    recipes = await serverFetch<SavedRecipeView[]>('/cook-today/recipes');
+  } catch {
+    // API unreachable — fall through to the "couldn't load" state below
+    // rather than taking down the whole route (same precedent as /invite).
+  }
 
   return (
-    <main className={shellStyles.container}>
-      <Logo href="/" size={32} className={shellStyles.pageLogo} />
-      <BackLink href="/cook-today" label="Cook Today" />
-      <h1 className={styles.title}>Saved recipes</h1>
-      <SavedRecipesList initialRecipes={recipes} />
-    </main>
+    <AppShell guest={false}>
+      <main className={shellStyles.shellPage}>
+        <h1 className={styles.title}>Saved recipes</h1>
+        {recipes ? (
+          <SavedRecipesList initialRecipes={recipes} />
+        ) : (
+          <>
+            <p className={styles.errorText}>Couldn&apos;t load your saved recipes. Check your connection and try again.</p>
+            <Link href="/cook-today/saved" className={styles.primaryButton} style={{ textDecoration: 'none', display: 'inline-block' }}>
+              Try again
+            </Link>
+          </>
+        )}
+      </main>
+    </AppShell>
   );
 }

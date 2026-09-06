@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as Location from 'expo-location';
-import type { FoodProviderResult, LocalFoodSearchResponse } from '@foodpadi/shared';
+import type { FoodProviderResult, LocalFoodSearchInteractionType, LocalFoodSearchResponse } from '@foodpadi/shared';
 import { api, ApiError } from '../api/client';
 import { Button } from './Button';
 import { Card } from './Card';
@@ -56,6 +56,17 @@ export function LocalFoodSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stage]);
 
+  // "Place viewed" (brief §16) — this list of cards *is* the place detail
+  // view here (there's no separate "open details" step), so a result
+  // actually rendering to the user is the honest moment to record it.
+  useEffect(() => {
+    if (stage !== 'results') return;
+    for (const provider of results) {
+      track('place_viewed', { providerId: provider.id, name: provider.name });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, results]);
+
   const runSearch = async (body: { latitude?: number; longitude?: number; locationText?: string }) => {
     setStage('searching');
     setErrorMessage(null);
@@ -78,15 +89,23 @@ export function LocalFoodSearch({
     }
   };
 
+  // Fire-and-forget, same precedent as elsewhere (trackGoalEvent etc.) — a
+  // broken analytics call must never surface to the user or block the flow.
+  const track = (interactionType: LocalFoodSearchInteractionType, metadata?: Record<string, unknown>) => {
+    void getToken().then((token) => api.trackLocalFoodSearchInteraction(interactionType, metadata, token));
+  };
+
   const findNearby = async () => {
     if (!query.trim()) return;
     setStage('asking-permission');
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
+        track('location_permission_denied');
         setStage('manual-location');
         return;
       }
+      track('location_permission_granted');
       const position = await Location.getCurrentPositionAsync({});
       await runSearch({ latitude: position.coords.latitude, longitude: position.coords.longitude });
     } catch {
@@ -99,6 +118,7 @@ export function LocalFoodSearch({
   const searchManualLocation = () => {
     const trimmed = manualLocation.trim();
     if (!trimmed) return;
+    track('manual_location_used', { locationText: trimmed });
     runSearch({ locationText: trimmed });
   };
 
@@ -180,6 +200,9 @@ export function LocalFoodSearch({
 
       {stage === 'results' ? (
         <>
+          {/* Ties the results unambiguously back to the food that was
+              actually searched (brief §8) — never a generic "near you". */}
+          <Text style={styles.resultsHeading}>{query} Near You</Text>
           {source === 'openstreetmap' ? (
             <Text style={styles.attribution}>Results from OpenStreetMap · © OpenStreetMap contributors</Text>
           ) : null}
@@ -193,15 +216,31 @@ export function LocalFoodSearch({
               {provider.distanceText ? <Text style={styles.providerMeta}>{provider.distanceText}</Text> : null}
               {provider.address ? <Text style={styles.providerMeta}>{provider.address}</Text> : null}
               {provider.phone ? <Text style={styles.providerMeta}>{provider.phone}</Text> : null}
+              {/* Raw OSM value, shown as-is — never interpreted into an "open
+                  now"/"closed" claim (brief §7/§8: never fabricate opening
+                  status; only ever shown when the source actually has it). */}
+              {provider.openingHours ? <Text style={styles.providerMeta}>{provider.openingHours}</Text> : null}
 
               <View style={styles.buttonRow}>
                 {provider.bookingUrl ? (
-                  <TouchableOpacity style={styles.actionChip} onPress={() => Linking.openURL(provider.bookingUrl!)}>
+                  <TouchableOpacity
+                    style={styles.actionChip}
+                    onPress={() => {
+                      track('external_ordering_clicked', { providerId: provider.id, kind: 'booking' });
+                      Linking.openURL(provider.bookingUrl!);
+                    }}
+                  >
                     <Text style={styles.actionChipText}>Book now</Text>
                   </TouchableOpacity>
                 ) : null}
                 {provider.orderUrl ? (
-                  <TouchableOpacity style={styles.actionChip} onPress={() => Linking.openURL(provider.orderUrl!)}>
+                  <TouchableOpacity
+                    style={styles.actionChip}
+                    onPress={() => {
+                      track('external_ordering_clicked', { providerId: provider.id, kind: 'order' });
+                      Linking.openURL(provider.orderUrl!);
+                    }}
+                  >
                     <Text style={styles.actionChipText}>Order online</Text>
                   </TouchableOpacity>
                 ) : null}
@@ -216,7 +255,13 @@ export function LocalFoodSearch({
                   </TouchableOpacity>
                 ) : null}
                 {provider.mapsUrl ? (
-                  <TouchableOpacity style={styles.actionChip} onPress={() => Linking.openURL(provider.mapsUrl!)}>
+                  <TouchableOpacity
+                    style={styles.actionChip}
+                    onPress={() => {
+                      track('directions_clicked', { providerId: provider.id });
+                      Linking.openURL(provider.mapsUrl!);
+                    }}
+                  >
                     <Text style={styles.actionChipText}>Maps</Text>
                   </TouchableOpacity>
                 ) : null}
@@ -258,6 +303,7 @@ function makeStyles(c: ThemeColors) {
   // border/padding — the extra top rule + spacing here would double up.
   containerEmbedded: { marginTop: spacing.md, paddingTop: 0, borderTopWidth: 0 },
   heading: { fontSize: 18, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  resultsHeading: { fontSize: 18, fontWeight: '700', color: c.text, marginBottom: spacing.sm },
   subtitle: { ...typography.caption, color: c.textMuted, marginBottom: spacing.md, lineHeight: 18 },
   box: { backgroundColor: c.surfaceSunken, borderRadius: radius.lg, padding: spacing.lg, marginTop: spacing.md },
   boxText: { ...typography.caption, color: c.textMuted, marginBottom: spacing.md, lineHeight: 18 },

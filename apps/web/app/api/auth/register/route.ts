@@ -10,7 +10,10 @@ import {
 } from '../../../../lib/session';
 import { REF_COOKIE } from '../../../../lib/referral';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4310';
+// 127.0.0.1, not "localhost": the NestJS API binds 0.0.0.0 (IPv4 only), and
+// on Windows "localhost" often resolves to ::1 first — a fetch that lands on
+// IPv6 gets ECONNREFUSED.
+const API_URL = process.env.API_URL ?? 'http://127.0.0.1:4310';
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as RegisterRequest;
@@ -20,15 +23,27 @@ export async function POST(request: NextRequest) {
   // never sees or sends it. Attribution is best-effort server-side.
   const referralCode = request.cookies.get(REF_COOKIE)?.value;
 
-  const apiRes = await fetch(`${API_URL}/auth/register`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      // Let the API derive a hashed signup fingerprint from the real client.
-      'x-forwarded-for': request.headers.get('x-forwarded-for') ?? '',
-    },
-    body: JSON.stringify({ ...body, ...(referralCode ? { referralCode } : {}) }),
-  });
+  let apiRes: Response;
+  try {
+    apiRes = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // Let the API derive a hashed signup fingerprint from the real client.
+        'x-forwarded-for': request.headers.get('x-forwarded-for') ?? '',
+      },
+      body: JSON.stringify({ ...body, ...(referralCode ? { referralCode } : {}) }),
+    });
+  } catch (e) {
+    // API process is down / restarting / unreachable — return a clean 503
+    // the form can show, not an unhandled throw that becomes an opaque 500
+    // and the generic "something went wrong".
+    console.error(`[api-auth] register: upstream fetch to ${API_URL} failed:`, e);
+    return NextResponse.json(
+      { message: 'The server is temporarily unavailable. Please try again in a moment.' },
+      { status: 503 },
+    );
+  }
 
   const rawBody = await apiRes.text();
   if (!apiRes.ok) {

@@ -37,6 +37,34 @@
   font-weight: 600;
 }
 
+/* Guest: 3-days / This-week are shown but locked — a free account unlocks them. */
+.chipLocked {
+  border-style: dashed;
+  background: var(--surface-sunken);
+  color: var(--text-faint);
+  cursor: not-allowed;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.lockedNudge {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin: calc(-1 * var(--space-sm)) 0 var(--space-lg);
+}
+
+.lockedNudge a {
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.lockedNudge a:hover {
+  text-decoration: underline;
+}
+
 .fieldRow {
   margin-bottom: var(--space-lg);
 }
@@ -244,19 +272,20 @@
 
 .mealCard {
   display: flex;
-  gap: var(--space-lg);
+  gap: 20px;
   background: var(--surface);
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg);
-  padding: var(--space-lg);
-  margin-bottom: var(--space-md);
+  padding: var(--space-xl);
+  margin-bottom: var(--space-xl);
   box-shadow: var(--shadow-sm);
 }
 
 .mealImage {
   flex-shrink: 0;
-  width: 88px;
-  height: 88px;
-  border-radius: var(--radius-md);
+  width: 104px;
+  height: 104px;
+  border-radius: var(--radius-lg);
   object-fit: cover;
   background: var(--surface-sunken);
 }
@@ -268,14 +297,15 @@
 
 .mealDate {
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--text-muted);
-  margin: 0 0 var(--space-xs);
+  margin: 0 0 6px;
 }
 
 .mealTitle {
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 700;
   color: var(--text);
   margin: 0 0 var(--space-sm);
@@ -302,7 +332,18 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-md) var(--space-lg);
-  margin-top: var(--space-xs);
+  margin-top: var(--space-sm);
+}
+
+/* Composed with .itemActions on the "Replace this day / Replace with
+   something specific / Remove" row specifically — a divider + extra top
+   space marks it as the card's secondary, meta-level actions, distinct
+   from Cook it/Get it and Set time above it (hierarchy: date → meal →
+   cook/get it → set time → secondary actions). */
+.secondaryActionsRow {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
 }
 
 /* "Find it nearby" results for a Get-it day — reuses eat-now.module.css's
@@ -310,6 +351,20 @@
    block off from the actions row above it. */
 .nearbyBlock {
   margin-top: var(--space-md);
+}
+
+/* Real "Find Near Me" — same solid-pill treatment as DecideFlow's
+   equivalent button on Home (home.module.css's .findNearMeButton). */
+.findNearMeButton {
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .itemActionText {
@@ -339,6 +394,41 @@
 .itemActionTextDanger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* --- "30 min before" meal reminder (lib/mealReminders.ts) --- */
+.reminderNote {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0 0 var(--space-sm);
+}
+
+.timeRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+
+.timeInput {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+/* Web has no push infrastructure — the reminder is just a setTimeout in
+   this tab (see lib/mealReminders.ts's top comment) — so this honestly says
+   what that actually requires, rather than implying it works like a mobile
+   push notification. */
+.reminderHint {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 0 0 var(--space-sm);
 }
 
 /* --- Saved plans list (apps/web/app/plan/saved) --- */
@@ -416,4 +506,24 @@
 .dangerButton:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* Meal cards keep their thumbnail+text row on a phone rather than stacking
+   (that already reads fine at 104px) — just scaled back so a 104px image
+   doesn't crowd out the title/tags on a 375px screen. */
+@media (max-width: 480px) {
+  .mealCard {
+    gap: var(--space-md);
+    padding: var(--space-lg);
+    margin-bottom: var(--space-lg);
+  }
+
+  .mealImage {
+    width: 72px;
+    height: 72px;
+  }
+
+  .mealTitle {
+    font-size: 17px;
+  }
 }

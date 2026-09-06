@@ -16,6 +16,10 @@ import { ScanModule } from './modules/scan/scan.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { WaitlistModule } from './modules/waitlist/waitlist.module';
 import { ReferralsModule } from './modules/referrals/referrals.module';
+import { CompanionModule } from './modules/companion/companion.module';
+import { FeedbackModule } from './modules/feedback/feedback.module';
+import { CookingAssistantModule } from './modules/cooking-assistant/cooking-assistant.module';
+import { HomeModule } from './modules/home/home.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -37,6 +41,10 @@ import { AppController } from './app.controller';
     AdminModule,
     WaitlistModule,
     ReferralsModule,
+    CompanionModule,
+    FeedbackModule,
+    CookingAssistantModule,
+    HomeModule,
   ],
   controllers: [AppController],
 })

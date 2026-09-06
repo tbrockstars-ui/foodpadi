@@ -12,13 +12,17 @@ export class ApiError extends Error {
 
 function extractErrorMessage(rawBody: string): string | null {
   if (!rawBody) return null;
+  const trimmed = rawBody.trim();
+  // A CDN / gateway error page is HTML, not our JSON error shape — don't
+  // surface markup as a message.
+  if (trimmed.startsWith('<')) return null;
   try {
-    const parsed = JSON.parse(rawBody) as { message?: string | string[] };
+    const parsed = JSON.parse(trimmed) as { message?: string | string[] };
     if (Array.isArray(parsed.message)) return parsed.message.join('. ');
     if (typeof parsed.message === 'string') return parsed.message;
     return null;
   } catch {
-    return rawBody;
+    return trimmed.length <= 200 ? trimmed : null;
   }
 }
 

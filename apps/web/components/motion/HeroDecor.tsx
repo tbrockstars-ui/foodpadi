@@ -96,7 +96,10 @@ export function HeroDecor() {
                 }
           }
         >
-          <Image src={piece.src} alt="" fill sizes="(max-width: 720px) 40vw, 360px" style={{ objectFit: 'contain' }} priority />
+          {/* Decorative only — never `priority`. Letting these compete with the
+              hero logo for the initial connection was pushing LCP out; they
+              lazy-load below the fold instead. */}
+          <Image src={piece.src} alt="" fill sizes="(max-width: 720px) 40vw, 360px" style={{ objectFit: 'contain' }} loading="lazy" />
         </motion.div>
       ))}
 

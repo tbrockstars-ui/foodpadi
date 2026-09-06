@@ -41,7 +41,7 @@ export function GuestAutoStart() {
 
   return (
     <main className={styles.container}>
-      <Logo size={56} />
+      <Logo size={67} />
       {failed ? (
         <>
           <p className={styles.message}>Could not start FoodPadi. Please try again.</p>

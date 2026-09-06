@@ -1,25 +1,28 @@
 import React, { useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { DISCLAIMER_TEXT, RecipeView } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
 import { api, ApiError } from '../api/client';
 import { tokenStore } from '../api/tokenStore';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { Chip } from '../components/Chip';
 import { LoadingState } from '../components/LoadingState';
 import { MemberBenefitCard } from '../components/MemberBenefitCard';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { Section } from '../components/Section';
 import { SignupPromptModal } from '../components/SignupPromptModal';
 import { Tag } from '../components/Tag';
+import { FadeInView } from '../components/motion/FadeInView';
+import { getCuisineImage } from '../constants/cuisineImages';
 import { guestPrompts } from '../lib/guestPrompts';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
-import type { AppStackParamList } from '../navigation/AppStack';
+import type { MainTabScreenProps } from '../navigation/types';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'CookToday'> & { onRequestLogin: () => void };
+type Props = MainTabScreenProps<'Cook'> & { onRequestLogin: () => void };
 
 const QUICK_INGREDIENTS = [
   'Chicken',
@@ -59,6 +62,7 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   const [timeConstraint, setTimeConstraint] = useState<number | undefined>(undefined);
   const [recipes, setRecipes] = useState<RecipeView[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeView | null>(null);
+  const [savedRecipeId, setSavedRecipeId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [showSignupPrompt, setShowSignupPrompt] = useState(false);
   // Shown once per guest session under the results list (frequency control,
@@ -67,6 +71,14 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
+  // True when the signed-in recipe generator was unavailable and we served
+  // the curated pool instead (the same source guests get). Shown as a note
+  // above the results so the list doesn't look silently personalised.
+  const [curatedFallback, setCuratedFallback] = useState(false);
+  // The recipe-detail hero is a representative cuisine photo, not essential —
+  // if it can't load (offline, CDN blocked on this network) hide it rather
+  // than leaving a grey box.
+  const [heroFailed, setHeroFailed] = useState(false);
 
   const toggleIngredient = (name: string) => {
     setIngredients((current) =>
@@ -97,6 +109,7 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
 
   const findRecipes = async () => {
     setError(null);
+    setCuratedFallback(false);
     setStep('loading');
     try {
       const token = user ? await tokenStore.getAccessToken() : await guestSession.ensureSession();
@@ -110,6 +123,12 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
         // fresh guest session and retrying once before giving up.
         if (!user && e instanceof ApiError && e.status === 401) {
           results = await requestRecipes(await guestSession.recoverSession());
+        } else if (!user && e instanceof ApiError && e.status === 403) {
+          // The guest token isn't disclaimer-acknowledged (the local flag and
+          // the token's own claim drifted apart, or a fresh token was minted
+          // mid-flow). Acknowledge and retry with the rotated token directly —
+          // don't call ensureSession() again, it would hand back the stale one.
+          results = await requestRecipes(await guestSession.acknowledgeDisclaimer());
         } else {
           throw e;
         }
@@ -124,8 +143,39 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
         }
       }
     } catch (e) {
+      // The signed-in generator failed (AI provider down, or a server-side
+      // error). Retry against the curated pool via a guest session — the
+      // same deterministic recipes the guest flow serves — so Cook still
+      // works on MVP infrastructure, the way Eat Now falls back to curated.
+      if (user) {
+        try {
+          let curated: RecipeView[];
+          try {
+            curated = await requestRecipes(await guestSession.ensureSession());
+          } catch (inner) {
+            if (inner instanceof ApiError && inner.status === 403) {
+              curated = await requestRecipes(await guestSession.acknowledgeDisclaimer());
+            } else {
+              throw inner;
+            }
+          }
+          setRecipes(curated);
+          setCuratedFallback(true);
+          setStep('results');
+          return;
+        } catch {
+          // fall through to the error message below
+        }
+      }
+
       if (e instanceof ApiError && e.status === 503) {
         setError("Cook Today isn't ready yet — the recipe generator isn't configured. Check back soon.");
+      } else if (e instanceof ApiError && e.message) {
+        // Surface the server's actual message (e.g. an auth/disclaimer problem)
+        // rather than a blank generic — makes real failures diagnosable.
+        setError(e.message);
+      } else if (e instanceof Error && /network/i.test(e.message)) {
+        setError("Couldn't reach FoodPadi — check your connection and try again.");
       } else {
         setError('Something went wrong finding recipes. Please try again.');
       }
@@ -136,6 +186,8 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   const openRecipe = (recipe: RecipeView) => {
     setSelectedRecipe(recipe);
     setSaved(false);
+    setSavedRecipeId(undefined);
+    setHeroFailed(false);
     setStep('detail');
   };
 
@@ -147,22 +199,35 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
     }
     setSaving(true);
     try {
-      await api.saveRecipe(selectedRecipe);
+      const savedRecipe = await api.saveRecipe(selectedRecipe);
       setSaved(true);
+      setSavedRecipeId(savedRecipe.id);
     } finally {
       setSaving(false);
     }
   };
 
+  const startCooking = () => {
+    if (!selectedRecipe) return;
+    navigation.navigate('CookingSession', { recipe: selectedRecipe, savedRecipeId });
+  };
+
+  const goToScan = () => (user ? navigation.navigate('Scan') : onRequestLogin());
+
   if (step === 'disclaimer') {
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Before you start</Text>
+      <Screen>
+        <ScreenHeader title="Before you start" />
         <ScrollView style={styles.disclaimerBox} contentContainerStyle={{ padding: spacing.lg }}>
           <Text style={styles.disclaimerText}>{DISCLAIMER_TEXT}</Text>
         </ScrollView>
-        <Button label="I understand" onPress={acknowledgeDisclaimer} loading={acknowledging} style={styles.actionSpacing} />
-      </View>
+        <Button
+          label="I understand"
+          onPress={acknowledgeDisclaimer}
+          loading={acknowledging}
+          style={styles.actionSpacing}
+        />
+      </Screen>
     );
   }
 
@@ -171,47 +236,58 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
   }
 
   if (step === 'detail' && selectedRecipe) {
+    const image = getCuisineImage(selectedRecipe.cuisine);
     return (
-      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-        <BackLink label="Back to results" onPress={() => setStep('results')} />
+      <Screen scroll>
+        <ScreenHeader title={selectedRecipe.title} onBack={() => setStep('results')} backLabel="Results" />
 
-        <Text style={styles.title}>{selectedRecipe.title}</Text>
+        {!heroFailed ? (
+          <Image
+            source={{ uri: image.url }}
+            accessibilityLabel={image.alt}
+            style={styles.heroImage}
+            resizeMode="cover"
+            onError={() => setHeroFailed(true)}
+          />
+        ) : null}
         <View style={styles.tagRow}>
           <Tag label={`${selectedRecipe.cookTimeMinutes} min`} />
           <Tag label={`${selectedRecipe.servings} servings`} />
           {selectedRecipe.cuisine ? <Tag label={selectedRecipe.cuisine} /> : null}
         </View>
 
-        <Text style={styles.sectionHeading}>Ingredients</Text>
-        <Card style={styles.section}>
-          {selectedRecipe.ingredients.map((ingredient, index) => (
-            <Text key={index} style={styles.ingredientLine}>
-              {[ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ')}
-            </Text>
-          ))}
-        </Card>
+        <Section title="Ingredients">
+          <Card>
+            {selectedRecipe.ingredients.map((ingredient, index) => (
+              <Text key={index} style={styles.ingredientLine}>
+                {[ingredient.quantity, ingredient.unit, ingredient.name].filter(Boolean).join(' ')}
+              </Text>
+            ))}
+          </Card>
+        </Section>
 
-        <Text style={styles.sectionHeading}>Steps</Text>
-        <Card style={styles.section}>
+        <Section title="Steps">
           {selectedRecipe.steps.map((step_, index) => (
             <View key={index} style={styles.stepRow}>
               <Text style={styles.stepNumber}>{index + 1}</Text>
               <Text style={styles.stepText}>{step_}</Text>
             </View>
           ))}
-        </Card>
+        </Section>
 
         <Text style={styles.safetyNotice}>
           Food information only. FoodPadi does not monitor allergies, allergic reactions or medical
           conditions and does not determine whether food is medically safe for you.
         </Text>
 
+        <Button label="Start Cooking" onPress={startCooking} style={styles.actionSpacing} />
         <Button
-          label={saved ? 'Saved' : 'Save this recipe'}
+          label={saved ? '✓  Saved' : 'Save this recipe'}
           onPress={saveRecipe}
           disabled={saved}
           loading={saving}
-          style={styles.actionSpacing}
+          variant="secondary"
+          style={styles.secondaryAction}
         />
 
         <SignupPromptModal
@@ -223,30 +299,37 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
           }}
           onDismiss={() => setShowSignupPrompt(false)}
         />
-      </ScrollView>
+      </Screen>
     );
   }
 
   if (step === 'results') {
     return (
-      <View style={styles.container}>
-        <BackLink label="Home" onPress={() => navigation.goBack()} />
-        <Text style={styles.title}>A few things you could cook</Text>
+      <Screen>
+        <ScreenHeader title="A few things you could cook" />
+        {curatedFallback ? (
+          <Text style={styles.fallbackNote}>
+            Showing FoodPadi&apos;s curated recipes — personalised suggestions aren&apos;t available
+            right now.
+          </Text>
+        ) : null}
         {recipes.length === 0 ? (
           <Text style={styles.emptyText}>
             No recipes match that combination. Try a longer time limit, or a few different ingredients.
           </Text>
         ) : (
-          <ScrollView>
+          <ScrollView style={styles.resultsList} showsVerticalScrollIndicator={false}>
             {recipes.map((recipe, index) => (
-              <Card key={index} onPress={() => openRecipe(recipe)} style={styles.resultCard}>
-                <Text style={styles.resultTitle}>{recipe.title}</Text>
-                <View style={styles.tagRow}>
-                  <Tag label={`${recipe.cookTimeMinutes} min`} />
-                  <Tag label={`${recipe.servings} servings`} />
-                  {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
-                </View>
-              </Card>
+              <FadeInView key={index} delay={index * 40}>
+                <Card onPress={() => openRecipe(recipe)} style={styles.resultCard}>
+                  <Text style={styles.resultTitle}>{recipe.title}</Text>
+                  <View style={styles.tagRow}>
+                    <Tag label={`${recipe.cookTimeMinutes} min`} />
+                    <Tag label={`${recipe.servings} servings`} />
+                    {recipe.cuisine ? <Tag label={recipe.cuisine} /> : null}
+                  </View>
+                </Card>
+              </FadeInView>
             ))}
             {showResultsBenefit ? (
               <MemberBenefitCard
@@ -259,17 +342,22 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
             ) : null}
           </ScrollView>
         )}
-        <Button label="Start over" variant="secondary" onPress={() => setStep('input')} style={styles.actionSpacing} />
-      </View>
+        <Button label="Start over" variant="tertiary" onPress={() => setStep('input')} style={styles.startOver} />
+      </Screen>
     );
   }
 
-  // step === 'input'
+  // step === 'input' — the Cook tab root
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Home" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>What have you got?</Text>
-      <Text style={styles.subtitle}>Tap what you have, or add something else.</Text>
+    <Screen scroll>
+      <ScreenHeader title="What's in your kitchen?" subtitle="Scan it, tap what you have, or add something else." />
+
+      <Button
+        label="📷 Scan my kitchen"
+        variant="secondary"
+        onPress={goToScan}
+        style={styles.scanButton}
+      />
 
       <View style={styles.chipWrap}>
         {QUICK_INGREDIENTS.map((name) => (
@@ -314,82 +402,97 @@ export function CookTodayScreen({ navigation, route, onRequestLogin }: Props) {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
       <Button
-        label="Find recipes"
+        label="Cook Something"
         onPress={findRecipes}
         disabled={ingredients.length === 0}
         style={styles.actionSpacing}
       />
 
-      {user ? (
-        <>
-          <TouchableOpacity onPress={() => navigation.navigate('ImportRecipe')} style={styles.importLink}>
-            <Text style={styles.importLinkText}>Or import a recipe from a link →</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('SavedRecipes')} style={styles.importLink}>
-            <Text style={styles.importLinkText}>View my saved recipes →</Text>
-          </TouchableOpacity>
-        </>
-      ) : null}
-    </ScrollView>
+      <View style={styles.moreActions}>
+        {user ? (
+          <>
+            <Button
+              label="Import a recipe from a link"
+              variant="tertiary"
+              onPress={() => navigation.navigate('ImportRecipe')}
+            />
+            <Button
+              label="My saved recipes"
+              variant="tertiary"
+              onPress={() => navigation.navigate('SavedRecipes')}
+            />
+          </>
+        ) : null}
+      </View>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
-  sectionHeading: { ...typography.label, color: c.textMuted, marginTop: spacing.lg, marginBottom: spacing.sm },
-  section: { marginBottom: spacing.sm },
-  chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
-  addInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 15,
-    color: c.text,
-  },
-  addButton: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-  },
-  addButtonText: { color: c.text, fontWeight: '600' },
-  errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
-  emptyText: { ...typography.body, color: c.textMuted },
-  actionSpacing: { marginTop: spacing.xl },
-  importLink: { marginTop: spacing.lg, alignItems: 'center' },
-  importLinkText: { color: c.primary, fontSize: 14, fontWeight: '600' },
-  resultCard: { marginBottom: spacing.md },
-  resultTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.sm },
-  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
-  ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
-  stepRow: { flexDirection: 'row', marginBottom: spacing.md, gap: spacing.md },
-  stepNumber: {
-    ...typography.label,
-    color: c.primary,
-    backgroundColor: c.primarySoft,
-    width: 24,
-    height: 24,
-    borderRadius: radius.pill,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  stepText: { ...typography.body, color: c.text, flex: 1 },
-  safetyNotice: { ...typography.caption, color: c.textFaint, marginTop: spacing.lg, lineHeight: 18 },
-  disclaimerBox: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: c.border,
-    borderRadius: radius.lg,
-    backgroundColor: c.surface,
-  },
-  disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
+    sectionHeading: { ...typography.overline, color: c.textMuted, marginTop: spacing.xl, marginBottom: spacing.sm },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    addRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg },
+    addInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      fontSize: 15,
+      color: c.text,
+    },
+    addButton: {
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      justifyContent: 'center',
+    },
+    addButtonText: { color: c.text, fontWeight: '600' },
+    errorText: { color: c.danger, marginTop: spacing.lg, fontSize: 14 },
+    emptyText: { ...typography.body, color: c.textMuted },
+    actionSpacing: { marginTop: spacing.xl },
+    secondaryAction: { marginTop: spacing.sm },
+    scanButton: { marginBottom: spacing.lg },
+    resultsList: { flex: 1 },
+    fallbackNote: { ...typography.caption, color: c.textFaint, marginBottom: spacing.md, lineHeight: 18 },
+    startOver: { marginTop: spacing.md },
+    moreActions: { marginTop: spacing.lg, gap: spacing.xs },
+    heroImage: {
+      width: '100%',
+      height: 160,
+      borderRadius: radius.lg,
+      backgroundColor: c.surfaceSunken,
+      marginBottom: spacing.md,
+    },
+    resultCard: { marginBottom: spacing.md },
+    resultTitle: { ...typography.title, color: c.text, marginBottom: spacing.sm },
+    tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.md },
+    ingredientLine: { ...typography.body, color: c.text, marginBottom: spacing.xs },
+    stepRow: { flexDirection: 'row', marginBottom: spacing.lg, gap: spacing.md },
+    stepNumber: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: c.primary,
+      backgroundColor: c.primarySoft,
+      width: 26,
+      height: 26,
+      borderRadius: radius.pill,
+      textAlign: 'center',
+      lineHeight: 26,
+      overflow: 'hidden',
+    },
+    stepText: { fontSize: 16, lineHeight: 24, color: c.text, flex: 1 },
+    safetyNotice: { ...typography.caption, color: c.textFaint, marginTop: spacing.lg, lineHeight: 18 },
+    disclaimerBox: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.border,
+      borderRadius: radius.lg,
+      backgroundColor: c.surface,
+    },
+    disclaimerText: { fontSize: 14, lineHeight: 21, color: c.text },
   });
 }

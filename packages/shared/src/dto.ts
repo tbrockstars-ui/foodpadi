@@ -127,7 +127,64 @@ export interface RecipeView {
   steps: string[];
 }
 
-export type SaveRecipeRequest = RecipeView;
+// `isFavorite` lets the heart save-and-favourite an idea in one call
+// (LikeHeart.tsx) instead of a save-then-toggle round trip.
+export type SaveRecipeRequest = RecipeView & { isFavorite?: boolean };
+
+export interface ToggleFavoriteRequest {
+  isFavorite: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Home "Ideas for you" — GET /home/ideas. Deterministic, no AI (guest-safe):
+// the curated recipe pool scored against the member's pantry / preferences /
+// goals. `matchPercent` is a real pantry-ingredient overlap, and is null when
+// there's no pantry to match against (every guest, and members who haven't
+// added anything yet) — the UI hides the "You have X%" line in that case.
+
+export type HomeIdeaDifficulty = 'Easy' | 'Medium' | 'Hard';
+export type HomeIdeaPriceBand = '£' | '££' | '£££';
+
+export interface HomeIdeaView {
+  /** Stable slug from the recipe title — the key the "save to favourites" heart passes back. */
+  slug: string;
+  title: string;
+  cuisine: string | null;
+  timeMinutes: number;
+  difficulty: HomeIdeaDifficulty;
+  priceBand: HomeIdeaPriceBand;
+  /** Real % of this recipe's ingredients the member already has in their pantry; null when there's no pantry to score against. */
+  matchPercent: number | null;
+  /** The single strongest pantry match — only ever set on one idea, and only when matchPercent is meaningful. */
+  bestMatch: boolean;
+  /** The full recipe, so the "save" action needs no extra round trip. */
+  recipe: RecipeView;
+}
+
+export interface HomeIdeasResponse {
+  ideas: HomeIdeaView[];
+}
+
+// GET /home/recently-cooked — Home's "Recently cooked" card. Real cook
+// history: a Recipe the member owns whose `lastCookedAt` was stamped by
+// finishing a guided Cook Today session (POST /cook-today/recipes/:id/cooked),
+// not just saved/generated. Empty for a guest (nothing persists for them) and
+// for a member who hasn't finished cooking anything yet — the client falls
+// back to sample cards only if the request itself fails, never to fill a
+// genuinely empty history.
+export interface RecentlyCookedItem {
+  id: string;
+  title: string;
+  cuisine: string | null;
+  /** ISO timestamp of the most recent time this recipe was cooked. */
+  lastCookedAt: string;
+  /** Favorites engine — see SavedRecipeView.isFavorite. */
+  isFavorite: boolean;
+}
+
+export interface RecentlyCookedResponse {
+  items: RecentlyCookedItem[];
+}
 
 // GET /cook-today/recipes — same shape as RecipeView plus the two fields
 // that only exist once a recipe is actually persisted (matches the existing
@@ -135,6 +192,10 @@ export type SaveRecipeRequest = RecipeView;
 export interface SavedRecipeView extends RecipeView {
   id: string;
   createdAt: string;
+  // True when the heart is on. A recipe can also appear in the Favorites
+  // engine (GET /cook-today/recipes/favorites) via a 5-star COOK rating
+  // without this being true — see CookTodayService.listFavorites.
+  isFavorite: boolean;
 }
 
 export interface ImportRecipeRequest {
@@ -173,9 +234,9 @@ export interface ScanPhotoResponse {
 // pantry one above: given a photo of a prepared dish (not a fridge/cupboard/
 // shopping bag), identify the dish and its likely ingredient composition —
 // "the possible combination" — so a customer can see roughly what's in
-// something before eating it. Guest-accessible (same precedent as Decide/
-// Eat Now/Cook Today) since nothing is persisted here, unlike the pantry
-// scan above which is account-only.
+// something before eating it. Account-only, same as the pantry scan above —
+// `FoodContentController` is `@UseGuards(JwtAuthGuard)` (a guest must never
+// trigger the paid vision model, regardless of whether anything persists).
 export interface ScanFoodContentRequest {
   imageBase64: string;
   mediaType: ScanImageMediaType;
@@ -210,6 +271,39 @@ export interface AddPantryItemsRequest {
 
 export interface AddPantryItemsResponse {
   added: number;
+}
+
+// ---------------------------------------------------------------------------
+// Guided-cooking assistant — POST /cooking-assistant/check-step (vision) and
+// POST /cooking-assistant/ask (text Q&A), both member-only (JwtAuthGuard,
+// same posture as Scan — a guest must never trigger a paid AI call).
+
+export interface CheckCookingStepRequest {
+  imageBase64: string;
+  mediaType: ScanImageMediaType;
+  recipeTitle: string;
+  stepText: string;
+}
+
+export interface CheckCookingStepResponse {
+  /** What's visibly true in the photo relevant to this step. */
+  observation: string;
+  /** Non-authoritative read on whether it matches this step — never a guarantee. */
+  suggestion: string;
+  /** Always present — appearance alone can never confirm food safety. */
+  safetyNote: string;
+}
+
+export interface AskCookingQuestionRequest {
+  recipeTitle: string;
+  ingredients: string[];
+  steps: string[];
+  currentStepIndex: number;
+  question: string;
+}
+
+export interface AskCookingQuestionResponse {
+  answer: string;
 }
 
 export interface SearchEatNowRequest {
@@ -405,6 +499,8 @@ export interface FoodProviderResult {
   requestedFood: string;
   matchedFood: string;
   matchType: FoodMatchType;
+  /** Raw OpenStreetMap `opening_hours` tag value, shown as-is — never parsed into an "open now" claim (that syntax is its own mini-language) and never present unless the source actually has it. */
+  openingHours: string | null;
 }
 
 export interface LocalFoodSearchResponse {
@@ -412,6 +508,26 @@ export interface LocalFoodSearchResponse {
   results: FoodProviderResult[];
   /** Non-null only when results came from a real grounded source that requires attribution when shown. */
   source: 'openstreetmap' | null;
+}
+
+// ---------------------------------------------------------------------------
+// "Find Near Me" client-only interaction analytics — POST /local-food-search/
+// interaction. Guest-or-auth, same posture as the search endpoint itself
+// (see local-food-search.controller.ts); these are actions the server can't
+// otherwise observe (a permission prompt's result, tapping a maps/order link).
+
+export type LocalFoodSearchInteractionType =
+  | 'find_near_me_clicked'
+  | 'location_permission_granted'
+  | 'location_permission_denied'
+  | 'manual_location_used'
+  | 'place_viewed'
+  | 'directions_clicked'
+  | 'external_ordering_clicked';
+
+export interface LocalFoodSearchInteractionRequest {
+  interactionType: LocalFoodSearchInteractionType;
+  metadata?: Record<string, unknown>;
 }
 
 // The unified intent-first decision engine — see the "FoodPadi is a food-
@@ -540,3 +656,139 @@ Food businesses may change ingredients, recipes, suppliers or preparation method
 Do not rely on this app as your sole source of information when deciding whether food is safe for you or another person.
 
 If you require medical or dietary advice, consult an appropriately qualified healthcare or dietary professional.`;
+
+// ---------------------------------------------------------------------------
+// FoodPadi Memory & Companion — GET /companion/suggestion etc. Members only;
+// a guest never calls these (JwtAuthGuard-only, no guest token accepted).
+
+export type CompanionSuggestionType =
+  | 'usual_time'
+  | 'use_what_you_have'
+  | 'goal_support'
+  | 'variety'
+  | 'routine'
+  | 'plan_support';
+
+/** Where a suggestion's CTA lands — always an existing screen/flow, never a new one. */
+export type CompanionCtaTarget = 'decide' | 'cook' | 'eat_now' | 'plan';
+
+export interface CompanionSuggestionView {
+  id: string;
+  type: CompanionSuggestionType;
+  title: string;
+  body: string;
+  /** "Why am I seeing this?" — always shown, never hidden (brief §14). */
+  reason: string;
+  ctaLabel: string;
+  ctaTarget: CompanionCtaTarget;
+  /** Pre-fills the target flow — e.g. pantry ingredients for Cook, a query for Eat Now. */
+  ctaPayload?: {
+    initialIngredients?: string[];
+    initialQuery?: string;
+    whyLabel?: string;
+    promptFill?: string;
+  };
+}
+
+export interface CompanionSuggestionResponse {
+  suggestion: CompanionSuggestionView | null;
+}
+
+export type CompanionAction = 'opened' | 'accepted' | 'dismissed' | 'not_useful' | 'do_not_remind';
+
+export interface CompanionActionRequest {
+  action: CompanionAction;
+}
+
+export interface CompanionPreferencesView {
+  enabled: boolean;
+  notificationsEnabled: boolean;
+  mutedTypes: CompanionSuggestionType[];
+}
+
+export interface UpdateCompanionPreferencesRequest {
+  enabled?: boolean;
+  notificationsEnabled?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Feedback & Rating — POST/GET/PATCH/DELETE /feedback. Signed-in only, same
+// posture as Companion above. Feeds PatternService's recipe/cuisine/
+// plan-satisfaction detectors server-side (apps/api/src/modules/companion/
+// pattern.service.ts) — never read back into a user-facing "your rating
+// history" feature yet (Phase 3).
+
+export type FeedbackEntityType = 'RECIPE' | 'MEAL' | 'PLAN';
+export type FeedbackContext = 'EAT_NOW' | 'COOK' | 'PLAN' | 'DECIDE' | 'ORDER' | 'OTHER';
+
+export interface CreateFeedbackRequest {
+  entityType: FeedbackEntityType;
+  entityId: string;
+  context: FeedbackContext;
+  /** 1-5 */
+  rating: number;
+  /** Quick-tag keys, e.g. "loved_it" / "would_make_again" — see FEEDBACK_TAGS. */
+  tags?: string[];
+  comment?: string;
+}
+
+export interface UpdateFeedbackRequest {
+  rating?: number;
+  tags?: string[];
+  comment?: string;
+}
+
+export interface FeedbackView {
+  id: string;
+  entityType: FeedbackEntityType;
+  entityId: string;
+  context: FeedbackContext;
+  rating: number;
+  tags: string[];
+  comment: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Quick-tag vocabulary per context (brief §A/§B/§C) — kept as data rather
+ * than duplicated per screen, mobile and web both render from this.
+ */
+export const FEEDBACK_TAGS: Record<FeedbackEntityType, { positive: string[]; negative: string[] }> = {
+  MEAL: {
+    positive: ['loved_it', 'really_good', 'would_choose_again'],
+    negative: ['it_was_okay', 'not_for_me', 'wouldnt_choose_again'],
+  },
+  RECIPE: {
+    positive: ['loved_it', 'tasty', 'would_make_again'],
+    negative: ['too_difficult', 'too_long', 'wouldnt_make_again'],
+  },
+  PLAN: {
+    positive: ['meals_suited_me', 'good_variety', 'easy_to_cook', 'stayed_within_budget', 'used_ingredients_i_had'],
+    negative: ['too_repetitive', 'too_expensive', 'too_much_cooking', 'not_enough_variety', 'didnt_suit_schedule'],
+  },
+};
+
+export const FEEDBACK_TAG_LABELS: Record<string, string> = {
+  loved_it: 'Loved it',
+  really_good: 'Really good',
+  would_choose_again: 'Would choose again',
+  it_was_okay: 'It was okay',
+  not_for_me: 'Not for me',
+  wouldnt_choose_again: "Wouldn't choose it again",
+  tasty: 'Tasty',
+  would_make_again: 'Would make again',
+  too_difficult: 'Too difficult',
+  too_long: 'Too long',
+  wouldnt_make_again: "Wouldn't make again",
+  meals_suited_me: 'Meals suited me',
+  good_variety: 'Good variety',
+  easy_to_cook: 'Easy to cook',
+  stayed_within_budget: 'Stayed within budget',
+  used_ingredients_i_had: 'Used ingredients I already had',
+  too_repetitive: 'Too repetitive',
+  too_expensive: 'Too expensive',
+  too_much_cooking: 'Too much cooking',
+  not_enough_variety: 'Not enough variety',
+  didnt_suit_schedule: "Didn't suit my schedule",
+};

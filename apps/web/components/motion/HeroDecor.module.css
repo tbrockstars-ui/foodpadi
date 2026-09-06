@@ -34,7 +34,7 @@
 .saladToss {
   left: clamp(-72px, -5vw, -34px);
   bottom: -34px;
-  width: clamp(200px, 25vw, 352px);
+  width: clamp(160px, 20vw, 282px); /* -20% */
   aspect-ratio: 820 / 1093;
 }
 
@@ -94,7 +94,7 @@
 
 @media (max-width: 980px) {
   .saladToss {
-    width: clamp(156px, 32vw, 236px);
+    width: clamp(125px, 25.6vw, 189px); /* -20% */
     bottom: -34px;
     left: -30px;
   }
@@ -121,7 +121,7 @@
      is clipped by .layer's overflow:hidden, so nothing can cause horizontal
      scroll. */
   .saladToss {
-    width: 132px;
+    width: 106px; /* -20% */
     bottom: -26px;
     left: -34px;
   }

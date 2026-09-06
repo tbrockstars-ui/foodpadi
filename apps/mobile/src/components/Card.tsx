@@ -1,7 +1,8 @@
 import React from 'react';
-import { StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { Animated, StyleProp, StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { radius, shadow, spacing, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import { usePressScale } from './motion/usePressScale';
 
 interface Props {
   children: React.ReactNode;
@@ -10,20 +11,31 @@ interface Props {
   raised?: boolean;
 }
 
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
+
 /**
  * Previously each screen redefined its own
  * `{ backgroundColor: surface, borderRadius, ...shadow.card }` object.
+ * A pressable Card now also gets the shared subtle press-scale
+ * (visual-redesign brief §19).
  */
 export function Card({ children, onPress, style, raised }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const press = usePressScale();
   const cardStyle = [styles.base, raised && shadow.raised, !raised && shadow.card, style];
 
   if (onPress) {
     return (
-      <TouchableOpacity style={cardStyle} onPress={onPress} accessibilityRole="button">
+      <AnimatedTouchable
+        style={[cardStyle, press.style]}
+        onPress={onPress}
+        onPressIn={press.onPressIn}
+        onPressOut={press.onPressOut}
+        accessibilityRole="button"
+      >
         {children}
-      </TouchableOpacity>
+      </AnimatedTouchable>
     );
   }
   return <View style={cardStyle}>{children}</View>;

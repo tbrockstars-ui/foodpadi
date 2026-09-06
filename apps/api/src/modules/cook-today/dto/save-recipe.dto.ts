@@ -2,6 +2,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -54,4 +55,11 @@ export class SaveRecipeDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   steps!: string[];
+
+  // Set when the save comes from tapping the heart on an idea that isn't
+  // persisted yet (LikeHeart.tsx) — saves and favourites it in one call
+  // instead of a save-then-toggle round trip.
+  @IsOptional()
+  @IsBoolean()
+  isFavorite?: boolean;
 }

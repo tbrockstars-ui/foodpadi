@@ -79,7 +79,11 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
     ],
   },
   {
-    title: 'Chickpea & Spinach Curry',
+    // "Vegan" prefix added deliberately (was "Chickpea & Spinach Curry") —
+    // every ingredient here is already plant-based; this just makes that
+    // honest and lets isVeganFood's title match actually find it (see
+    // home-ideas.ts's hard vegan filter, packages/shared/src/foodTags.ts).
+    title: 'Vegan Chickpea & Spinach Curry',
     cookTimeMinutes: 30,
     servings: 3,
     cuisine: 'Indian',
@@ -230,7 +234,10 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
     ],
   },
   {
-    title: 'Veggie Bean Chilli',
+    // Was "Veggie Bean Chilli" — same reasoning as the curry above, every
+    // ingredient is plant-based so "Vegan" is both accurate and lets it
+    // actually surface under the vegan filter.
+    title: 'Vegan Bean Chilli',
     cookTimeMinutes: 30,
     servings: 4,
     cuisine: 'Mexican',
@@ -491,7 +498,9 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
     ],
   },
   {
-    title: 'Butternut Squash Soup',
+    // Was "Butternut Squash Soup" — squash/onion/garlic/vegetable stock/oil
+    // is already plant-based; same "Vegan" prefix reasoning as above.
+    title: 'Vegan Butternut Squash Soup',
     cookTimeMinutes: 35,
     servings: 4,
     cuisine: 'British',

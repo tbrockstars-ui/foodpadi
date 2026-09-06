@@ -235,7 +235,9 @@ export function ScanScreen({ navigation }: Props) {
         </Text>
         <Button
           label="Cook with what's in your pantry"
-          onPress={() => navigation.navigate('CookToday', { initialIngredients: confirmedNames })}
+          onPress={() =>
+            navigation.navigate('Main', { screen: 'Cook', params: { initialIngredients: confirmedNames } })
+          }
           style={styles.actionSpacing}
         />
         <Button label="Scan another photo" variant="secondary" onPress={startOver} style={styles.actionSpacing} />
@@ -272,7 +274,10 @@ export function ScanScreen({ navigation }: Props) {
         <Button
           label="Find recipes with these ingredients"
           onPress={() =>
-            navigation.navigate('CookToday', { initialIngredients: dishIngredients.map((i) => i.name) })
+            navigation.navigate('Main', {
+              screen: 'Cook',
+              params: { initialIngredients: dishIngredients.map((i) => i.name) },
+            })
           }
           style={styles.actionSpacing}
         />

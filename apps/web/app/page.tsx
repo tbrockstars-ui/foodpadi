@@ -12,7 +12,7 @@ import { HeroDecor } from '../components/motion/HeroDecor';
 import { ChipRow } from '../components/motion/ChipRow';
 import { FoodCarousel } from '../components/motion/FoodCarousel';
 import { WeekStrip } from '../components/motion/WeekStrip';
-import { HomeHub } from './HomeHub';
+import { HomeHub, type HomeIdeasSearchParams } from './HomeHub';
 import styles from './page.module.css';
 
 // Placeholder support address — swap for the real inbox once set up.
@@ -63,7 +63,23 @@ const SECONDARY_ACTIONS: HubAction[] = [
   { key: 'scan', icon: '/scan-food.png', label: 'Scan Food', subtitle: 'Food, ingredients or receipt', live: false, disabledTag: 'App only' },
 ];
 
-export default async function LandingPage() {
+// Next.js hands query params as string | string[] | undefined (a repeated
+// key becomes an array) — "Ideas for you" only ever wants the first value.
+function firstParam(value: string | string[] | undefined): string | undefined {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+export default async function LandingPage({
+  searchParams,
+}: {
+  searchParams?: { mood?: string | string[]; maxTime?: string | string[]; maxBudget?: string | string[] };
+}) {
+  const ideasSearchParams: HomeIdeasSearchParams = {
+    mood: firstParam(searchParams?.mood),
+    maxTime: firstParam(searchParams?.maxTime),
+    maxBudget: firstParam(searchParams?.maxBudget),
+  };
+
   if (isAuthenticated()) {
     // Same gate as mobile's RootNavigator: disclaimer is mandatory before
     // any feature, goal/preferences (OnboardingFlow) are skippable but must
@@ -73,7 +89,7 @@ export default async function LandingPage() {
       const me = await serverFetch<UserSummary>('/users/me');
       if (!me.disclaimerAcknowledgedAt) redirect('/disclaimer');
       if (!me.onboardingCompletedAt) redirect('/goal');
-      return <HomeHub />;
+      return <HomeHub ideasSearchParams={ideasSearchParams} />;
     } catch (e) {
       // A stale cookie (401 — expired/invalid token) or one pointing at a
       // deleted account (404 — the account no longer exists) both mean "not
@@ -122,8 +138,9 @@ export default async function LandingPage() {
             <Image
               src="/decor/logo.png"
               alt="FoodPadi — your instant meal companion"
-              width={420}
-              height={420}
+              width={504}
+              height={504}
+              sizes="(max-width: 720px) 264px, 480px"
               className={styles.heroLogoImg}
               priority
             />

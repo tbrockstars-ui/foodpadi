@@ -1,8 +1,10 @@
 import React from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BackLink } from '../components/BackLink';
 import { Card } from '../components/Card';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { Section } from '../components/Section';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
@@ -20,35 +22,32 @@ export function SubscriptionScreen({ navigation }: Props) {
   const s = makeStyles(colors);
 
   return (
-    <ScrollView style={s.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Settings" onPress={() => navigation.goBack()} />
-      <Text style={s.title}>Subscription &amp; payments</Text>
+    <Screen scroll>
+      <ScreenHeader title="Subscription &amp; payments" onBack={() => navigation.goBack()} backLabel="Settings" />
 
-      <Text style={s.sectionHeading}>Plan</Text>
-      <Card style={s.section}>
-        <View style={s.planRow}>
-          <Text style={s.planLabel}>Current plan</Text>
-          <View style={s.planBadge}>
-            <Text style={s.planBadgeText}>Free</Text>
+      <Section title="Plan">
+        <Card>
+          <View style={s.planRow}>
+            <Text style={s.planLabel}>Current plan</Text>
+            <View style={s.planBadge}>
+              <Text style={s.planBadgeText}>Free</Text>
+            </View>
           </View>
-        </View>
-        <Text style={s.muted}>You&apos;re on the free plan. Paid plans aren&apos;t available yet.</Text>
-      </Card>
+          <Text style={s.muted}>You&apos;re on the free plan. Paid plans aren&apos;t available yet.</Text>
+        </Card>
+      </Section>
 
-      <Text style={s.sectionHeading}>Payment history</Text>
-      <Card style={s.section}>
-        <Text style={s.muted}>No payments yet.</Text>
-      </Card>
-    </ScrollView>
+      <Section title="Payment history">
+        <Card>
+          <Text style={s.muted}>No payments yet.</Text>
+        </Card>
+      </Section>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-    title: { ...typography.display, color: c.text, marginBottom: spacing.xl },
-    sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },
-    section: { marginBottom: spacing.sm },
     planRow: {
       flexDirection: 'row',
       alignItems: 'center',

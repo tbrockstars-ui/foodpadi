@@ -5,6 +5,7 @@ import {
   ForbiddenException,
   Get,
   Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -15,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CookTodayService } from './cook-today.service';
 import { GenerateRecipesDto } from './dto/generate-recipes.dto';
 import { SaveRecipeDto } from './dto/save-recipe.dto';
+import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
 
 @Controller('cook-today')
 export class CookTodayController {
@@ -47,9 +49,36 @@ export class CookTodayController {
     return this.cookTodayService.listSaved(user.userId);
   }
 
+  // Favorites engine — a recipe with the heart on OR a 5-star COOK rating
+  // (see CookTodayService.listFavorites). Declared before ':id' routes below
+  // so "favorites" is never captured as a recipeId param.
+  @Get('recipes/favorites')
+  @UseGuards(JwtAuthGuard)
+  listFavorites(@CurrentUser() user: CurrentUserPayload) {
+    return this.cookTodayService.listFavorites(user.userId);
+  }
+
+  @Patch('recipes/:id/favorite')
+  @UseGuards(JwtAuthGuard)
+  toggleFavorite(
+    @Param('id') id: string,
+    @Body() dto: ToggleFavoriteDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.cookTodayService.toggleFavorite(id, user.userId, dto);
+  }
+
   @Delete('recipes/:id')
   @UseGuards(JwtAuthGuard)
   async delete(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
     await this.cookTodayService.delete(id, user.userId);
+  }
+
+  // "Recently cooked" engine — the guided cooking session calls this on
+  // reaching the end of the steps (see CookTodayService.markCooked).
+  @Post('recipes/:id/cooked')
+  @UseGuards(JwtAuthGuard)
+  markCooked(@Param('id') id: string, @CurrentUser() user: CurrentUserPayload) {
+    return this.cookTodayService.markCooked(id, user.userId);
   }
 }

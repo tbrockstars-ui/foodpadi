@@ -1,4 +1,4 @@
-import { classifyVenue, resolveSignal } from './local-food-search.service';
+import { classifyVenue, matchAndRank, resolveSignal } from './local-food-search.service';
 
 describe('resolveSignal', () => {
   it('maps West African dish names to the West African signal', () => {
@@ -73,5 +73,53 @@ describe('classifyVenue', () => {
       matchType: 'CLOSE_MATCH',
       matchedFood: 'Bowls',
     });
+  });
+});
+
+describe('matchAndRank', () => {
+  const origin = { latitude: 51.5, longitude: -0.1 };
+  const westAfrican = resolveSignal('jollof rice');
+
+  it('passes through a real opening_hours tag as-is, never parsed', () => {
+    const results = matchAndRank(
+      [
+        {
+          id: 1,
+          type: 'node',
+          lat: 51.501,
+          lon: -0.101,
+          tags: { name: 'Enish', cuisine: 'nigerian', opening_hours: 'Mo-Su 12:00-23:00' },
+        },
+      ],
+      origin,
+      'jollof rice',
+      ['jollof'],
+      westAfrican,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].openingHours).toBe('Mo-Su 12:00-23:00');
+  });
+
+  it('leaves openingHours null when the source has no such tag', () => {
+    const results = matchAndRank(
+      [{ id: 2, type: 'node', lat: 51.501, lon: -0.101, tags: { name: 'Enish', cuisine: 'nigerian' } }],
+      origin,
+      'jollof rice',
+      ['jollof'],
+      westAfrican,
+    );
+    expect(results).toHaveLength(1);
+    expect(results[0].openingHours).toBeNull();
+  });
+
+  it('never fabricates a result for a venue with no supporting evidence', () => {
+    const results = matchAndRank(
+      [{ id: 3, type: 'node', lat: 51.501, lon: -0.101, tags: { name: 'Some Pub', amenity: 'pub' } }],
+      origin,
+      'sushi',
+      ['sushi'],
+      resolveSignal('sushi'),
+    );
+    expect(results).toHaveLength(0);
   });
 });

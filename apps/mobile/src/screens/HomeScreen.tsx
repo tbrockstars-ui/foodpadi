@@ -1,147 +1,85 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import React, { useRef } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
-import { Card } from '../components/Card';
-import { DecideFlow } from '../components/DecideFlow';
+import { CompanionCard } from '../components/CompanionCard';
+import { DecideFlow, type DecideFlowHandle } from '../components/DecideFlow';
 import { FriendWelcomeBanner } from '../components/FriendWelcomeBanner';
-import { MemberBenefitCard } from '../components/MemberBenefitCard';
-import { Tag } from '../components/Tag';
+import { Screen } from '../components/Screen';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
-import type { AppStackParamList } from '../navigation/AppStack';
+import type { MainTabScreenProps } from '../navigation/types';
 
-type Props = NativeStackScreenProps<AppStackParamList, 'Home'> & { onRequestLogin: () => void };
+type Props = MainTabScreenProps<'Home'> & { onRequestLogin: () => void };
 
-// Secondary shortcuts for returning users who already know which tool they
-// want — DecideFlow above is the primary, first-time experience
-// (docs/IMPLEMENTATION_PLAN.md's "What should I eat?" Home rework, and the
-// decision-engine architecture memory's "single intent-first entry point").
-// "Eat Now" isn't a shortcut here — same call as the web Home: DecideFlow
-// already covers "find something to eat now" and routes to Eat Now's
-// "find it nearby" when the user picks a "Get it" option.
-const TOOL_SHORTCUTS = [
-  { key: 'cook-today', label: 'Cook Today', live: true },
-  { key: 'plan-ahead', label: 'Plan Ahead', live: true },
-  { key: 'scan', label: '📷  Scan Food', live: true },
-] as const;
+function greeting(): string {
+  const h = new Date().getHours();
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
-export function HomeScreen({ navigation, onRequestLogin }: Props) {
+/**
+ * Home is the single intent-first entry point (decision-engine architecture
+ * memory). After the declutter pass it holds exactly one job — "What should
+ * I eat?" — with DecideFlow as the one dominant element. Cook and Plan moved
+ * to the tab bar; Scan moved into the Cook tab; Settings/Login moved into
+ * Profile. Guests get a one-line nudge here; the fuller "make FoodPadi
+ * yours" card still appears inside DecideFlow after they've used it a couple
+ * of times (existing guestPrompts throttle).
+ */
+export function HomeScreen({ onRequestLogin, navigation }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const { user } = useAuth();
   const isGuest = !user;
-
-  const openTool = (key: (typeof TOOL_SHORTCUTS)[number]['key']) => {
-    if (key === 'cook-today') navigation.navigate('CookToday');
-    // Plan Ahead now has an AI-free guest preview (guest-mode brief §8) —
-    // PlanAheadScreen renders it for a guest and the full account version
-    // otherwise.
-    if (key === 'plan-ahead') navigation.navigate('PlanAhead');
-    // Scan builds your personal pantry, which only exists for a real account
-    // (same precedent as Plan Ahead) — a guest tapping it goes to signup.
-    if (key === 'scan') {
-      if (isGuest) onRequestLogin();
-      else navigation.navigate('Scan');
-    }
-  };
+  const decideRef = useRef<DecideFlowHandle>(null);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
-      <View style={styles.header}>
-        <Text style={styles.brand}>FoodPadi</Text>
-        <Text
-          style={styles.headerLink}
-          onPress={() => (isGuest ? onRequestLogin() : navigation.navigate('Settings'))}
-          accessibilityRole="button"
-          accessibilityLabel={isGuest ? 'Log in' : 'Settings'}
-        >
-          {isGuest ? 'Log in' : '⚙  Settings'}
-        </Text>
-      </View>
+    <Screen scroll>
+      <Text style={styles.brand}>FoodPadi</Text>
+      <Text style={styles.greeting}>{greeting()}</Text>
 
       <Text style={styles.heading}>What should I eat?</Text>
-      <Text style={styles.subtitle}>Tell FoodPadi what you have or what you're after, and we'll decide.</Text>
+      <Text style={styles.subtitle}>
+        Tell FoodPadi what you have or what you&apos;re after, and it&apos;ll decide.
+      </Text>
 
       {!isGuest ? <FriendWelcomeBanner /> : null}
 
-      <View style={styles.decideWrap}>
-        <DecideFlow onRequestLogin={onRequestLogin} />
-      </View>
+      {/* Memory & Companion's one piece of UI — members only (guests get zero
+          persistent behavioural profiling), Home-only, at most one suggestion. */}
+      {!isGuest ? (
+        <CompanionCard navigation={navigation} onDecide={(promptFill) => decideRef.current?.focusWithPrompt(promptFill)} />
+      ) : null}
 
-      <Text style={styles.toolsHeading}>Or choose a tool</Text>
-      <View style={styles.toolsRow}>
-        {TOOL_SHORTCUTS.map((tool, index) => (
-          <React.Fragment key={tool.key}>
-            {index > 0 ? <Text style={styles.toolsDivider}>·</Text> : null}
-            <TouchableOpacity
-              onPress={tool.live ? () => openTool(tool.key) : undefined}
-              disabled={!tool.live}
-              accessibilityRole="button"
-            >
-              <View style={styles.toolShortcut}>
-                <Text style={[styles.toolLabel, !tool.live && styles.toolLabelDisabled]}>{tool.label}</Text>
-                {!tool.live ? <Tag label="Soon" tone="neutral" /> : null}
-              </View>
-            </TouchableOpacity>
-          </React.Fragment>
-        ))}
+      <View style={styles.decideWrap}>
+        <DecideFlow ref={decideRef} onRequestLogin={onRequestLogin} />
       </View>
 
       {isGuest ? (
-        <MemberBenefitCard
-          icon="✨"
-          title="Make FoodPadi yours"
-          body="Deciding what to eat and Cook Today work without an account. Create a free one and FoodPadi remembers your recipes, your preferences and your plans."
-          ctaLabel="Create free account"
-          onPress={onRequestLogin}
-        />
+        <Text style={styles.guestNote} onPress={onRequestLogin} accessibilityRole="button">
+          Deciding and cooking work without an account.{' '}
+          <Text style={styles.guestNoteLink}>Create a free one</Text> and FoodPadi remembers your
+          recipes, preferences and plans.
+        </Text>
       ) : (
-        <Card>
-          <Text style={styles.companionHeading}>Your companion</Text>
-          <Text style={styles.companionBody}>
-            Nothing planned yet — try Plan Ahead to get started.
-          </Text>
-        </Card>
+        <Text style={styles.companionNote}>
+          Nothing planned yet — open the Plan tab whenever you want to look ahead.
+        </Text>
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background },
-  scrollContent: { padding: spacing.xl, paddingTop: 64, paddingBottom: spacing.xxl },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.lg,
-  },
-  brand: { ...typography.label, color: c.textMuted, letterSpacing: 1 },
-  headerLink: { color: c.primary, fontSize: 14, fontWeight: '600' },
-  heading: { ...typography.display, color: c.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
-  decideWrap: { marginBottom: spacing.lg },
-  toolsHeading: {
-    ...typography.label,
-    color: c.textFaint,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  toolsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  toolsDivider: { color: c.textFaint },
-  toolShortcut: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  toolLabel: { fontSize: 14, fontWeight: '600', color: c.primary },
-  toolLabelDisabled: { color: c.textFaint },
-  companionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm },
-  companionBody: { ...typography.body, color: c.text },
+    brand: { ...typography.label, color: c.textMuted, letterSpacing: 1 },
+    greeting: { ...typography.body, color: c.textMuted, marginTop: spacing.xs },
+    heading: { ...typography.display, color: c.text, marginTop: spacing.lg, marginBottom: spacing.xs },
+    subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
+    decideWrap: { marginBottom: spacing.lg },
+    guestNote: { ...typography.caption, color: c.textMuted, lineHeight: 19 },
+    guestNoteLink: { color: c.primary, fontWeight: '600' },
+    companionNote: { ...typography.caption, color: c.textFaint, lineHeight: 19 },
   });
 }

@@ -5,9 +5,8 @@ import { getGuestState } from '../../lib/guestSession';
 import { PlanGuestPreview } from './PlanGuestPreview';
 import { PlanScopeForm } from './PlanScopeForm';
 import { PlanView } from './PlanView';
-import { BackLink } from '../../components/BackLink';
+import { AppShell } from '../../components/AppShell';
 import { GuestDisclaimerGate } from '../../components/GuestDisclaimerGate';
-import { Logo } from '../../components/Logo';
 import shellStyles from '../app-shell.module.css';
 import styles from './plan.module.css';
 
@@ -38,26 +37,26 @@ export default async function PlanPage({ searchParams }: { searchParams: { new?:
   const showPlan = plan && !searchParams.new;
 
   return (
-    <main className={shellStyles.container}>
-      <Logo href="/" size={32} className={shellStyles.pageLogo} />
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-md)' }}>
-        <BackLink href="/" label="Home" />
+    <AppShell guest={guest}>
+      <main className={shellStyles.shellPage}>
         {!guest ? (
-          <Link href="/plan/saved" className={styles.itemActionText}>
-            Saved plans
-          </Link>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 'var(--space-md)' }}>
+            <Link href="/plan/saved" className={styles.itemActionText}>
+              Saved plans
+            </Link>
+          </div>
         ) : null}
-      </div>
 
-      {guest ? (
-        <GuestDisclaimerGate acknowledged={getGuestState()?.disclaimerAcknowledged ?? false}>
-          <PlanGuestPreview />
-        </GuestDisclaimerGate>
-      ) : showPlan ? (
-        <PlanView plan={plan!} />
-      ) : (
-        <PlanScopeForm />
-      )}
-    </main>
+        {guest ? (
+          <GuestDisclaimerGate acknowledged={getGuestState()?.disclaimerAcknowledged ?? false}>
+            <PlanGuestPreview />
+          </GuestDisclaimerGate>
+        ) : showPlan ? (
+          <PlanView plan={plan!} />
+        ) : (
+          <PlanScopeForm />
+        )}
+      </main>
+    </AppShell>
   );
 }

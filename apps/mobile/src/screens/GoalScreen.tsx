@@ -3,6 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { GoalsEditor } from '../components/goals/GoalsEditor';
 import { type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import { useScreenInsets } from '../theme/useScreenInsets';
 
 /**
  * Onboarding entry point for Food & Lifestyle Goals — goal selection is
@@ -14,8 +15,9 @@ import { useTheme } from '../theme/ThemeContext';
 export function GoalScreen({ onNext }: { onNext: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const ins = useScreenInsets();
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
       <GoalsEditor onDone={onNext} onSkip={onNext} />
     </View>
   );
@@ -23,6 +25,6 @@ export function GoalScreen({ onNext }: { onNext: () => void }) {
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+    container: { flex: 1, backgroundColor: c.background, paddingHorizontal: 24 },
   });
 }

@@ -39,16 +39,22 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/splash-icon.png",
-          "imageWidth": 220,
-          "resizeMode": "contain",
-          "backgroundColor": "#FBFAF7"
+          "image": "./assets/splash.png",
+          "resizeMode": "cover",
+          "backgroundColor": "#14171A",
+          "dark": {
+            "image": "./assets/splash.png",
+            "resizeMode": "cover",
+            "backgroundColor": "#14171A"
+          }
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-secure-store",
+      "expo-status-bar"
     ],
     "extra": {
-      "apiBaseUrl": "https://foodpadi-api.onrender.com",
+      "apiBaseUrl": "https://foodpadi-api-495c.onrender.com",
       "googleAuth": {
         "webClientId": "1012058800117-jsk24r6p16gu0h8ih8vrr8sec1u05eh6.apps.googleusercontent.com",
         "androidClientId": "1012058800117-7q6r357g99cqgce1oe1nc1km8d60h531.apps.googleusercontent.com",

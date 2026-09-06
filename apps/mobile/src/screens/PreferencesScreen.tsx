@@ -5,6 +5,7 @@ import { Button } from '../components/Button';
 import { Chip } from '../components/Chip';
 import { spacing, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import { useScreenInsets } from '../theme/useScreenInsets';
 
 // A starting set of cuisines, not an exhaustive list — this is deliberately
 // small and skippable (docs/FOODPADI_ONBOARDING_SPEC.md, docs/
@@ -30,6 +31,7 @@ const CUISINES = [
 export function PreferencesScreen({ onDone }: { onDone: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const ins = useScreenInsets();
   const [selected, setSelected] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
@@ -61,7 +63,7 @@ export function PreferencesScreen({ onDone }: { onDone: () => void }) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
       <Text style={styles.heading}>Any cuisines you love?</Text>
       <Text style={styles.subtitle}>
         Pick as many as you like — FoodPadi will learn more about your taste as you go.
@@ -86,7 +88,7 @@ export function PreferencesScreen({ onDone }: { onDone: () => void }) {
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+  container: { flex: 1, backgroundColor: c.background, paddingHorizontal: 24 },
   heading: { fontSize: 22, fontWeight: '700', color: c.text, marginBottom: 8 },
   subtitle: { fontSize: 14, color: c.textMuted, marginBottom: 20, lineHeight: 20 },
   chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, flexGrow: 1, alignContent: 'flex-start' },

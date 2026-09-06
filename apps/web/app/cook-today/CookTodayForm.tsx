@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import type { RecipeView } from '@foodpadi/shared';
 import styles from './cook-today.module.css';
+import { CookingSession } from './CookingSession';
+import { ScanKitchen } from './ScanKitchen';
 import { MemberBenefitCard } from '../../components/MemberBenefitCard';
 import { guestPrompts } from '../../lib/guestClient';
 
@@ -24,7 +26,7 @@ const TIME_OPTIONS: { label: string; value: number | undefined }[] = [
   { label: '60 min', value: 60 },
 ];
 
-type Step = 'input' | 'results' | 'detail';
+type Step = 'input' | 'results' | 'detail' | 'cooking';
 
 // The proxy clears the session cookies and answers 401 when it can't refresh
 // an expired access token. There's nothing to retry client-side — bounce the
@@ -63,6 +65,7 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
   const [timeConstraint, setTimeConstraint] = useState<number | undefined>(undefined);
   const [recipes, setRecipes] = useState<RecipeView[]>([]);
   const [selectedRecipe, setSelectedRecipe] = useState<RecipeView | null>(null);
+  const [savedRecipeId, setSavedRecipeId] = useState<string | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -116,6 +119,7 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
   const openRecipe = (recipe: RecipeView) => {
     setSelectedRecipe(recipe);
     setSaved(false);
+    setSavedRecipeId(undefined);
     setSaveError(null);
     setStep('detail');
   };
@@ -143,13 +147,26 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
       if (!res.ok) {
         throw new Error(await errorMessageFrom(res, "Couldn't save this recipe"));
       }
+      const savedRecipe = (await res.json()) as { id: string };
       setSaved(true);
+      setSavedRecipeId(savedRecipe.id);
     } catch (e) {
       setSaveError(e instanceof Error ? e.message : "Couldn't save this recipe.");
     } finally {
       setSaving(false);
     }
   };
+
+  if (step === 'cooking' && selectedRecipe) {
+    return (
+      <CookingSession
+        recipe={selectedRecipe}
+        savedRecipeId={savedRecipeId}
+        isGuest={isGuest}
+        onClose={() => setStep('detail')}
+      />
+    );
+  }
 
   if (step === 'detail' && selectedRecipe) {
     return (
@@ -188,7 +205,16 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
           conditions and does not determine whether food is medically safe for you.
         </p>
 
-        <button type="button" className={styles.primaryButton} onClick={saveRecipe} disabled={saved || saving}>
+        <button type="button" className={styles.primaryButton} onClick={() => setStep('cooking')}>
+          Start Cooking
+        </button>
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          onClick={saveRecipe}
+          disabled={saved || saving}
+          style={{ marginTop: 'var(--space-sm)' }}
+        >
           {saved ? 'Saved' : saving ? 'Saving…' : 'Save this recipe'}
         </button>
         {saveError ? <p className={styles.errorText}>{saveError}</p> : null}
@@ -241,8 +267,14 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
 
   return (
     <div>
-      <h1 className={styles.title}>What have you got?</h1>
-      <p className={styles.subtitle}>Tap what you have, or add something else.</p>
+      <h1 className={styles.title}>What&apos;s in your kitchen?</h1>
+      <p className={styles.subtitle}>Scan it, tap what you have, or add something else.</p>
+
+      {!isGuest ? (
+        <div style={{ marginBottom: 'var(--space-lg)' }}>
+          <ScanKitchen onAddIngredients={(names) => setIngredients((current) => [...new Set([...current, ...names])])} />
+        </div>
+      ) : null}
 
       <div className={styles.chipWrap}>
         {QUICK_INGREDIENTS.map((name) => (
@@ -298,7 +330,7 @@ export function CookTodayForm({ isGuest = false }: { isGuest?: boolean }) {
 
       <div style={{ marginTop: 24 }}>
         <button type="button" className={styles.primaryButton} onClick={findRecipes} disabled={ingredients.length === 0 || loading}>
-          {loading ? 'Finding recipes…' : 'Find recipes'}
+          {loading ? 'Finding recipes…' : 'Cook Something'}
         </button>
       </div>
     </div>

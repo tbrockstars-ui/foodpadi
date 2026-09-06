@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import type { FoodIdeaView, MealChoice, MealPlanView } from '@foodpadi/shared';
+import type { FoodIdeaView, MealChoice, MealPlanItemView, MealPlanView } from '@foodpadi/shared';
 import { getCuisineImage } from '../../lib/imageAssets';
 import { FoodImage } from '../../components/FoodImage';
+import { cancelMealReminder, scheduleMealReminder, type MealReminderResult } from '../../lib/mealReminders';
+import { LocalFoodSearch, type LocalFoodSearchStage } from '../eat-now/LocalFoodSearch';
 import styles from './plan.module.css';
 import eatNowStyles from '../eat-now/eat-now.module.css';
 
@@ -23,6 +25,25 @@ function formatPence(pence: number): string {
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+// null ("scheduled") shows nothing — anything else is worth telling the
+// user, since it means the reminder they just asked for won't actually fire.
+const REMINDER_RESULT_MESSAGE: Record<MealReminderResult, string | null> = {
+  scheduled: null,
+  'no-time': null,
+  past: "That time's already passed today — no reminder was set.",
+  'permission-denied': 'Reminder saved, but notifications are blocked for this site — allow them in your browser settings to actually get nudged.',
+  unsupported: "Reminder saved, but this browser doesn't support notifications — you won't get a nudge here.",
+};
+
+/** The reminder fires 30 minutes before plannedTime — shown so "30 min before X" isn't left for the user to do the maths on. Matches mobile's PlanAheadScreen. */
+function formatReminderTime(plannedTime: string): string {
+  const [hours, minutes] = plannedTime.split(':').map(Number);
+  const total = (hours * 60 + minutes - 30 + 24 * 60) % (24 * 60);
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
 
 /** Web counterpart to apps/mobile/src/screens/PlanAheadScreen.tsx's plan step. */
@@ -51,6 +72,32 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
   const [nearbyResults, setNearbyResults] = useState<FoodIdeaView[] | null>(null);
   const [nearbySearching, setNearbySearching] = useState(false);
   const [nearbyError, setNearbyError] = useState<string | null>(null);
+
+  // Draft text for each item's time field, keyed by item id — separate from
+  // the committed plannedTime so typing doesn't fire a request per keystroke.
+  // Matches mobile's PlanAheadScreen.
+  const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
+  const [timeError, setTimeError] = useState<string | null>(null);
+
+  // Re-arm every item's reminder whenever the plan's data changes (initial
+  // load, or a fresh server-rendered `plan` after any router.refresh() below)
+  // — a reminder here is just a setTimeout (see lib/mealReminders.ts), so a
+  // closed-then-reopened tab has lost whatever was pending and needs it
+  // rescheduled, same precedent as mobile re-arming on app start.
+  useEffect(() => {
+    for (const item of plan.items) {
+      if (item.plannedTime) void scheduleMealReminder(item);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan]);
+
+  // "Find Near Me" — the real, geolocation-based provider search (same
+  // LocalFoodSearch used by Home's DecideFlow), separate from the
+  // illustrative catalogue search above. Only one item's real search shows
+  // at once, same as nearbyOpenId.
+  const [findNearMeOpenId, setFindNearMeOpenId] = useState<string | null>(null);
+  const [findNearMeStage, setFindNearMeStage] = useState<LocalFoodSearchStage>('idle');
+  const findNearMeBusy = findNearMeStage === 'asking-permission' || findNearMeStage === 'searching';
 
   const focusDraft = focusOpenId ? (focusDrafts[focusOpenId] ?? '') : '';
 
@@ -124,6 +171,46 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
         setNearbyOpenId(null);
         setNearbyResults(null);
       }
+      if (mealChoice !== 'eat_out' && findNearMeOpenId === itemId) {
+        setFindNearMeOpenId(null);
+      }
+      router.refresh();
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
+  // Native <input type="time"> already only ever hands back a valid "HH:mm"
+  // (or ""), so unlike a free-text field there's no format to validate here
+  // — the browser's own time picker is what guarantees the hour/minute are
+  // right in the first place.
+  const applyPlannedTime = async (item: MealPlanItemView) => {
+    // Falls back to the already-committed plannedTime, exactly like the
+    // input's own displayed value below — without this, clicking "Update"
+    // before ever touching the field (timeDrafts has nothing for this item
+    // yet) would read as an empty draft and silently clear the time instead
+    // of just resubmitting it unchanged.
+    const draft = (timeDrafts[item.id] ?? item.plannedTime ?? '').trim();
+    setTimeError(null);
+    setBusyItemId(item.id);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${plan.id}/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plannedTime: draft || null }),
+      });
+      if (!res.ok) {
+        setTimeError(await readError(res, 'Could not update that reminder. Please try again.'));
+        return;
+      }
+      const updated = (await res.json()) as MealPlanView;
+      const updatedItem = updated.items.find((i) => i.id === item.id);
+      if (updatedItem?.plannedTime) {
+        const result = await scheduleMealReminder(updatedItem);
+        setTimeError(REMINDER_RESULT_MESSAGE[result]);
+      } else {
+        cancelMealReminder(item.id);
+      }
       router.refresh();
     } finally {
       setBusyItemId(null);
@@ -166,6 +253,7 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
     setBusyItemId(itemId);
     try {
       await fetch(`/api/proxy/plan-ahead/${plan.id}/items/${itemId}`, { method: 'DELETE' });
+      cancelMealReminder(itemId);
       router.refresh();
     } finally {
       setBusyItemId(null);
@@ -222,6 +310,7 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
       </p>
 
       {error ? <p className={styles.errorText}>{error}</p> : null}
+      {timeError ? <p className={styles.errorText}>{timeError}</p> : null}
 
       {plan.items.map((item) => {
         const image = item.recipe ? getCuisineImage(item.recipe.cuisine) : null;
@@ -242,6 +331,13 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
               ) : (
                 <p className={styles.mealTitle}>Nothing planned for this day</p>
               )}
+
+              {item.plannedTime ? (
+                <p className={styles.reminderNote}>
+                  🔔 Reminder at {formatReminderTime(item.plannedTime)} — 30 min before it&apos;s time to{' '}
+                  {item.mealChoice === 'eat_out' ? 'order' : 'start cooking'}.
+                </p>
+              ) : null}
 
               {item.recipe ? (
                 <>
@@ -268,11 +364,69 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                     </button>
                   </div>
 
+                  {/* 30-min-before reminder. The time input is a native
+                      <input type="time"> — the browser's own hour/minute
+                      picker, not a free-text field someone could mistype —
+                      so this is guaranteed a valid "HH:mm" (or empty) before
+                      it ever reaches applyPlannedTime. */}
+                  <div className={styles.timeRow}>
+                    <input
+                      className={styles.timeInput}
+                      type="time"
+                      aria-label="Meal time"
+                      value={timeDrafts[item.id] ?? item.plannedTime ?? ''}
+                      onChange={(e) => setTimeDrafts((current) => ({ ...current, [item.id]: e.target.value }))}
+                    />
+                    <button
+                      type="button"
+                      className={styles.itemActionText}
+                      onClick={() => applyPlannedTime(item)}
+                      disabled={busyItemId === item.id}
+                    >
+                      {item.plannedTime ? 'Update' : 'Set time'}
+                    </button>
+                  </div>
+                  {item.plannedTime ? (
+                    <p className={styles.reminderHint}>
+                      Keep this tab open around then to get the notification.
+                    </p>
+                  ) : null}
+
                   {item.mealChoice === 'eat_out' ? (
                     <div className={styles.itemActions}>
                       <button type="button" className={styles.itemActionText} onClick={() => findNearby(item)}>
                         {nearbyOpenId === item.id ? 'Hide' : 'Find it nearby'}
                       </button>
+                      {/* The real, geolocation-based provider search — same
+                          LocalFoodSearch component Home's "Get it" options
+                          use — so a Plan day can point at an actual nearby
+                          business, not just the illustrative catalogue
+                          example above. */}
+                      {findNearMeOpenId === item.id ? (
+                        findNearMeBusy ? null : (
+                          <button
+                            type="button"
+                            className={styles.itemActionText}
+                            onClick={() => setFindNearMeOpenId(null)}
+                          >
+                            Hide
+                          </button>
+                        )
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.findNearMeButton}
+                          onClick={() => setFindNearMeOpenId(item.id)}
+                        >
+                          Find Near Me
+                        </button>
+                      )}
+                    </div>
+                  ) : null}
+
+                  {findNearMeOpenId === item.id ? (
+                    <div className={styles.nearbyBlock}>
+                      <LocalFoodSearch query={item.recipe.title} autoStart onStageChange={setFindNearMeStage} />
                     </div>
                   ) : null}
 
@@ -306,6 +460,7 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                                   ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
                                   {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
                                 </p>
+                                <p className={eatNowStyles.illustrativeTag}>Example only — not a specific place</p>
                                 <div className={eatNowStyles.tagRow}>
                                   <span className={eatNowStyles.tag}>{idea.cuisine}</span>
                                   <span className={eatNowStyles.tag}>{BUDGET_LABEL[idea.budgetTier]}</span>
@@ -320,7 +475,7 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                 </>
               ) : null}
 
-              <div className={styles.itemActions}>
+              <div className={`${styles.itemActions} ${styles.secondaryActionsRow}`}>
                 <button
                   type="button"
                   className={styles.itemActionText}

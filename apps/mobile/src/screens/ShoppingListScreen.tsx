@@ -1,18 +1,49 @@
-import React, { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, Animated, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Feather } from '@expo/vector-icons';
 import { AISLE_ORDER, categorizeIngredient, ShoppingListView } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
+import { SectionHeader } from '../components/Section';
+import { useReduceMotion } from '../components/motion/useReduceMotion';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'ShoppingList'>;
+
+/** A checkbox whose tick pops in with a small scale (declutter pass §19). */
+function CheckBox({ checked, color }: { checked: boolean; color: ThemeColors }) {
+  const styles = makeStyles(color);
+  const reduceMotion = useReduceMotion();
+  const scale = useRef(new Animated.Value(checked ? 1 : 0)).current;
+
+  useEffect(() => {
+    if (reduceMotion) {
+      scale.setValue(checked ? 1 : 0);
+      return;
+    }
+    Animated.timing(scale, {
+      toValue: checked ? 1 : 0,
+      duration: checked ? 160 : 100,
+      useNativeDriver: true,
+    }).start();
+  }, [checked, reduceMotion, scale]);
+
+  return (
+    <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+      <Animated.View style={{ transform: [{ scale }] }}>
+        <Feather name="check" size={13} color={color.primaryText} />
+      </Animated.View>
+    </View>
+  );
+}
 
 export function ShoppingListScreen({ route, navigation }: Props) {
   const { colors } = useTheme();
@@ -87,20 +118,20 @@ export function ShoppingListScreen({ route, navigation }: Props) {
   })).filter((group) => group.items.length > 0);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Home" onPress={() => navigation.navigate('Home')} />
-      <Text style={styles.title}>Shopping list</Text>
-      <Text style={styles.subtitle}>
-        {remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}
-      </Text>
+    <Screen scroll>
+      <ScreenHeader
+        title="Shopping list"
+        subtitle={remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}
+        onBack={() => navigation.goBack()}
+      />
 
       {list.mealPlanId ? (
         <Button
           label={rebuilding ? 'Rebuilding…' : 'Rebuild from plan'}
-          variant="secondary"
+          variant="tertiary"
           onPress={rebuildFromPlan}
           loading={rebuilding}
-          style={{ marginBottom: spacing.lg }}
+          style={styles.rebuild}
         />
       ) : null}
 
@@ -109,25 +140,23 @@ export function ShoppingListScreen({ route, navigation }: Props) {
       ) : (
         groups.map((group) => (
           <View key={group.aisle} style={styles.group}>
-            <Text style={styles.groupHeading}>{group.aisle}</Text>
+            <SectionHeader title={group.aisle} />
             <Card style={styles.card}>
-              {group.items.map((item) => (
-                <View key={item.id} style={styles.row}>
+              {group.items.map((item, i) => (
+                <View key={item.id} style={[styles.row, i > 0 && styles.rowDivider]}>
                   <TouchableOpacity
                     style={styles.checkRow}
                     onPress={() => toggle(item.id, !item.checked)}
                     accessibilityRole="checkbox"
                     accessibilityState={{ checked: item.checked }}
                   >
-                    <View style={[styles.checkbox, item.checked && styles.checkboxChecked]}>
-                      {item.checked ? <Text style={styles.checkmark}>✓</Text> : null}
-                    </View>
+                    <CheckBox checked={item.checked} color={colors} />
                     <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>
                       {[item.quantity, item.ingredientName].filter(Boolean).join(' ')}
                     </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => removeItem(item.id)} accessibilityLabel="Remove item">
-                    <Text style={styles.removeIcon}>✕</Text>
+                  <TouchableOpacity onPress={() => removeItem(item.id)} accessibilityLabel="Remove item" hitSlop={8}>
+                    <Feather name="x" size={15} color={colors.textFaint} />
                   </TouchableOpacity>
                 </View>
               ))}
@@ -152,57 +181,53 @@ export function ShoppingListScreen({ route, navigation }: Props) {
           <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
       </View>
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.xs },
-  subtitle: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
-  card: { marginBottom: spacing.lg },
-  group: { marginBottom: spacing.sm },
-  groupHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.xs },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.sm,
-  },
-  checkRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: radius.sm,
-    borderWidth: 1,
-    borderColor: c.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxChecked: { backgroundColor: c.primary, borderColor: c.primary },
-  checkmark: { color: c.primaryText, fontSize: 13, fontWeight: '700' },
-  itemText: { ...typography.body, color: c.text, flex: 1 },
-  itemTextChecked: { color: c.textFaint, textDecorationLine: 'line-through' },
-  removeIcon: { color: c.textFaint, fontSize: 14, paddingHorizontal: spacing.sm },
-  addRow: { flexDirection: 'row', gap: spacing.sm },
-  addInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: c.border,
-    backgroundColor: c.surface,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    fontSize: 15,
-    color: c.text,
-  },
-  addButton: {
-    backgroundColor: c.surfaceSunken,
-    borderRadius: radius.md,
-    paddingHorizontal: spacing.lg,
-    justifyContent: 'center',
-  },
-  addButtonText: { color: c.text, fontWeight: '600' },
+    rebuild: { alignSelf: 'flex-start', marginBottom: spacing.md },
+    card: { marginBottom: spacing.lg, paddingVertical: spacing.xs },
+    group: { marginBottom: spacing.sm },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: spacing.md,
+    },
+    rowDivider: { borderTopWidth: 1, borderTopColor: c.border },
+    checkRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: spacing.md },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: radius.sm,
+      borderWidth: 1,
+      borderColor: c.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    checkboxChecked: { backgroundColor: c.primary, borderColor: c.primary },
+    itemText: { ...typography.body, color: c.text, flex: 1 },
+    itemTextChecked: { color: c.textFaint, textDecorationLine: 'line-through' },
+    addRow: { flexDirection: 'row', gap: spacing.sm },
+    addInput: {
+      flex: 1,
+      borderWidth: 1,
+      borderColor: c.border,
+      backgroundColor: c.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      fontSize: 15,
+      color: c.text,
+    },
+    addButton: {
+      backgroundColor: c.surfaceSunken,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.lg,
+      justifyContent: 'center',
+    },
+    addButtonText: { color: c.text, fontWeight: '600' },
   });
 }

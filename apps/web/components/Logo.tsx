@@ -15,6 +15,11 @@ interface LogoProps {
   /** Wrap in a link to "/" (skip on pages that already are "/"). */
   href?: string;
   className?: string;
+  /** Eager-load + high fetch priority. Only true where this mark IS the LCP
+      element (e.g. the big login/register badge) — a small header mark is not,
+      and `priority` there just steals bandwidth from real above-the-fold
+      content on that route. */
+  priority?: boolean;
 }
 
 /**
@@ -24,12 +29,13 @@ interface LogoProps {
  * hero top bar and the login page so both use the same asset consistently.
  */
 export function Logo({
-  size = 44,
+  size = 53, // 44 + 20%
   wordmarkSize,
   withWordmark = true,
   onDark = false,
   href,
   className,
+  priority = false,
 }: LogoProps) {
   const inner = (
     <>
@@ -38,9 +44,11 @@ export function Logo({
         alt="FoodPadi"
         width={size}
         height={size}
+        sizes={`${size}px`}
         className={styles.mark}
         style={{ width: size, height: size }}
-        priority
+        priority={priority}
+        loading={priority ? undefined : 'lazy'}
       />
       {withWordmark ? (
         <span

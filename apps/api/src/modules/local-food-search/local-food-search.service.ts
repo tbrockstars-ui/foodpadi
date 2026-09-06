@@ -3,6 +3,7 @@ import type { FoodMatchType, FoodProviderResult, LocalFoodSearchResponse } from 
 import { AnalyticsService } from '../analytics/analytics.service';
 import type { RequestActor } from '../auth/guest-or-auth.guard';
 import { LocalFoodSearchDto } from './dto/local-food-search.dto';
+import { LocalFoodSearchInteractionDto } from './dto/local-food-search-interaction.dto';
 
 // Identifies this app to OpenStreetMap's public services, as their usage
 // policies require (Nominatim in particular will block requests with no —
@@ -25,12 +26,12 @@ const OVERPASS_URLS = [
 // slow/hung public mirror stalls the whole request for minutes and the user
 // eventually sees a generic "couldn't find nearby food" error — the timeout
 // turns that into a fast fall-through to the next mirror instead.
-const OVERPASS_FETCH_TIMEOUT_MS = 10000;
-const OVERPASS_RETRY_BACKOFF_MS = 1200;
+const OVERPASS_FETCH_TIMEOUT_MS = 7000;
+const OVERPASS_RETRY_BACKOFF_MS = 800;
 const NOMINATIM_FETCH_TIMEOUT_MS = 6000;
 // Overpass's own server-side budget — kept just under the fetch timeout so the
 // server returns a partial/empty result rather than us aborting mid-response.
-const OVERPASS_SERVER_TIMEOUT_S = 9;
+const OVERPASS_SERVER_TIMEOUT_S = 6;
 
 // Start local (1 mile — a short walk, which is what "find it nearby" means),
 // and only widen to 3 miles when the close pass genuinely matched nothing.
@@ -277,6 +278,9 @@ function actorToAnalyticsFields(actor: RequestActor) {
 export class LocalFoodSearchService {
   private readonly logger = new Logger(LocalFoodSearchService.name);
   private readonly venueCache = new Map<string, { at: number; elements: OverpassElement[] }>();
+  // Geocodes barely move, so a typed-location lookup (and especially a "Try
+  // again" tap on the same one) shouldn't pay Nominatim's latency twice.
+  private readonly geocodeCache = new Map<string, { at: number; latitude: number; longitude: number }>();
 
   constructor(private readonly analytics: AnalyticsService) {}
 
@@ -298,7 +302,7 @@ export class LocalFoodSearchService {
     for (const radiusMetres of SEARCH_RADII_METRES) {
       usedRadius = radiusMetres;
       const elements = await this.getNearbyVenues(origin, radiusMetres);
-      results = this.matchAndRank(elements, origin, dto.query, queryTokens, matchedSignal);
+      results = matchAndRank(elements, origin, dto.query, queryTokens, matchedSignal);
       if (results.length > 0) break; // widen only when the closer pass found nothing
     }
 
@@ -314,7 +318,20 @@ export class LocalFoodSearchService {
     };
   }
 
+  // "Find Near Me" brief §16 — a thin, fire-and-forget pass-through to the
+  // existing AnalyticsService, same posture as `search()` above; there is
+  // nothing to compute or validate beyond the DTO's own @IsIn check.
+  async trackInteraction(dto: LocalFoodSearchInteractionDto, actor: RequestActor): Promise<void> {
+    await this.analytics.track(dto.interactionType, actorToAnalyticsFields(actor), dto.metadata ?? {});
+  }
+
   private async geocode(locationText: string): Promise<{ latitude: number; longitude: number }> {
+    const cacheKey = locationText.toLowerCase();
+    const cached = this.geocodeCache.get(cacheKey);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      return { latitude: cached.latitude, longitude: cached.longitude };
+    }
+
     const url = new URL(NOMINATIM_URL);
     url.searchParams.set('q', locationText);
     url.searchParams.set('format', 'json');
@@ -339,7 +356,13 @@ export class LocalFoodSearchService {
     if (results.length === 0) {
       throw new BadRequestException("We couldn't find that location. Try a postcode or a town name.");
     }
-    return { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) };
+    const point = { latitude: parseFloat(results[0].lat), longitude: parseFloat(results[0].lon) };
+    if (this.geocodeCache.size >= CACHE_MAX_ENTRIES) {
+      const oldest = this.geocodeCache.keys().next().value;
+      if (oldest !== undefined) this.geocodeCache.delete(oldest);
+    }
+    this.geocodeCache.set(cacheKey, { at: Date.now(), ...point });
+    return point;
   }
 
   // Fetch (or reuse a recent) set of nearby food venues for this location.
@@ -400,37 +423,44 @@ export class LocalFoodSearchService {
       out center tags;
     `.trim();
 
-    // Attempt order: each mirror once, plus one extra shot at the primary
-    // (best-maintained) instance after a short backoff — its 429s are usually
-    // a brief per-IP burst limit that clears within a second or two.
-    const attempts = [...OVERPASS_URLS, OVERPASS_URLS[0]];
+    // One mirror hit against `url`; resolves with its elements or rejects.
+    // Non-2xx is a rejection so `Promise.any` moves on to a sibling mirror.
+    const hitMirror = async (url: string): Promise<OverpassElement[]> => {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain', 'User-Agent': USER_AGENT },
+        body: query,
+        signal: AbortSignal.timeout(OVERPASS_FETCH_TIMEOUT_MS),
+      });
+      if (!response.ok) throw new Error(`${url} → HTTP ${response.status}`);
+      const data = (await response.json()) as OverpassResponse;
+      return data.elements ?? [];
+    };
+
+    // Race the mirrors in pairs instead of trying them strictly one-at-a-time:
+    // the free public instances vary wildly in load minute-to-minute, so firing
+    // at two at once and taking whichever answers first turns a worst-case
+    // "every mirror times out in series" (~5 × 7s) into ~2 rounds, and the
+    // common case into whichever healthy mirror is fastest today. A final lone
+    // retry against the best-maintained primary covers a transient 429 burst.
+    const rounds: string[][] = [
+      [OVERPASS_URLS[0], OVERPASS_URLS[1]],
+      [OVERPASS_URLS[2], OVERPASS_URLS[3]],
+      [OVERPASS_URLS[0]],
+    ];
 
     let lastError = '';
-    for (const [i, url] of attempts.entries()) {
-      const isLastAttempt = i === attempts.length - 1;
-      const isPrimaryRetry = i === attempts.length - 1 && url === OVERPASS_URLS[0];
-      if (isPrimaryRetry) await new Promise((r) => setTimeout(r, OVERPASS_RETRY_BACKOFF_MS));
-
+    for (const [roundIndex, round] of rounds.entries()) {
+      if (roundIndex === rounds.length - 1) {
+        await new Promise((r) => setTimeout(r, OVERPASS_RETRY_BACKOFF_MS));
+      }
       try {
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain', 'User-Agent': USER_AGENT },
-          body: query,
-          signal: AbortSignal.timeout(OVERPASS_FETCH_TIMEOUT_MS),
-        });
-        if (!response.ok) {
-          lastError = `HTTP ${response.status}`;
-          this.logger.warn(`Overpass mirror ${url} returned ${response.status}`);
-          if (isLastAttempt) break;
-          continue; // rate-limited (429) or briefly down — try the next mirror
-        }
-        const data = (await response.json()) as OverpassResponse;
-        return data.elements ?? [];
+        return await Promise.any(round.map((url) => hitMirror(url)));
       } catch (e) {
-        lastError = e instanceof Error ? e.message : String(e);
-        this.logger.warn(`Overpass mirror ${url} failed: ${lastError}`);
-        if (isLastAttempt) break;
-        continue; // timeout, connection error, aborted, or unparseable body
+        // AggregateError from Promise.any — every mirror in this round failed.
+        const errs = e instanceof AggregateError ? e.errors : [e];
+        lastError = errs.map((err) => (err instanceof Error ? err.message : String(err))).join('; ');
+        this.logger.warn(`Overpass round ${roundIndex + 1} failed: ${lastError}`);
       }
     }
 
@@ -438,78 +468,84 @@ export class LocalFoodSearchService {
     throw new ServiceUnavailableException("We couldn't reach the local food data source right now. Please try again in a moment.");
   }
 
-  // A business is only ever included if its own OSM tags provide real
-  // evidence of the requested food — never included just for being nearby,
-  // and address/phone/website are only ever populated from real tags on
-  // that same element, never guessed or constructed.
-  private matchAndRank(
-    elements: OverpassElement[],
-    origin: { latitude: number; longitude: number },
-    requestedFood: string,
-    queryTokens: string[],
-    matchedSignal: FoodSignal | undefined,
-  ): FoodProviderResult[] {
-    const results: FoodProviderResult[] = [];
+}
 
-    for (const el of elements) {
-      const tags = el.tags ?? {};
-      const name = tags.name;
-      if (!name) continue; // never show an unnamed business
+function milesFromText(distanceText: string | null): number {
+  if (!distanceText) return 999;
+  if (distanceText.startsWith('under')) return 0;
+  return parseFloat(distanceText) || 999;
+}
 
-      const lat = el.lat ?? el.center?.lat;
-      const lon = el.lon ?? el.center?.lon;
-      if (typeof lat !== 'number' || typeof lon !== 'number') continue;
+function buildAddress(tags: Record<string, string>): string | null {
+  const parts = [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'] || tags['addr:town']].filter(
+    Boolean,
+  );
+  return parts.length > 0 ? parts.join(' ') : null;
+}
 
-      const classification = classifyVenue(tags, requestedFood, queryTokens, matchedSignal);
-      if (!classification) continue; // no real evidence at all — never shown
+function nullIfNotHttpUrl(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? value : null;
+  } catch {
+    return null;
+  }
+}
 
-      const miles = distanceMiles(origin.latitude, origin.longitude, lat, lon);
-      const address = this.buildAddress(tags);
+// A business is only ever included if its own OSM tags provide real evidence
+// of the requested food — never included just for being nearby, and
+// address/phone/website are only ever populated from real tags on that same
+// element, never guessed or constructed. Pure and exported for unit testing,
+// same rationale as classifyVenue/resolveSignal above.
+export function matchAndRank(
+  elements: OverpassElement[],
+  origin: { latitude: number; longitude: number },
+  requestedFood: string,
+  queryTokens: string[],
+  matchedSignal: FoodSignal | undefined,
+): FoodProviderResult[] {
+  const results: FoodProviderResult[] = [];
 
-      results.push({
-        id: `${el.type}-${el.id}`,
-        name,
-        address,
-        phone: tags.phone || tags['contact:phone'] || null,
-        websiteUrl: this.nullIfNotHttpUrl(tags.website || tags['contact:website']),
-        orderUrl: null, // OSM has no reliable ordering-URL concept — never guessed
-        bookingUrl: null, // same — no reliable reservation-URL concept in OSM tags
-        mapsUrl: `https://www.openstreetmap.org/${el.type}/${el.id}`,
-        distanceText: miles < 0.1 ? 'under 0.1 mi away' : `${miles.toFixed(1)} mi away`,
-        requestedFood,
-        matchedFood: classification.matchedFood,
-        matchType: classification.matchType,
-      });
-    }
+  for (const el of elements) {
+    const tags = el.tags ?? {};
+    const name = tags.name;
+    if (!name) continue; // never show an unnamed business
 
-    results.sort((a, b) => {
-      if (a.matchType !== b.matchType) return a.matchType === 'EXACT_MATCH' ? -1 : 1;
-      return this.milesFromText(a.distanceText) - this.milesFromText(b.distanceText);
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    if (typeof lat !== 'number' || typeof lon !== 'number') continue;
+
+    const classification = classifyVenue(tags, requestedFood, queryTokens, matchedSignal);
+    if (!classification) continue; // no real evidence at all — never shown
+
+    const miles = distanceMiles(origin.latitude, origin.longitude, lat, lon);
+    const address = buildAddress(tags);
+
+    results.push({
+      id: `${el.type}-${el.id}`,
+      name,
+      address,
+      phone: tags.phone || tags['contact:phone'] || null,
+      websiteUrl: nullIfNotHttpUrl(tags.website || tags['contact:website']),
+      orderUrl: null, // OSM has no reliable ordering-URL concept — never guessed
+      bookingUrl: null, // same — no reliable reservation-URL concept in OSM tags
+      mapsUrl: `https://www.openstreetmap.org/${el.type}/${el.id}`,
+      distanceText: miles < 0.1 ? 'under 0.1 mi away' : `${miles.toFixed(1)} mi away`,
+      requestedFood,
+      matchedFood: classification.matchedFood,
+      matchType: classification.matchType,
+      // Raw tag value, shown as-is — never parsed into an "open now" claim
+      // (opening_hours syntax is its own mini-language) and never present
+      // unless OSM actually has it for this venue.
+      openingHours: tags.opening_hours || null,
     });
-
-    return results.slice(0, MAX_RESULTS);
   }
 
-  private milesFromText(distanceText: string | null): number {
-    if (!distanceText) return 999;
-    if (distanceText.startsWith('under')) return 0;
-    return parseFloat(distanceText) || 999;
-  }
+  results.sort((a, b) => {
+    if (a.matchType !== b.matchType) return a.matchType === 'EXACT_MATCH' ? -1 : 1;
+    return milesFromText(a.distanceText) - milesFromText(b.distanceText);
+  });
 
-  private buildAddress(tags: Record<string, string>): string | null {
-    const parts = [tags['addr:housenumber'], tags['addr:street'], tags['addr:city'] || tags['addr:town']].filter(
-      Boolean,
-    );
-    return parts.length > 0 ? parts.join(' ') : null;
-  }
-
-  private nullIfNotHttpUrl(value: string | undefined): string | null {
-    if (!value) return null;
-    try {
-      const url = new URL(value);
-      return url.protocol === 'http:' || url.protocol === 'https:' ? value : null;
-    } catch {
-      return null;
-    }
-  }
+  return results.slice(0, MAX_RESULTS);
 }

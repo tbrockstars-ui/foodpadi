@@ -97,7 +97,7 @@
 
 .heroLogoImg {
   width: 100%;
-  max-width: 400px;
+  max-width: 480px; /* 400px + 20% */
   height: auto;
   filter: drop-shadow(0 24px 44px rgba(0, 0, 0, 0.38));
 }
@@ -363,7 +363,7 @@
   }
 
   .heroLogoImg {
-    max-width: 220px;
+    max-width: 264px; /* 220px + 20% */
   }
 
   .heroContent {

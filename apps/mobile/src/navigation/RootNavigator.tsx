@@ -1,12 +1,11 @@
-import React, { useState } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useGuestSession } from '../auth/GuestSessionContext';
+import { BrandLoadingScreen } from '../components/BrandLoadingScreen';
 import { AuthFlow } from './AuthFlow';
 import { DisclaimerScreen } from '../screens/DisclaimerScreen';
 import { OnboardingFlow } from './OnboardingFlow';
 import { AppStack } from './AppStack';
-import { useTheme } from '../theme/ThemeContext';
 
 /**
  * A simple state-driven switch rather than a stack navigator with named
@@ -24,18 +23,24 @@ import { useTheme } from '../theme/ThemeContext';
  * check below — takes over the screen without discarding the guest session;
  * "Continue as guest" on the resulting AuthScreen clears it again.
  */
+// The branded loading screen always shows for at least this long on launch,
+// so it's a deliberate intro every time rather than a flash that a fast
+// (cached-session) start would skip.
+const MIN_SPLASH_MS = 2000;
+
 export function RootNavigator() {
   const { user, isLoading: authLoading, refreshUser } = useAuth();
   const { isLoading: guestLoading, hasGuestSession, ensureSession } = useGuestSession();
-  const { colors } = useTheme();
   const [wantsToLogIn, setWantsToLogIn] = useState(false);
+  const [minSplashElapsed, setMinSplashElapsed] = useState(false);
 
-  if (authLoading || guestLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator color={colors.primary} size="large" />
-      </View>
-    );
+  useEffect(() => {
+    const t = setTimeout(() => setMinSplashElapsed(true), MIN_SPLASH_MS);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (authLoading || guestLoading || !minSplashElapsed) {
+    return <BrandLoadingScreen />;
   }
 
   if (!user) {

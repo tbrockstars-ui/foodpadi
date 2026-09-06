@@ -20,10 +20,12 @@ interface GuestSessionContextValue {
   /** Recovers from a guest token the server has rejected (401) — e.g. its
    * 24h TTL lapsed, or the API restarted with a rotated signing secret.
    * ensureSession() alone can't fix this: it trusts whatever token is
-   * already cached and never re-validates it. Mints a fresh session and, if
-   * the disclaimer was already accepted locally, transparently re-acknowledges
-   * it too (a new token always starts unacknowledged server-side). Returns
-   * the resulting token for the caller to retry its request with. */
+   * already cached and never re-validates it. Mints a fresh session AND
+   * acknowledges the disclaimer on it (a fresh token always starts
+   * unacknowledged server-side; recoverSession only ever runs after the user
+   * has already passed the disclaimer gate for this feature, so the retry
+   * would otherwise immediately 403). Returns the resulting token for the
+   * caller to retry its request with. */
   recoverSession: () => Promise<string>;
 }
 
@@ -66,16 +68,18 @@ export function GuestSessionProvider({ children }: { children: React.ReactNode }
 
   const recoverSession = useCallback(async () => {
     const { guestToken: freshToken } = await api.createGuestSession();
-    if (!disclaimerAcknowledged) {
-      await tokenStore.setGuestToken(freshToken);
-      setGuestToken(freshToken);
-      return freshToken;
-    }
+    // Always acknowledge the fresh token. recoverSession only runs after a
+    // feature request was rejected, i.e. after the user already passed that
+    // feature's disclaimer gate this session — so a fresh, unacknowledged
+    // token would just 403 on the retry. Re-acknowledging silently keeps the
+    // user on exactly what they already agreed to.
     const { guestToken: ackedToken } = await api.acknowledgeGuestDisclaimer(freshToken);
     await tokenStore.setGuestToken(ackedToken);
+    await tokenStore.setGuestDisclaimerAcknowledged();
     setGuestToken(ackedToken);
+    setDisclaimerAcknowledged(true);
     return ackedToken;
-  }, [disclaimerAcknowledged]);
+  }, []);
 
   // Called once a guest converts to a real account — guest state is
   // intentionally ephemeral (docs/FOODPADI_AUTHENTICATION_SPEC.md), there is

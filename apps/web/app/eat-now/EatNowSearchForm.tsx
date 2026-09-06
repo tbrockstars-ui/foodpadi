@@ -94,6 +94,7 @@ export function EatNowSearchForm({ isGuest = false }: { isGuest?: boolean }) {
                   ~{idea.distanceMiles} mi · {idea.deliveryMinutesMin}–{idea.deliveryMinutesMax} min ·{' '}
                   {formatPence(idea.pricePenceMin)}–{formatPence(idea.pricePenceMax)}
                 </p>
+                <p className={styles.illustrativeTag}>Example only — not a specific place</p>
                 <div className={styles.tagRow}>
                   <span className={styles.tag}>{idea.cuisine}</span>
                   <span className={styles.tag}>{BUDGET_LABEL[idea.budgetTier]}</span>

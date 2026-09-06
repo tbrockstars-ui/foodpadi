@@ -1,0 +1,299 @@
+/* Persistent sidebar + topbar shell for the main app — same shape as
+   apps/web/app/admin/admin.module.css's .shell/.sidebar/.topbar rules,
+   applied to member/guest routes instead of /admin/*. */
+
+.shell {
+  display: flex;
+  height: 100vh;
+  background: var(--background);
+}
+
+.sidebar {
+  flex-shrink: 0;
+  width: 232px;
+  height: 100vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+  padding: var(--space-xl) var(--space-lg);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.sidebarBrand {
+  padding: 0 var(--space-sm);
+}
+
+.sidebarNav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sidebarLink {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebarLink:hover {
+  background: var(--surface-sunken);
+  color: var(--text);
+}
+
+.sidebarLinkActive,
+.sidebarLinkActive:hover {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+
+.tipCard {
+  margin-top: auto;
+  padding: var(--space-md);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+}
+
+.tipHeading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tipBody {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.shellMain {
+  flex: 1;
+  min-width: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  /* Matches .shellPage's own horizontal padding (app-shell.module.css) so
+     the topbar's edges line up with the content column below it, instead
+     of the header reading as a separate, disconnected strip. */
+  padding: var(--space-lg) 40px;
+}
+
+@media (max-width: 1024px) {
+  .topbar {
+    padding: var(--space-lg) 32px;
+  }
+}
+
+.guestLinks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.guestLink {
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.themeToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.memberActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.avatar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+
+.shellContent {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* Docked footer — a fixed-height row at the bottom of shellMain's 100vh
+   column (flex-shrink:0), so it stays put under shellContent's scroll on
+   every page instead of scrolling away with the content. */
+.footerBanner {
+  flex-shrink: 0;
+  padding: 10px var(--space-xxl);
+  background: var(--primary-soft);
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+}
+
+.footerBannerTitle {
+  font-size: 13.5px;
+  font-weight: 800;
+  color: var(--primary-dark);
+  margin: 0;
+}
+
+.footerBannerSubtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.footerBannerItems {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+}
+
+.footerBannerItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    height: auto;
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: auto;
+    height: auto;
+    overflow-y: visible;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .sidebarBrand {
+    padding: 0;
+  }
+
+  .sidebarNav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .tipCard {
+    display: none;
+  }
+
+  .shellMain {
+    height: auto;
+    overflow: visible;
+  }
+
+  .shellContent {
+    overflow: visible;
+  }
+
+  .topbar {
+    padding: var(--space-md) var(--space-lg);
+  }
+
+  .footerBanner {
+    padding: 8px var(--space-lg);
+  }
+
+  /* Keep the docked footer compact on narrow screens — the feature chips
+     are the least essential part, so they go first. */
+  .footerBannerItems {
+    display: none;
+  }
+}
+
+/* A real phone (≤640px) has too many nav items (Home/Cook/Plan/Pantry/
+   Discover/Favorites/Profile) to wrap onto a couple of rows the way the
+   900px breakpoint above assumes. Left as flex-wrap, .sidebarNav wraps to
+   4-5 rows at this width, and — because .sidebar still centers its children
+   vertically (align-items: center) — that tall wrapped block ends up
+   vertically centered *through* .sidebarBrand, visually interleaving the
+   logo between rows of nav links instead of sitting above them. Below this
+   width the nav becomes one horizontally-scrollable row instead, so it
+   never wraps at all. */
+@media (max-width: 640px) {
+  .sidebar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-sm);
+  }
+
+  .sidebarBrand {
+    align-self: flex-start;
+  }
+
+  .sidebarNav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    /* Same scrollbar treatment as FoodCarousel's horizontal track
+       (globals.css) rather than a bare OS scrollbar under the nav strip. */
+    scrollbar-width: thin;
+  }
+
+  .sidebarLink {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}

@@ -1,14 +1,16 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { SavedRecipeView } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
+import { FadeInView } from '../components/motion/FadeInView';
 import { LoadingState } from '../components/LoadingState';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { Tag } from '../components/Tag';
 import { spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
@@ -59,8 +61,8 @@ export function SavedRecipesScreen({ navigation }: Props) {
   if (recipes === null) {
     if (loadFailed) {
       return (
-        <ScrollView style={styles.container}>
-          <BackLink label="Back" onPress={() => navigation.goBack()} />
+        <Screen>
+          <ScreenHeader title="Saved recipes" onBack={() => navigation.goBack()} />
           <EmptyState
             title="Couldn't load your saved recipes"
             body="Check your connection and try again."
@@ -70,26 +72,26 @@ export function SavedRecipesScreen({ navigation }: Props) {
               void load();
             }}
           />
-        </ScrollView>
+        </Screen>
       );
     }
     return <LoadingState message="Loading your saved recipes…" />;
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Saved recipes</Text>
+    <Screen scroll>
+      <ScreenHeader title="Saved recipes" onBack={() => navigation.goBack()} />
 
       {recipes.length === 0 ? (
         <Text style={styles.emptyText}>
           Nothing saved yet — save a recipe from Cook Today or Import a recipe to see it here.
         </Text>
       ) : (
-        recipes.map((recipe) => {
+        recipes.map((recipe, index) => {
           const expanded = expandedId === recipe.id;
           return (
-            <Card key={recipe.id} style={styles.recipeCard}>
+            <FadeInView key={recipe.id} delay={index * 40}>
+            <Card style={styles.recipeCard}>
               <TouchableOpacity onPress={() => setExpandedId(expanded ? null : recipe.id)}>
                 <Text style={styles.recipeTitle}>{recipe.title}</Text>
                 <View style={styles.tagRow}>
@@ -119,32 +121,36 @@ export function SavedRecipesScreen({ navigation }: Props) {
                   ))}
 
                   <Button
+                    label="Start Cooking"
+                    onPress={() => navigation.navigate('CookingSession', { recipe, savedRecipeId: recipe.id })}
+                    style={{ marginTop: spacing.md }}
+                  />
+                  <Button
                     label={deletingId === recipe.id ? 'Removing…' : 'Remove from saved'}
                     variant="danger"
                     onPress={() => removeRecipe(recipe.id)}
                     loading={deletingId === recipe.id}
-                    style={{ marginTop: spacing.md }}
+                    style={{ marginTop: spacing.sm }}
                   />
                 </View>
               ) : null}
             </Card>
+            </FadeInView>
           );
         })
       )}
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-  title: { ...typography.display, color: c.text, marginBottom: spacing.lg },
   emptyText: { ...typography.body, color: c.textMuted },
   recipeCard: { marginBottom: spacing.md },
-  recipeTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
+  recipeTitle: { ...typography.title, color: c.text, marginBottom: spacing.xs },
   tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   detail: { marginTop: spacing.lg, paddingTop: spacing.lg, borderTopWidth: 1, borderTopColor: c.border },
-  sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
+  sectionHeading: { ...typography.overline, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.md },
   ingredientLine: { ...typography.body, color: c.text, marginBottom: 4 },
   stepRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.sm },
   stepNumber: {

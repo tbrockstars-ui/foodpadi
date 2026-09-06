@@ -9,16 +9,31 @@ import {
   sessionCookieOptions,
 } from '../../../../lib/session';
 
-const API_URL = process.env.API_URL ?? 'http://localhost:4310';
+// 127.0.0.1, not "localhost": the NestJS API binds 0.0.0.0 (IPv4 only), and
+// on Windows "localhost" often resolves to ::1 first — a fetch that lands on
+// IPv6 gets ECONNREFUSED.
+const API_URL = process.env.API_URL ?? 'http://127.0.0.1:4310';
 
 export async function POST(request: NextRequest) {
   const body = (await request.json()) as LoginRequest;
 
-  const apiRes = await fetch(`${API_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  let apiRes: Response;
+  try {
+    apiRes = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+  } catch (e) {
+    // API process is down / restarting / unreachable — return a clean 503
+    // the form can show, not an unhandled throw that becomes an opaque 500
+    // and the generic "something went wrong".
+    console.error(`[api-auth] login: upstream fetch to ${API_URL} failed:`, e);
+    return NextResponse.json(
+      { message: 'The server is temporarily unavailable. Please try again in a moment.' },
+      { status: 503 },
+    );
+  }
 
   const rawBody = await apiRes.text();
   if (!apiRes.ok) {

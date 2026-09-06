@@ -4,10 +4,12 @@ import { DISCLAIMER_TEXT } from '@foodpadi/shared';
 import { api } from '../api/client';
 import { type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import { useScreenInsets } from '../theme/useScreenInsets';
 
 export function DisclaimerScreen({ onAcknowledged }: { onAcknowledged: () => void }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
+  const ins = useScreenInsets();
   const [submitting, setSubmitting] = useState(false);
 
   const acknowledge = async () => {
@@ -21,7 +23,7 @@ export function DisclaimerScreen({ onAcknowledged }: { onAcknowledged: () => voi
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: ins.top, paddingBottom: ins.bottom }]}>
       <Text style={styles.heading}>Before you start</Text>
       <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.body}>{DISCLAIMER_TEXT}</Text>
@@ -35,7 +37,7 @@ export function DisclaimerScreen({ onAcknowledged }: { onAcknowledged: () => voi
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-  container: { flex: 1, backgroundColor: c.background, padding: 24, paddingTop: 64 },
+  container: { flex: 1, backgroundColor: c.background, paddingHorizontal: 24 },
   heading: { fontSize: 24, fontWeight: '700', color: c.text, marginBottom: 16 },
   scroll: { flex: 1, borderWidth: 1, borderColor: c.border, borderRadius: 12, backgroundColor: c.surface },
   scrollContent: { padding: 16 },

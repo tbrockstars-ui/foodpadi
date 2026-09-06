@@ -100,6 +100,19 @@ export class DecideService {
       // CookTodayService's curated guest branch, the "get it" lane from Eat
       // Now's deterministic catalog search.
       guest: actor.type === 'guest',
+      // Feeds PatternService's cuisine/duration/budget detection (Memory &
+      // Companion brief §5) — this is the only place these three signals are
+      // captured for a member, so they ride along on the event that already
+      // fires rather than a new tracking call.
+      cuisines: [
+        ...new Set(
+          optionsWithImages
+            .map((o) => o.recipe?.cuisine ?? o.foodIdea?.cuisine)
+            .filter((c): c is string => !!c),
+        ),
+      ],
+      timeConstraintMinutes: dto.timeMinutes ?? null,
+      budgetPence: dto.budgetPence ?? null,
     });
 
     return { options: optionsWithImages };

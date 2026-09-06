@@ -10,6 +10,12 @@ import { AnalyticsService } from '../analytics/analytics.service';
 import { RequestActor } from '../auth/guest-or-auth.guard';
 import { GenerateRecipesDto } from './dto/generate-recipes.dto';
 import { SaveRecipeDto } from './dto/save-recipe.dto';
+import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
+
+// A recipe with a 5-star COOK rating counts as a favourite even if the heart
+// was never tapped — "loved it" during the post-cook rating IS a favourite
+// signal, not a separate thing the user has to also remember to heart.
+const FAVORITE_RATING_THRESHOLD = 5;
 
 interface CookPersonalisation {
   favouriteCuisines: string[];
@@ -84,6 +90,10 @@ export class CookTodayService {
         personalisation.favouriteCuisines.length > 0 ||
         personalisation.avoidedIngredients.length > 0 ||
         !!personalisation.goalGuidance,
+      // Feeds PatternService's cuisine/duration detection (Memory & Companion
+      // brief §5) — additive, nothing else reads these two fields today.
+      cuisines: [...new Set(safe.map((r) => r.cuisine).filter((c): c is string => !!c))],
+      timeConstraintMinutes: dto.timeConstraintMinutes ?? null,
     });
 
     return safe;
@@ -151,6 +161,7 @@ export class CookTodayService {
         cuisine: dto.cuisine,
         steps: dto.steps,
         createdByUserId: userId,
+        isFavorite: dto.isFavorite ?? false,
         ingredients: {
           create: dto.ingredients.map((ingredient) => ({
             name: ingredient.name,
@@ -173,6 +184,75 @@ export class CookTodayService {
       include: { ingredients: true },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  /**
+   * Favorites engine, write side: toggling the heart (LikeHeart.tsx) on an
+   * already-saved recipe. A not-yet-saved idea instead sets `isFavorite` at
+   * creation time via `save()` above — this only ever runs against a real
+   * Recipe row the user owns.
+   */
+  async toggleFavorite(recipeId: string, userId: string, dto: ToggleFavoriteDto) {
+    const recipe = await this.prisma.recipe.findUnique({ where: { id: recipeId } });
+    if (!recipe || recipe.deletedAt) {
+      throw new NotFoundException('Recipe not found.');
+    }
+    if (recipe.createdByUserId !== userId) {
+      throw new ForbiddenException();
+    }
+    await this.prisma.recipe.update({ where: { id: recipeId }, data: { isFavorite: dto.isFavorite } });
+    await this.analytics.track('cook_today_recipe_favorited', { userId }, { recipeId, isFavorite: dto.isFavorite });
+    return { isFavorite: dto.isFavorite };
+  }
+
+  /**
+   * Favorites engine, read side: a recipe counts as a favourite either
+   * because the heart is on (`isFavorite`) or because it earned a 5-star
+   * rating during the post-cook feedback flow (FoodFeedback, context COOK) —
+   * whichever happened, this is the one list that shows it. Matches
+   * HomeService.getRecentlyCooked's "real data, not a special-cased empty
+   * shape" precedent.
+   */
+  async listFavorites(userId: string) {
+    const lovedFeedback = await this.prisma.foodFeedback.findMany({
+      where: { userId, entityType: 'RECIPE', rating: { gte: FAVORITE_RATING_THRESHOLD }, deletedAt: null },
+      select: { entityId: true },
+    });
+    const lovedRecipeIds = [...new Set(lovedFeedback.map((f) => f.entityId))];
+
+    return this.prisma.recipe.findMany({
+      where: {
+        createdByUserId: userId,
+        deletedAt: null,
+        OR: [{ isFavorite: true }, { id: { in: lovedRecipeIds } }],
+      },
+      include: { ingredients: true },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * "Recently cooked" engine, write side: the guided cooking session
+   * (apps/web CookingSession / apps/mobile CookingSessionScreen) calls this
+   * the moment the cook reaches the end of the steps — deliberately not
+   * gated on them going on to rate it, since a rating is optional and
+   * "I finished cooking this" shouldn't depend on it. Stamps `lastCookedAt`
+   * to *now* every time, including re-cooks, so Home always reflects the
+   * most recent time this recipe was actually cooked. Read side:
+   * HomeService.getRecentlyCooked.
+   */
+  async markCooked(recipeId: string, userId: string) {
+    const recipe = await this.prisma.recipe.findUnique({ where: { id: recipeId } });
+    if (!recipe || recipe.deletedAt) {
+      throw new NotFoundException('Recipe not found.');
+    }
+    if (recipe.createdByUserId !== userId) {
+      throw new ForbiddenException();
+    }
+    const lastCookedAt = new Date();
+    await this.prisma.recipe.update({ where: { id: recipeId }, data: { lastCookedAt } });
+    await this.analytics.track('cook_today_recipe_cooked', { userId }, { recipeId });
+    return { lastCookedAt };
   }
 
   async delete(recipeId: string, userId: string) {

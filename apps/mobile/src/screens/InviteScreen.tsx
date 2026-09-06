@@ -1,14 +1,15 @@
 import React, { useCallback, useState } from 'react';
-import { ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { REFERRAL_TIERS, type ReferralSummary } from '@foodpadi/shared';
 import { api } from '../api/client';
-import { BackLink } from '../components/BackLink';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { EmptyState } from '../components/EmptyState';
 import { LoadingState } from '../components/LoadingState';
+import { Screen } from '../components/Screen';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 import type { AppStackParamList } from '../navigation/AppStack';
@@ -70,8 +71,8 @@ export function InviteScreen({ navigation }: Props) {
   if (!summary) {
     if (loadFailed) {
       return (
-        <View style={styles.container}>
-          <BackLink label="Back" onPress={() => navigation.goBack()} />
+        <Screen>
+          <ScreenHeader title="Invite a friend" onBack={() => navigation.goBack()} />
           <EmptyState
             title="Couldn't load your invites"
             body="Check your connection and try again. Inviting friends may not be available on this build yet."
@@ -81,7 +82,7 @@ export function InviteScreen({ navigation }: Props) {
               void load();
             }}
           />
-        </View>
+        </Screen>
       );
     }
     return <LoadingState message="Loading your invites…" />;
@@ -93,12 +94,14 @@ export function InviteScreen({ navigation }: Props) {
     : 100;
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: spacing.xxl }}>
-      <BackLink label="Back" onPress={() => navigation.goBack()} />
-      <Text style={styles.title}>Invite a friend</Text>
+    <Screen scroll>
+      <ScreenHeader
+        title="Invite a friend"
+        subtitle="A friend who joins through your link and makes their first food decision counts here."
+        onBack={() => navigation.goBack()}
+      />
       <Text style={styles.lede}>
         Know someone who always says &ldquo;I don&apos;t know what to eat&rdquo;? Send them FoodPadi.
-        When a friend joins through your link and makes their first food decision, it counts here.
       </Text>
 
       {celebrated.length > 0 ? (
@@ -195,16 +198,14 @@ export function InviteScreen({ navigation }: Props) {
           ))
         )}
       </Card>
-    </ScrollView>
+    </Screen>
   );
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    container: { flex: 1, backgroundColor: c.background, padding: spacing.xl, paddingTop: 56 },
-    title: { ...typography.display, color: c.text, marginBottom: spacing.sm },
     lede: { ...typography.body, color: c.textMuted, marginBottom: spacing.lg },
-    sectionHeading: { ...typography.label, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },
+    sectionHeading: { ...typography.overline, color: c.textMuted, marginBottom: spacing.sm, marginTop: spacing.lg },
     section: { marginBottom: spacing.sm },
     celebrate: { backgroundColor: c.primarySoft, borderWidth: 1, borderColor: c.primary },
     celebrateClose: { position: 'absolute', top: 6, right: 8, padding: 6 },
