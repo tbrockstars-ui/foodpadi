@@ -62,7 +62,7 @@
 
 .copyButton.copied {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .shareRow {
@@ -169,7 +169,7 @@
 
 .badgeQualified {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .empty {

@@ -11,7 +11,10 @@ import type { RecipeView } from '@foodpadi/shared';
  */
 export type MainTabParamList = {
   Home: undefined;
-  Cook: { initialIngredients?: string[] } | undefined;
+  // initialPrompt: "Cook It" on a Decide result (DecideFlow.tsx) deep-links
+  // here with the selected meal's exact title, pre-filling the free-text box
+  // — same precedent as initialIngredients (Scan's pantry deep-link).
+  Cook: { initialIngredients?: string[]; initialPrompt?: string } | undefined;
   Plan: undefined;
   Profile: undefined;
 };
@@ -36,10 +39,15 @@ export type AppStackParamList = {
   ImportRecipe: undefined;
   Scan: undefined;
   Cuisines: undefined;
+  // Birth-month avatar picker (user instruction 2026-09-11).
+  EditAvatar: undefined;
   // Guided step-by-step cooking. `savedRecipeId` is passed when the recipe
   // is already persisted (Saved Recipes, or already saved from Cook Today's
   // detail view) so the session can skip its own auto-save.
   CookingSession: { recipe: RecipeView; savedRecipeId?: string };
+  // Customer-facing FoodPadi Food Dealer profile (dealer brief §27). A leaf
+  // screen pushed over the tab bar from local discovery — not a new tab (§46).
+  DealerProfile: { slug: string };
 };
 
 export type AppStackScreenProps<T extends keyof AppStackParamList> = NativeStackScreenProps<

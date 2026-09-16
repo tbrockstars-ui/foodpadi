@@ -110,7 +110,7 @@
 }
 
 .guestLink {
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 15px;
   font-weight: 700;
   text-decoration: none;
@@ -138,6 +138,25 @@
   display: flex;
   align-items: center;
   gap: var(--space-md);
+}
+
+/* Trial status chip — reuses the pill shape of .themeToggle so it sits
+   consistently in the topbar; links to the upgrade page. */
+.trialChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
 }
 
 .avatar {

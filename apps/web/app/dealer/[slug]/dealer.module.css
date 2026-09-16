@@ -1,0 +1,164 @@
+.page {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-lg);
+  color: var(--text);
+}
+/* Same bordered-pill "‹ Back" button used everywhere else in the app
+   (cook-today.module.css / onboarding.module.css's .secondaryButton) —
+   adopted here rather than inventing a new style, just as an <a> instead
+   of a <button> since this is real navigation, not client-side state. */
+.backLink {
+  display: inline-block;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-muted);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  margin: 0 0 var(--space-lg);
+}
+.backLink:hover {
+  background: var(--surface-sunken);
+}
+/* Plain contextual label, not a link — the .backLink button above is the
+   only clickable "back" affordance now. */
+.crumb {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-md);
+}
+.badges {
+  display: flex;
+  gap: 6px;
+}
+.verified {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px 10px;
+}
+.name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 26px;
+  font-weight: 800;
+  margin: 6px 0 2px;
+}
+.nameBadge {
+  flex-shrink: 0;
+}
+.meta {
+  color: var(--text-muted);
+  font-size: 14px;
+  margin: 2px 0;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0 var(--space-lg);
+}
+.action {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--primary);
+  color: var(--primary-ink);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+.action:hover {
+  background: var(--primary);
+  color: var(--primary-text);
+}
+.section {
+  margin: var(--space-lg) 0;
+}
+.h2 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 var(--space-sm);
+}
+.productList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+}
+.productList li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.price {
+  color: var(--text-muted);
+}
+.unavailable {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.hours {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 4px;
+}
+.hours li {
+  display: flex;
+  gap: var(--space-md);
+}
+.day {
+  width: 44px;
+  text-transform: capitalize;
+  color: var(--text-muted);
+}
+.report {
+  margin-top: var(--space-xl);
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.report a {
+  color: var(--text-muted);
+}
+
+/* report form */
+.form {
+  display: grid;
+  gap: var(--space-md);
+  max-width: 480px;
+}
+.select,
+.textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+}
+.textarea {
+  min-height: 90px;
+}
+.submit {
+  justify-self: start;
+  padding: 10px 20px;
+  border-radius: var(--radius-pill);
+  border: 0;
+  background: var(--primary);
+  color: var(--primary-text);
+  font-weight: 700;
+  cursor: pointer;
+}

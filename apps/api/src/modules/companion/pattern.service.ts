@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { EntitlementService } from '../billing/entitlement.service';
 
 /**
  * Deterministic behavioural-pattern detection (Memory & Companion brief §5).
@@ -431,9 +432,17 @@ const DECISION_EVENT_TYPES = ['decide_options_generated', 'cook_today_recipes_ge
  */
 @Injectable()
 export class PatternService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly entitlements: EntitlementService,
+  ) {}
 
   async recompute(userId: string, now: Date = new Date()): Promise<void> {
+    // Persistent behavioural memory is a Paid-only capability (Guest/Trial/Paid
+    // model): a guest or trial user builds no FoodPattern profile. Existing
+    // rows from a past paid period are left in place, just not refreshed.
+    if ((await this.entitlements.getUserEntitlement(userId)) !== 'paid') return;
+
     const eventSince = new Date(now.getTime() - EVENT_LOOKBACK_DAYS * 86_400_000);
     const recipeSince = new Date(now.getTime() - RECIPE_LOOKBACK_DAYS * 86_400_000);
 

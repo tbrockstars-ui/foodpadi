@@ -9,7 +9,9 @@ const CUISINES = [
   'Thai', 'Mediterranean', 'British & comfort food', 'French', 'Caribbean', 'Middle Eastern',
 ] as const;
 
-/** Web counterpart to apps/mobile/src/screens/PreferencesScreen.tsx — the final onboarding step. */
+/** Web counterpart to apps/mobile/src/screens/PreferencesScreen.tsx — the
+ * cuisines onboarding step. Onboarding is finished on the next step
+ * (/avoid-foods), which is where complete-onboarding is called. */
 export function PreferencesForm() {
   const router = useRouter();
   const [selected, setSelected] = useState<string[]>([]);
@@ -31,24 +33,13 @@ export function PreferencesForm() {
           }),
         ),
       );
-      await fetch('/api/proxy/users/me/complete-onboarding', { method: 'POST' });
-      router.push('/');
-      router.refresh();
+      router.push('/avoid-foods');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const skip = async () => {
-    setSubmitting(true);
-    try {
-      await fetch('/api/proxy/users/me/complete-onboarding', { method: 'POST' });
-      router.push('/');
-      router.refresh();
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const skip = () => router.push('/avoid-foods');
 
   return (
     <div>

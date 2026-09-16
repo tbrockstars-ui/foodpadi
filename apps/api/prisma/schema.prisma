@@ -27,27 +27,38 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  profile              UserProfile?
-  foodGoals            FoodGoal[]
-  foodPreferences      FoodPreference[]
-  avoidedIngredients   AvoidedIngredient[]
-  householdMemberships HouseholdMember[]
-  createdHouseholds    Household[]           @relation("HouseholdCreator")
-  refreshTokens        RefreshToken[]
-  passwordResetTokens  PasswordResetToken[]
-  aiMemory             AiMemory[]
-  recipes              Recipe[]
-  foodEvents           FoodEvent[]
-  mealPlans            MealPlan[]
-  shoppingLists        ShoppingList[]
-  pantryItems          PantryItem[]
-  referralsMade        Referral[]            @relation("Referrer")
-  referralReceived     Referral?             @relation("Referred")
-  referralMilestones   ReferralMilestone[]
-  foodPatterns         FoodPattern[]
-  companionSuggestions CompanionSuggestion[]
-  companionPreference  CompanionPreference?
-  foodFeedback         FoodFeedback[]
+  profile                 UserProfile?
+  foodGoals               FoodGoal[]
+  foodPreferences         FoodPreference[]
+  avoidedIngredients      AvoidedIngredient[]
+  householdMemberships    HouseholdMember[]
+  createdHouseholds       Household[]              @relation("HouseholdCreator")
+  refreshTokens           RefreshToken[]
+  passwordResetTokens     PasswordResetToken[]
+  aiMemory                AiMemory[]
+  recipes                 Recipe[]
+  foodEvents              FoodEvent[]
+  mealPlans               MealPlan[]
+  shoppingLists           ShoppingList[]
+  pantryItems             PantryItem[]
+  referralsMade           Referral[]               @relation("Referrer")
+  referralReceived        Referral?                @relation("Referred")
+  referralMilestones      ReferralMilestone[]
+  foodPatterns            FoodPattern[]
+  companionSuggestions    CompanionSuggestion[]
+  companionPreference     CompanionPreference?
+  foodFeedback            FoodFeedback[]
+  subscription            Subscription?
+  cookingJourneys         CookingJourney[]
+  dailyReminderPreference DailyReminderPreference?
+  // FoodPadi Food Dealer Network (dealer brief §51/§52): a dealer signs in with
+  // an ordinary customer account — no parallel auth. The Dealer row's
+  // ownerUserId is the ownership key every portal endpoint authorizes on.
+  // Array (not a to-one) so a future operator can hold more than one dealer;
+  // the MVP portal UI assumes exactly one.
+  dealers                 Dealer[]                 @relation("DealerOwner")
+  dealerReports           DealerReport[]           @relation("DealerReporter")
+  dealerRatings           DealerRating[]           @relation("DealerRater")
 
   @@map("users")
 }
@@ -57,8 +68,32 @@ model UserProfile {
   userId                   String    @unique @map("user_id")
   user                     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   displayName              String?   @map("display_name")
+  // ISO 3166-1 alpha-2 country of residence, collected at registration. Drives
+  // the FoodPadi Premium currency + local price (BillingService.getPricing) and
+  // which payment provider a checkout routes to (Stripe vs Flutterwave for NG).
+  // Nullable: pre-existing accounts and Google/mobile signups may not have it
+  // until the user sets it (Profile / the paywall's country picker).
+  countryCode              String?   @map("country_code")
   onboardingCompletedAt    DateTime? @map("onboarding_completed_at")
   disclaimerAcknowledgedAt DateTime? @map("disclaimer_acknowledged_at")
+  // In-app "7-day trial" of FoodPadi AI (Guest/Trial/Paid model — docs/
+  // SUBSCRIPTION_MODEL.md). Set once at signup, never cleared: after
+  // trialEndsAt passes, a user with no active Subscription resolves to the
+  // GUEST entitlement (account + data kept, AI off). Distinct from Stripe's
+  // own card-gated trial (Subscription.trialEndsAt / BillingConfig.trialDays).
+  trialStartedAt           DateTime? @map("trial_started_at")
+  trialEndsAt              DateTime? @map("trial_ends_at")
+  // Server-side counter of AI calls made during the trial, checked against
+  // BillingConfig.trialAiLimit by AiAccessService. Never trusted from a client.
+  trialAiUsedCount         Int       @default(0) @map("trial_ai_used_count")
+  // Avatar picker (user instruction 2026-09-11) — a deterministic, no-asset
+  // icon: an emoji tied to the user's birth month, in one of 3 colour shades.
+  // birthMonth is 1-12 (or null, never set) and only drives which month's
+  // icon the picker defaults to; avatarId ("<month>-<shade>", validated
+  // against packages/shared/src/avatars.ts) is the actual chosen icon and can
+  // be from any month — someone can like a different month's look.
+  birthMonth               Int?      @map("birth_month")
+  avatarId                 String?   @map("avatar_id")
   createdAt                DateTime  @default(now()) @map("created_at")
   updatedAt                DateTime  @updatedAt @map("updated_at")
 
@@ -274,8 +309,9 @@ model Recipe {
   // doesn't decide favourite status, it's one of two signals.
   isFavorite      Boolean   @default(false) @map("is_favorite")
 
-  ingredients   RecipeIngredient[]
-  mealPlanItems MealPlanItem[]
+  ingredients     RecipeIngredient[]
+  mealPlanItems   MealPlanItem[]
+  cookingJourneys CookingJourney[]
 
   @@index([createdByUserId, lastCookedAt])
   @@map("recipes")
@@ -297,17 +333,29 @@ model RecipeIngredient {
 // meal gets a real Recipe row the moment it's generated, not only on save
 // (unlike Cook Today's ephemeral-until-saved guest results).
 model MealPlan {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scope       String // "today" | "3day" | "week" | "custom"
-  startDate   DateTime  @map("start_date")
-  endDate     DateTime  @map("end_date")
-  budgetPence Int?      @map("budget_pence")
-  status      String    @default("draft") // "draft" | "accepted" | "completed" | "abandoned"
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-  deletedAt   DateTime? @map("deleted_at")
+  id                           String    @id @default(uuid())
+  userId                       String    @map("user_id")
+  user                         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope                        String // "today" | "3day" | "week" | "custom"
+  startDate                    DateTime  @map("start_date")
+  endDate                      DateTime  @map("end_date")
+  budgetPence                  Int?      @map("budget_pence")
+  status                       String    @default("draft") // "draft" | "accepted" | "completed" | "abandoned"
+  // "HH:mm" 24h, optional plan-wide default eating time — an item with no
+  // plannedTime of its own inherits this (see packages/shared/src/
+  // planTiming.ts's effectivePlannedTime). Null means no default has been
+  // configured, same as before this field existed: every item is
+  // independently null unless explicitly set.
+  defaultMealTime              String?   @map("default_meal_time")
+  // Minutes before the effective planned time that a reminder fires — an
+  // item with no reminderOffsetMinutes of its own inherits this. Defaults to
+  // 30 (the previous hardcoded value everywhere) so every existing plan
+  // keeps today's exact behaviour with zero migration risk; 0 means "no
+  // reminder".
+  defaultReminderOffsetMinutes Int       @default(30) @map("default_reminder_offset_minutes")
+  createdAt                    DateTime  @default(now()) @map("created_at")
+  updatedAt                    DateTime  @updatedAt @map("updated_at")
+  deletedAt                    DateTime? @map("deleted_at")
 
   items         MealPlanItem[]
   shoppingLists ShoppingList[]
@@ -316,26 +364,33 @@ model MealPlan {
 }
 
 model MealPlanItem {
-  id          String   @id @default(uuid())
-  mealPlanId  String   @map("meal_plan_id")
-  mealPlan    MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  recipeId    String?  @map("recipe_id")
-  recipe      Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
-  mealSlot    String   @default("dinner") @map("meal_slot") // "breakfast" | "lunch" | "dinner" | "snack"
-  plannedDate DateTime @map("planned_date")
-  servings    Int      @default(2)
-  status      String   @default("planned") // "planned" | "cooked" | "skipped" | "swapped" | "rescued"
+  id                    String   @id @default(uuid())
+  mealPlanId            String   @map("meal_plan_id")
+  mealPlan              MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  recipeId              String?  @map("recipe_id")
+  recipe                Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  mealSlot              String   @default("dinner") @map("meal_slot") // "breakfast" | "lunch" | "dinner" | "snack"
+  plannedDate           DateTime @map("planned_date")
+  servings              Int      @default(2)
+  status                String   @default("planned") // "planned" | "cooked" | "skipped" | "swapped" | "rescued"
   // "cook" (default — use the attached recipe) or "eat_out" (Get It instead
   // of Cook It for this slot, mirroring the decision engine's two terminal
   // actions at plan level). recipe stays attached either way — switching to
   // eat_out doesn't discard it, in case the user switches back.
-  mealChoice  String   @default("cook") @map("meal_choice")
-  // "HH:mm" 24h, optional — when set, the client (currently mobile only)
-  // schedules a local reminder 30 minutes before this time so the user
-  // doesn't miss the window to start cooking or place an order.
-  plannedTime String?  @map("planned_time")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  mealChoice            String   @default("cook") @map("meal_choice")
+  // "HH:mm" 24h, optional — when set, the client schedules a local reminder
+  // before this time so the user doesn't miss the window to start cooking or
+  // place an order. Null means "inherit MealPlan.defaultMealTime" — see
+  // packages/shared/src/planTiming.ts's effectivePlannedTime.
+  plannedTime           String?  @map("planned_time")
+  // Per-day override for MealPlan.defaultReminderOffsetMinutes — null
+  // inherits the plan default, an explicit value (including 0 for "no
+  // reminder") overrides it just for this day.
+  reminderOffsetMinutes Int?     @map("reminder_offset_minutes")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  cookingJourneys CookingJourney[]
 
   @@map("meal_plan_items")
 }
@@ -353,7 +408,11 @@ model ShoppingList {
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
 
-  items ShoppingListItem[]
+  items          ShoppingListItem[]
+  // Set only for a list created from Cook Today's fridge-check inside an
+  // active Cooking Journey (back-reference; the FK column lives on
+  // CookingJourney.shoppingListId, which is @unique — at most one list here).
+  cookingJourney CookingJourney?
 
   @@map("shopping_lists")
 }
@@ -396,6 +455,25 @@ model WaitlistSignup {
   id        String   @id @default(uuid())
   email     String   @unique
   createdAt DateTime @default(now()) @map("created_at")
+
+  // Separate from waitlist membership itself — joining the waitlist is NOT
+  // marketing consent. Only set when the (unticked-by-default) checkbox was
+  // actually checked; version/timestamp record exactly what wording they
+  // agreed to and when (see packages/shared/src/consent.ts).
+  marketingConsent        Boolean   @default(false) @map("marketing_consent")
+  marketingConsentVersion String?   @map("marketing_consent_version")
+  marketingConsentAt      DateTime? @map("marketing_consent_at")
+
+  // What this signup is actually for — the same table backs both the
+  // generic "notify me about new features" form and the iOS-specific
+  // waitlist, rather than duplicating waitlist infrastructure. Only ever
+  // moves general -> ios_waitlist (more specific), never back.
+  purpose  String  @default("general") @map("purpose")
+  // First-touch attribution only (?source=/?campaign=) — set on first
+  // signup, never overwritten by a later re-submission with different or
+  // absent params.
+  source   String? @map("source")
+  campaign String? @map("campaign")
 
   @@map("waitlist_signups")
 }
@@ -567,6 +645,52 @@ model CompanionPreference {
   @@map("companion_preferences")
 }
 
+// FoodPadi Daily Companion Reminders (docs brief: "Daily Companion
+// Reminders") — a friendly "it's around your usual lunch/coffee time"
+// nudge, entirely separate from Plan Ahead's per-meal reminders
+// (MealPlan.defaultReminderOffsetMinutes) and Cooking Journey timers. One
+// row per user, created lazily with every slot off (see
+// DailyRemindersService) — mirrors CompanionPreference's shape exactly.
+//
+// `enabled` is the GLOBAL pause switch (brief §17): turning it off suspends
+// every reminder below WITHOUT clearing the configured times, so turning it
+// back on restores exactly what was there before. Each of the 8 slots below
+// has its own independent enabled flag on top of that.
+//
+// Times are "HH:mm" 24h local strings, same convention as MealPlan.
+// defaultMealTime/MealPlanItem.plannedTime — deliberately no stored
+// timezone/UTC offset (brief §21/§22): the client always resolves and fires
+// these against the device's own local clock, so DST and travel are handled
+// for free by never converting through UTC in the first place.
+model DailyReminderPreference {
+  userId String @id @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  enabled Boolean @default(true) @map("enabled")
+
+  weekdayBreakfastEnabled Boolean @default(false) @map("weekday_breakfast_enabled")
+  weekdayBreakfastTime    String? @map("weekday_breakfast_time")
+  weekdayLunchEnabled     Boolean @default(false) @map("weekday_lunch_enabled")
+  weekdayLunchTime        String? @map("weekday_lunch_time")
+  weekdayDinnerEnabled    Boolean @default(false) @map("weekday_dinner_enabled")
+  weekdayDinnerTime       String? @map("weekday_dinner_time")
+  weekdayCoffeeEnabled    Boolean @default(false) @map("weekday_coffee_enabled")
+  weekdayCoffeeTime       String? @map("weekday_coffee_time")
+
+  weekendBreakfastEnabled Boolean @default(false) @map("weekend_breakfast_enabled")
+  weekendBreakfastTime    String? @map("weekend_breakfast_time")
+  weekendLunchEnabled     Boolean @default(false) @map("weekend_lunch_enabled")
+  weekendLunchTime        String? @map("weekend_lunch_time")
+  weekendDinnerEnabled    Boolean @default(false) @map("weekend_dinner_enabled")
+  weekendDinnerTime       String? @map("weekend_dinner_time")
+  weekendCoffeeEnabled    Boolean @default(false) @map("weekend_coffee_enabled")
+  weekendCoffeeTime       String? @map("weekend_coffee_time")
+
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("daily_reminder_preferences")
+}
+
 // Explicit user feedback (Feedback & Rating brief) — a star rating plus
 // optional quick tags/comment, given at most one occasion per row so
 // cooking/eating the same recipe repeatedly and rating it each time
@@ -583,10 +707,10 @@ model FoodFeedback {
   userId     String    @map("user_id")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   entityType String    @map("entity_type") // "RECIPE" | "MEAL" | "PLAN"
-  entityId   String    @map("entity_id")   // Recipe.id | FoodIdea.id | MealPlan.id
-  context    String                        // "EAT_NOW" | "COOK" | "PLAN" | "DECIDE" | "ORDER" | "OTHER"
-  rating     Int                           // 1-5
-  tags       String[]                      // quick-tag keys, e.g. ["loved_it", "would_make_again"]
+  entityId   String    @map("entity_id") // Recipe.id | FoodIdea.id | MealPlan.id
+  context    String // "EAT_NOW" | "COOK" | "PLAN" | "DECIDE" | "ORDER" | "OTHER"
+  rating     Int // 1-5
+  tags       String[] // quick-tag keys, e.g. ["loved_it", "would_make_again"]
   comment    String?
   createdAt  DateTime  @default(now()) @map("created_at")
   updatedAt  DateTime  @updatedAt @map("updated_at")
@@ -595,4 +719,571 @@ model FoodFeedback {
   @@index([userId])
   @@index([entityType, entityId])
   @@map("food_feedback")
+}
+
+// ---------------------------------------------------------------------------
+// FoodPadi Premium — the ONE authoritative subscription/entitlement record
+// (docs/SUBSCRIPTION_MODEL.md "our backend's subscriptions table is the source
+// of truth for entitlement, updated only via verified webhook events").
+// Stripe Billing + hosted Checkout front the payment; this row is written only
+// from a signature-verified Stripe webhook or the equivalent post-Checkout
+// sync (BillingService.syncFromStripe*), never from a client-supplied flag.
+//
+// One row per user (userId is unique). Created lazily the first time the user
+// starts Checkout — a free user has no row, which EntitlementService treats
+// as "not premium".
+//
+// Price fields are deliberately split so a localized charge never overwrites
+// the canonical commercial price:
+//   basePriceCents / baseCurrency  — the $4.99 USD source-of-truth price
+//   presentmentAmountCents / presentmentCurrency — what Stripe actually
+//     charged this customer (copied verbatim from the paid invoice)
+// No exchange rate is ever stored or computed here — the pre-checkout estimate
+// is read live from the Stripe Price's currency_options, and the real charge
+// is whatever Stripe's invoice says.
+model Subscription {
+  id     String @id @default(uuid())
+  userId String @unique @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Which processor owns this subscription's billing. One row per user still —
+  // a user is on exactly one provider at a time. "stripe" fronts card / Apple
+  // Pay / Google Pay / Link / local methods with Adaptive Pricing; "flutterwave"
+  // fronts the Nigeria journey (native NGN, cards, bank transfer, USSD).
+  provider String @default("stripe") // "stripe" | "flutterwave"
+
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+  stripePriceId        String? @map("stripe_price_id")
+
+  // Flutterwave equivalents. `flwTxRef` is the client-generated reference we
+  // send with the hosted-checkout call and match on the redirect / webhook;
+  // `flwSubscriptionId` is Flutterwave's subscription id, used to cancel.
+  flwPlanId         String? @map("flw_plan_id")
+  flwSubscriptionId String? @unique @map("flw_subscription_id")
+  flwTxRef          String? @unique @map("flw_tx_ref")
+  flwCustomerEmail  String? @map("flw_customer_email")
+
+  // For "stripe" this mirrors Stripe's subscription.status verbatim:
+  //   "active" | "trialing" | "past_due" | "canceled" | "incomplete"
+  //     | "incomplete_expired" | "unpaid" | "paused"
+  // For "flutterwave" (which has no rich status model) it is one of:
+  //   "active" | "canceled" | "incomplete"
+  status String @default("incomplete")
+
+  basePriceCents  Int    @default(499) @map("base_price_cents")
+  baseCurrency    String @default("usd") @map("base_currency")
+  billingInterval String @default("month") @map("billing_interval")
+
+  presentmentAmountCents Int?    @map("presentment_amount_cents")
+  presentmentCurrency    String? @map("presentment_currency")
+
+  customerCountry   String?   @map("customer_country") // Stripe-confirmed billing country
+  currentPeriodEnd  DateTime? @map("current_period_end")
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt        DateTime? @map("canceled_at")
+  trialEndsAt       DateTime? @map("trial_ends_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("subscriptions")
+}
+
+// Admin-tunable subscription parameters — the "dynamic parameterised
+// subscription value management" surface (apps/web/app/admin/billing). One row
+// (`id = "singleton"`), created lazily with defaults by BillingConfigService.
+// The billing engine reads these instead of hard-coded literals / env; the
+// admin PUT also best-effort pushes changes to Stripe / Flutterwave (their
+// Price / plan objects are immutable, so a base-price change mints a new one
+// and its id is stored back here).
+model BillingConfig {
+  id                  String   @id @default("singleton")
+  basePriceCents      Int      @default(499)
+  baseCurrency        String   @default("usd")
+  // Stripe-side, card-gated trial length (default 0 = charge immediately).
+  trialDays           Int      @default(0)
+  // In-app Guest/Trial/Paid model: no-card trial length, and the total number
+  // of AI requests a trial user gets before AiAccessService blocks them.
+  appTrialDays        Int      @default(7)
+  trialAiLimit        Int      @default(20)
+  // Payment-failure grace / dunning window: days a `past_due` subscription
+  // keeps Premium after its paid period, so a failed renewal doesn't drop the
+  // user instantly (the standard subscription-app behaviour). The
+  // STRIPE_PAST_DUE_GRACE_DAYS env var, when set, overrides this.
+  pastDueGraceDays    Int      @default(3)
+  // Flutterwave (Nigeria) price, whole Naira per month.
+  flwNgnAmount        Int      @default(7500)
+  // Per-currency Stripe presentment amounts, minor units:
+  //   { "gbp": 449, "eur": 499, "hkd": 3900, ... }
+  currencyOptions     Json     @default("{}") @map("currency_options")
+  // Set only when the base price / plan is changed from the admin UI (Stripe
+  // Prices & Flutterwave plans can't be edited in place). Null → use the env value.
+  stripePriceId       String?  @map("stripe_price_id")
+  flwPlanId           String?  @map("flw_plan_id")
+  // FoodPadi Food Dealer Network subscription — a SEPARATE product from Premium
+  // (dealer brief §13) but its price is managed from the same admin billing
+  // dashboard. Default $4.99 / month. `dealerStripePriceId` / `dealerFlwPlanId`
+  // are set only when the price is changed from the admin UI (a fresh Stripe
+  // Price / Flutterwave plan is minted); null → fall back to the env value.
+  dealerPriceCents    Int      @default(499) @map("dealer_price_cents")
+  dealerNgnAmount     Int      @default(7500) @map("dealer_ngn_amount")
+  dealerStripePriceId String?  @map("dealer_stripe_price_id")
+  dealerFlwPlanId     String?  @map("dealer_flw_plan_id")
+  updatedBy           String?  @map("updated_by") // AdminStaffUser.id, best-effort
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@map("billing_config")
+}
+
+// Webhook idempotency ledger, shared by both providers — a processor may
+// deliver the same event more than once, and events can arrive out of order.
+// BillingService inserts the id here before running the handler; a duplicate
+// delivery hits the primary-key conflict and is acked without reprocessing,
+// and a handler failure deletes the row so the processor's retry can run.
+// `id` is namespaced per provider: "stripe:evt_1P..." / "flutterwave:<txn id>".
+model WebhookEvent {
+  id          String   @id
+  provider    String   @default("stripe") // "stripe" | "flutterwave"
+  type        String
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@index([type])
+  @@map("webhook_events")
+}
+
+// Daily foreign-exchange snapshot behind the paywall's "estimated local
+// equivalent" line. Refreshed at most once per ~20h — lazily on the first
+// read after it goes stale, plus an admin "Refresh now" button (Render's free
+// tier spins down, so a cron can't be relied on). Display-only: the estimate
+// is always labelled as such and the payment provider's checkout amount stays
+// authoritative for the actual charge (docs/SUBSCRIPTION_MODEL.md §20). One
+// row, id = "latest".
+model FxRateSnapshot {
+  id           String   @id @default("latest")
+  baseCurrency String   @default("usd") @map("base_currency")
+  // { "gbp": 0.787, "eur": 0.921, "ngn": 1650.5, ... } — units of that
+  // currency per 1 unit of baseCurrency.
+  rates        Json     @default("{}")
+  source       String?
+  fetchedAt    DateTime @default(now()) @map("fetched_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("fx_rate_snapshots")
+}
+
+// The persistent, resumable "cook this meal" flow (docs cooking-journey
+// brief). One ACTIVE journey per user (partial unique index in the
+// migration); it survives navigation, app close and logout because the row —
+// not React/session state — is the source of truth. The client state
+// machines (CookTodayForm / CookingSession) still drive the UI; this mirrors
+// their position so "Resume" lands the user exactly where they left off.
+//
+// No Prisma enums anywhere in this schema — `stage` / `status` / `timerStatus`
+// are strings with the allowed values listed inline, same as MealPlan.status
+// etc. Recipe is referenced (not duplicated); `recipeSnapshot` is a frozen
+// RecipeView kept only so the journey still renders if the Recipe row is
+// later deleted (onDelete: SetNull).
+model CookingJourney {
+  id     String @id @default(uuid())
+  userId String @map("user_id")
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  recipeId       String? @map("recipe_id")
+  recipe         Recipe? @relation(fields: [recipeId], references: [id], onDelete: SetNull)
+  recipeSnapshot Json    @map("recipe_snapshot")
+
+  // "recipe_selected" | "ingredient_check" | "shopping" | "ready_to_cook" | "cooking" | "feedback_pending"
+  stage       String @default("recipe_selected")
+  // "active" | "completed" | "cancelled" | "abandoned"
+  status      String @default("active")
+  // 0-based cooking-step cursor; only meaningful once stage reaches "cooking".
+  currentStep Int    @default(0) @map("current_step")
+
+  // FridgeCheck's have/need split: { "have": string[], "need": string[] }.
+  // Per-item purchase progress lives on ShoppingListItem.checked, not here.
+  ingredientStatus Json? @map("ingredient_status")
+
+  // The fridge-check "need to buy" list. @unique so re-running the check
+  // replaces cleanly and the back-relation on ShoppingList is a to-one.
+  shoppingListId String?       @unique @map("shopping_list_id")
+  shoppingList   ShoppingList? @relation(fields: [shoppingListId], references: [id], onDelete: SetNull)
+
+  // Set when the journey started from a Plan Ahead meal — lets a plan
+  // reminder deep-link straight into the active journey (brief §22).
+  mealPlanItemId String?       @map("meal_plan_item_id")
+  mealPlanItem   MealPlanItem? @relation(fields: [mealPlanItemId], references: [id], onDelete: SetNull)
+
+  // Step timer. Remaining is always COMPUTED from these (see
+  // packages/shared/src/cookingJourney.ts computeTimerRemaining), never a
+  // stored counter. running: `timerEndsAt` is the wall-clock target.
+  // paused: `timerRemainingSeconds` is the frozen value. done/idle: null.
+  timerStatus           String?   @map("timer_status") // "running" | "paused" | "done" | null
+  timerDurationSeconds  Int?      @map("timer_duration_seconds")
+  timerEndsAt           DateTime? @map("timer_ends_at")
+  timerRemainingSeconds Int?      @map("timer_remaining_seconds")
+
+  // The FoodFeedback row once the cook rates the meal (loose reference, same
+  // as FoodFeedback.entityId — no FK).
+  feedbackId         String?   @map("feedback_id")
+  cookingStartedAt   DateTime? @map("cooking_started_at")
+  cookingCompletedAt DateTime? @map("cooking_completed_at")
+  lastActivityAt     DateTime  @default(now()) @map("last_activity_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([userId, status])
+  @@map("cooking_journeys")
+}
+
+// ---------------------------------------------------------------------------
+// FoodPadi Food Dealer Network (dealer brief) — a web-only B2B onboarding +
+// subscription + management product. Dealer data lives here in the shared
+// backend and is consumed by BOTH web and mobile customer discovery (brief
+// §21). All customer-facing reads go through DealerSearchService, which only
+// ever exposes a curated public view — payment state, owner identity and
+// unpublished prices never leave the portal (brief §42/§51/§64).
+//
+// No Prisma enums (house style — see MealPlan.status etc.): string columns with
+// the allowed values listed inline.
+
+model Dealer {
+  id          String @id @default(uuid())
+  // Stable public identifier for /dealer/<slug> + the search API. Derived from
+  // the name (kebab-case), disambiguated with the primary locality on collision.
+  slug        String @unique
+  // Ownership key — a normal customer User. Every portal endpoint authorizes on
+  // `dealer.ownerUserId === req.user.userId`; a client-supplied dealerId is
+  // never trusted (brief §52).
+  ownerUserId String @map("owner_user_id")
+  owner       User   @relation("DealerOwner", fields: [ownerUserId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  // One of packages/shared DEALER_TYPES (brief §4).
+  dealerType  String  @map("dealer_type")
+
+  // Contact / ordering channels — only ever stored when the dealer supplies
+  // them, shown as-is, never fabricated (brief §27).
+  phone        String?
+  websiteUrl   String? @map("website_url")
+  orderUrl     String? @map("order_url")
+  whatsapp     String?
+  // Free-form { "mon": "09:00-18:00", ... }. Shown as-is; never parsed into an
+  // "open now" claim on the client (same posture as local-food-search's raw
+  // opening_hours passthrough).
+  openingHours Json?   @map("opening_hours")
+
+  // Searchable taxonomy (brief §3/§6/§7). Free-text arrays — no master catalog,
+  // same principle as Recipe ingredients. DealerSearchProfile denormalises
+  // these (+ products + locations) into the actual search index.
+  categories      String[]
+  cuisines        String[]
+  productKeywords String[] @map("product_keywords")
+  dietaryTags     String[] @map("dietary_tags")
+  serviceType     String[] @map("service_type")
+
+  // Moderation + approval lifecycle. EFFECTIVE customer visibility is
+  // (listingStatus == 'active' && dealer subscription active) — see
+  // DealerEntitlementService. 'active' is reachable ONLY from 'approved' (or
+  // 'expired' on renewal) — DealerSearchProfileService.rebuild is the sole
+  // writer, so a payment can never promote a dealer past admin review
+  // (admin-approval-before-payment business rule, 2026-09-11). "expired" is
+  // set lazily by the search/portal read once the subscription lapses past the
+  // grace window (brief §25), mirroring EntitlementService's lazy trial-expiry
+  // (no cron).
+  //   'draft' | 'pending_review' | 'changes_requested' | 'approved' | 'active'
+  //   | 'rejected' | 'suspended' | 'expired'
+  listingStatus      String    @default("draft") @map("listing_status")
+  // Admin's message on a 'changes_requested'/'rejected' decision — shown to the
+  // dealer verbatim, cleared on resubmission.
+  approvalNote       String?   @map("approval_note")
+  approvalReviewedAt DateTime? @map("approval_reviewed_at")
+  // A paid subscription does NOT imply verification (brief §23). Only a
+  // completed FoodPadi verification process sets 'verified'.
+  //   'unverified' | 'verified'
+  verificationStatus String    @default("unverified") @map("verification_status")
+  verifiedAt         DateTime? @map("verified_at")
+  verifiedBy         String?   @map("verified_by") // AdminStaffUser.id, best-effort
+
+  // 0-100, recomputed by DealerPortalService.scoreCompleteness on every write.
+  // Feeds ranking (quality signal) and Featured eligibility (brief §10/§17).
+  profileCompleteness Int @default(0) @map("profile_completeness")
+
+  // Denormalised from DealerRating so search/list reads never join+aggregate
+  // per candidate. Recomputed by DealerRatingService on every rating write.
+  // null average = no ratings yet (never shown as "0 stars").
+  ratingAverage Float? @map("rating_average")
+  ratingCount   Int    @default(0) @map("rating_count")
+
+  submittedAt DateTime? @map("submitted_at")
+  activatedAt DateTime? @map("activated_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+  deletedAt   DateTime? @map("deleted_at")
+
+  locations     DealerLocation[]
+  products      DealerProduct[]
+  subscription  DealerSubscription?
+  searchProfile DealerSearchProfile?
+  events        DealerEvent[]
+  reports       DealerReport[]
+  ratings       DealerRating[]
+  auditLogs     DealerAuditLog[]
+
+  @@index([ownerUserId])
+  @@index([listingStatus])
+  @@map("dealers")
+}
+
+// Approval/lifecycle audit trail (admin-approval-before-payment business rule,
+// 2026-09-11, brief §17) — every submit / resubmit / admin decision / payment
+// activation is recorded here, oldest first, surfaced to admin on the dealer
+// detail page. `adminId` is best-effort (AdminApiGuard doesn't carry a
+// per-staff id through yet, same posture as Dealer.verifiedBy) and null for
+// dealer-initiated or system (payment webhook) entries.
+model DealerAuditLog {
+  id             String   @id @default(uuid())
+  dealerId       String   @map("dealer_id")
+  dealer         Dealer   @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  adminId        String?  @map("admin_id")
+  action         String
+  previousStatus String?  @map("previous_status")
+  newStatus      String?  @map("new_status")
+  reason         String?
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([dealerId, createdAt])
+  @@map("dealer_audit_logs")
+}
+
+// A dealer may have one or more branches / a distributor service area (brief
+// §31/§32). The data model is multi-location from day one even though the MVP
+// dashboard UI focuses on one primary site + service areas.
+model DealerLocation {
+  id       String @id @default(uuid())
+  dealerId String @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  label              String?
+  addressLine        String?  @map("address_line")
+  // Town/city name used for locality search ("Leicester"). Required — a location
+  // with no locality can't be matched or shown.
+  locality           String
+  city               String?
+  region             String? // county / state
+  postcode           String?
+  countryCode        String   @default("GB") @map("country_code")
+  latitude           Float?
+  longitude          Float?
+  isPrimary          Boolean  @default(false) @map("is_primary")
+  // Localities served beyond the physical site (a distributor covering
+  // "Leicester", "Loughborough", "Market Harborough"). Never arbitrary — the
+  // portal validates these are real place names (brief §31).
+  serviceAreas       String[] @map("service_areas")
+  serviceRadiusMiles Int?     @map("service_radius_miles")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([dealerId])
+  @@index([locality])
+  @@map("dealer_locations")
+}
+
+model DealerProduct {
+  id       String @id @default(uuid())
+  dealerId String @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  name          String
+  category      String?
+  description   String?
+  // A pasted external https:// link. Mutually exclusive with imageData below —
+  // setting one clears the other (a product has at most one image, either
+  // hosted elsewhere or uploaded to us).
+  imageUrl      String?  @map("image_url")
+  // An uploaded photo, resized + re-encoded server-side (product-image.util.ts)
+  // and stored as real binary — there's no object storage provider configured
+  // for this app, so Postgres bytea is the pragmatic home for it (images are
+  // capped small enough that this stays cheap). Served via
+  // GET /dealers/products/:id/image, never embedded in JSON list/search
+  // responses.
+  imageData     Bytes?   @map("image_data")
+  imageMimeType String?  @map("image_mime_type")
+  available     Boolean  @default(true)
+  // Optional — dealers may list products without publishing a price (brief §18).
+  pricePence    Int?     @map("price_pence")
+  unit          String?
+  // Normalised synonyms seeded from the name, used by the search engine so
+  // "jollof" matches "Jollof Rice" (brief §36). Recomputed on write.
+  keywords      String[]
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([dealerId])
+  @@map("dealer_products")
+}
+
+// The dealer's B2B subscription. A SEPARATE product from FoodPadi Premium —
+// deliberately its own table, never sharing a row with `subscriptions` (brief
+// §13). Shape mirrors Subscription so the provider plumbing (StripeService /
+// FlutterwaveService) is reused as-is. One row per dealer.
+model DealerSubscription {
+  id       String @id @default(uuid())
+  dealerId String @unique @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  provider String @default("stripe") // "stripe" | "flutterwave"
+
+  stripeCustomerId     String? @unique @map("stripe_customer_id")
+  stripeSubscriptionId String? @unique @map("stripe_subscription_id")
+  stripePriceId        String? @map("stripe_price_id")
+
+  flwPlanId         String? @map("flw_plan_id")
+  flwSubscriptionId String? @unique @map("flw_subscription_id")
+  flwTxRef          String? @unique @map("flw_tx_ref")
+  flwCustomerEmail  String? @map("flw_customer_email")
+
+  // Stripe: mirrors subscription.status verbatim. Flutterwave: "active" |
+  // "canceled" | "incomplete".
+  status String @default("incomplete")
+
+  plan            String @default("dealer_monthly")
+  basePriceCents  Int    @default(2900) @map("base_price_cents")
+  baseCurrency    String @default("usd") @map("base_currency")
+  billingInterval String @default("month") @map("billing_interval")
+
+  presentmentAmountCents Int?    @map("presentment_amount_cents")
+  presentmentCurrency    String? @map("presentment_currency")
+
+  customerCountry   String?   @map("customer_country")
+  currentPeriodEnd  DateTime? @map("current_period_end")
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
+  canceledAt        DateTime? @map("canceled_at")
+  trialEndsAt       DateTime? @map("trial_ends_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("dealer_subscriptions")
+}
+
+// Denormalised search index for one dealer — rebuilt by
+// DealerSearchProfileService.rebuild() after every portal write AND every
+// subscription state change. DealerSearchService queries THIS table only, never
+// the normalised dealer/product/location rows, so a customer search is one
+// indexed read (brief §35: reuse Postgres, no Elasticsearch).
+model DealerSearchProfile {
+  dealerId String @id @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  // Space-joined blob of name + categories + cuisines + product names +
+  // localities, lowercased. Matched with ILIKE / to_tsvector (brief §35).
+  searchText     String   @map("search_text")
+  // Normalised lowercase arrays for exact-term scoring in dealer-ranking.ts.
+  localities     String[]
+  categoriesNorm String[] @map("categories_norm")
+  productsNorm   String[] @map("products_norm")
+  cuisinesNorm   String[] @map("cuisines_norm")
+
+  primaryLat Float? @map("primary_lat")
+  primaryLng Float? @map("primary_lng")
+
+  completeness       Int     @default(0)
+  // Mirror of Dealer.ratingAverage/ratingCount — a quality signal in ranking
+  // (dealer-ranking.ts), only once ratingCount clears DEALER_RATING_MIN_FOR_RANKING.
+  ratingAverage      Float?  @map("rating_average")
+  ratingCount        Int     @default(0) @map("rating_count")
+  // completeness >= threshold AND listingStatus 'active' AND subscription
+  // active. The search engine still re-checks the relevance + locality floors
+  // per query before actually placing a dealer in a Featured slot (brief §37).
+  featuredEligible   Boolean @default(false) @map("featured_eligible")
+  // Mirror of Dealer.listingStatus + a resolved "subscription active" flag so
+  // the search query needs no join.
+  listingStatus      String  @default("draft") @map("listing_status")
+  subscriptionActive Boolean @default(false) @map("subscription_active")
+
+  lastBuiltAt DateTime @default(now()) @map("last_built_at")
+
+  @@index([listingStatus, subscriptionActive])
+  @@map("dealer_search_profiles")
+}
+
+// Aggregate discovery analytics (brief §43/§55). NEVER stores customer PII —
+// `query` is the raw search string, unattached to any user or session; location
+// is coarse locality only (brief §42).
+model DealerEvent {
+  id       String @id @default(uuid())
+  dealerId String @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+
+  // 'search_appearance' | 'featured_impression' | 'profile_view' |
+  // 'website_click' | 'phone_click' | 'direction_click' | 'order_click'
+  type     String
+  locality String?
+  query    String?
+
+  occurredAt DateTime @default(now()) @map("occurred_at")
+
+  @@index([dealerId, type, occurredAt])
+  @@map("dealer_events")
+}
+
+// Customer-submitted report of a wrong/closed/incorrect/inappropriate listing
+// (brief §40). Deliberately minimal — no reviews, stars or social (brief §41).
+model DealerReport {
+  id             String  @id @default(uuid())
+  dealerId       String  @map("dealer_id")
+  dealer         Dealer  @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  // Nullable: a guest can report too (same posture as local-food-search).
+  reporterUserId String? @map("reporter_user_id")
+  reporter       User?   @relation("DealerReporter", fields: [reporterUserId], references: [id], onDelete: SetNull)
+
+  reason String // 'wrong_business' | 'closed' | 'incorrect_info' | 'inappropriate'
+  detail String?
+  status String  @default("open") // 'open' | 'reviewed' | 'actioned' | 'dismissed'
+
+  createdAt  DateTime  @default(now()) @map("created_at")
+  reviewedAt DateTime? @map("reviewed_at")
+  reviewedBy String?   @map("reviewed_by") // AdminStaffUser.id
+
+  @@index([dealerId])
+  @@index([status])
+  @@map("dealer_reports")
+}
+
+// Post-visit customer rating of a dealer (user instruction 2026-09-11). Kept
+// deliberately narrow, NOT a review/social feed (dealer brief §41/§78 — no
+// likes, no followers, no comment threads): one star rating + an optional
+// short comment per customer per dealer, tied to that business only, editable
+// by the rater, moderatable by admin. Account-only (no guest ratings) — same
+// posture as Feedback (guests have no persistent Memory to attach this to).
+model DealerRating {
+  id       String @id @default(uuid())
+  dealerId String @map("dealer_id")
+  dealer   Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  userId   String @map("user_id")
+  user     User   @relation("DealerRater", fields: [userId], references: [id], onDelete: Cascade)
+
+  rating  Int // 1-5
+  comment String?
+
+  // Admin moderation (brief §39/§40 — trust & safety), independent of the
+  // rating value itself; a hidden rating is excluded from the public list and
+  // the dealer's aggregate.
+  hidden   Boolean   @default(false)
+  hiddenBy String?   @map("hidden_by") // AdminStaffUser.id, best-effort
+  hiddenAt DateTime? @map("hidden_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // One rating per customer per dealer — re-rating updates it in place rather
+  // than piling up duplicates (this is a rating, not a comment thread).
+  @@unique([dealerId, userId])
+  @@index([dealerId, hidden])
+  @@map("dealer_ratings")
 }

@@ -7,7 +7,7 @@ interface AuthContextValue {
   user: UserSummary | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName: string) => Promise<void>;
   /** Exchange a Google ID token for a session (finds-or-creates the account). */
   loginWithGoogle: (idToken: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -45,8 +45,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(result.user);
   }, []);
 
-  const register = useCallback(async (email: string, password: string) => {
-    const result = await api.register({ email, password });
+  const register = useCallback(async (email: string, password: string, displayName: string) => {
+    const result = await api.register({ email, password, displayName });
     await tokenStore.setTokens(result.accessToken, result.refreshToken);
     setUser(result.user);
   }, []);

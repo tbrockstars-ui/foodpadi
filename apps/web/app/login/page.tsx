@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Button } from '../../components/Button';
 import { EyeIcon } from '../../components/EyeIcon';
 import { Logo } from '../../components/Logo';
+import { CountryFlagHint } from '../../components/CountrySelect';
 import { GoogleSignInButton } from '../GoogleSignInButton';
 import styles from '../auth.module.css';
 
@@ -79,6 +80,8 @@ function LoginForm() {
         </div>
         <h1 className={styles.title}>FoodPadi</h1>
         <p className={styles.subtitle}>Your food companion that plans with you, not for you.</p>
+
+        <CountryFlagHint className={styles.locationHint} />
 
         <form onSubmit={submit}>
           <input

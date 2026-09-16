@@ -25,6 +25,7 @@ import { useReduceMotion } from './motion/useReduceMotion';
 import { guestPrompts } from '../lib/guestPrompts';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
+import type { MainTabScreenProps } from '../navigation/types';
 
 type Stage = 'idle' | 'deciding' | 'options' | 'no-options' | 'error';
 
@@ -60,6 +61,10 @@ function isVeganOption(option: DecisionOptionView): boolean {
 interface DecideFlowProps {
   /** Guests only — routes the "let FoodPadi remember you" card's CTA to signup. */
   onRequestLogin?: () => void;
+  /** "Cook It" on a result deep-links to the Cook tab with the meal's exact
+   * title pre-filled — same navigation object CompanionCard already receives
+   * from HomeScreen. */
+  navigation: MainTabScreenProps<'Home'>['navigation'];
 }
 
 /** Imperative handle for CompanionCard's "decide"-targeted CTAs (Usual Time,
@@ -70,7 +75,7 @@ export interface DecideFlowHandle {
 }
 
 export const DecideFlow = forwardRef<DecideFlowHandle, DecideFlowProps>(function DecideFlow(
-  { onRequestLogin } = {},
+  { onRequestLogin, navigation },
   ref,
 ) {
   const { user } = useAuth();
@@ -347,32 +352,45 @@ export const DecideFlow = forwardRef<DecideFlowHandle, DecideFlowProps>(function
                 </View>
               </View>
 
-              {/* "Find Near Me" — the one CTA a Decide result has. Tapping it
-                  immediately searches for this already-selected food near the
-                  user (LocalFoodSearch's autoStart below); it never re-asks
-                  what food to look for. */}
-              {expandedId === option.id ? (
-                getSearchBusy ? null : (
-                  <TouchableOpacity
-                    style={styles.optionAction}
-                    onPress={() => toggleExpanded(option.id)}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.optionActionText}>Hide</Text>
-                  </TouchableOpacity>
-                )
-              ) : (
+              {/* Every result gets two independent actions: "Cook It" sends
+                  the exact title to the Cook tab's free-text box (the
+                  customer still has to hit its own submit — nothing here
+                  auto-generates a recipe), and "Find Nearby" is the existing
+                  CTA, untouched — tapping it immediately searches for this
+                  already-selected food near the user (LocalFoodSearch's
+                  autoStart below); it never re-asks what food to look for. */}
+              <View style={styles.optionActionsRow}>
                 <Button
-                  label="Find Near Me"
-                  onPress={() => {
-                    void getToken().then((token) =>
-                      api.trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title }, token),
-                    );
-                    toggleExpanded(option.id);
-                  }}
-                  style={styles.findNearMeButton}
+                  label="Cook It"
+                  variant="secondary"
+                  onPress={() => navigation.navigate('Cook', { initialPrompt: option.title })}
+                  style={styles.optionActionButton}
                 />
-              )}
+                {expandedId === option.id ? (
+                  getSearchBusy ? (
+                    <View style={styles.optionActionButton} />
+                  ) : (
+                    <TouchableOpacity
+                      style={[styles.optionAction, styles.optionActionButton]}
+                      onPress={() => toggleExpanded(option.id)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.optionActionText}>Hide</Text>
+                    </TouchableOpacity>
+                  )
+                ) : (
+                  <Button
+                    label="Find Nearby"
+                    onPress={() => {
+                      void getToken().then((token) =>
+                        api.trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title }, token),
+                      );
+                      toggleExpanded(option.id);
+                    }}
+                    style={styles.optionActionButton}
+                  />
+                )}
+              </View>
 
               {expandedId === option.id ? (
                 <View style={styles.optionDetail}>
@@ -477,9 +495,10 @@ function makeStyles(c: ThemeColors) {
   optionHeaderText: { flex: 1 },
   optionTitle: { fontSize: 17, fontWeight: '700', color: c.text, marginBottom: spacing.xs },
   optionReason: { ...typography.body, color: c.textMuted },
-  optionAction: { marginTop: spacing.md },
+  optionAction: { alignItems: 'center', justifyContent: 'center' },
   optionActionText: { color: c.primary, fontSize: 14, fontWeight: '600' },
-  findNearMeButton: { marginTop: spacing.md },
+  optionActionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
+  optionActionButton: { flex: 1 },
   optionDetail: { marginTop: spacing.md },
   });
 }

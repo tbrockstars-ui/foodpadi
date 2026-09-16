@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { MealPlanView } from '@foodpadi/shared';
+import type { MealPlanView, UserSummary } from '@foodpadi/shared';
 import { ApiError, isGuest, requireSessionOrGuest, serverFetch } from '../../lib/serverApi';
 import { getGuestState } from '../../lib/guestSession';
 import { PlanGuestPreview } from './PlanGuestPreview';
@@ -25,12 +25,23 @@ export default async function PlanPage({ searchParams }: { searchParams: { new?:
   const guest = isGuest();
 
   let plan: MealPlanView | null = null;
+  // Only a 'paid' entitlement unlocks the "This week" / "More options" scopes
+  // below (user instruction 2026-09-12) — trial and a lapsed/guest account
+  // stay capped at "Just tomorrow". Best-effort: a failed lookup falls back
+  // to the more restrictive `false`, never silently granting the gated scopes.
+  let isPremium = false;
   if (!guest) {
     try {
       plan = await serverFetch<MealPlanView | null>('/plan-ahead/current');
     } catch (e) {
       // A failed lookup shouldn't block the form — just fall through to it.
       if (!(e instanceof ApiError)) throw e;
+    }
+    try {
+      const me = await serverFetch<UserSummary>('/users/me');
+      isPremium = me.entitlement === 'paid';
+    } catch (e) {
+      if (e instanceof ApiError && e.status >= 500) throw e;
     }
   }
 
@@ -54,7 +65,7 @@ export default async function PlanPage({ searchParams }: { searchParams: { new?:
         ) : showPlan ? (
           <PlanView plan={plan!} />
         ) : (
-          <PlanScopeForm />
+          <PlanScopeForm isPremium={isPremium} />
         )}
       </main>
     </AppShell>

@@ -18,6 +18,12 @@ function greeting(): string {
   return 'Good evening';
 }
 
+function firstNameFrom(displayName: string | null | undefined, email: string | undefined): string | null {
+  const name = displayName?.trim() || email?.split('@')[0].trim();
+  if (!name) return null;
+  return name.split(/[\s._-]+/)[0];
+}
+
 /**
  * Home is the single intent-first entry point (decision-engine architecture
  * memory). After the declutter pass it holds exactly one job — "What should
@@ -32,12 +38,16 @@ export function HomeScreen({ onRequestLogin, navigation }: Props) {
   const styles = makeStyles(colors);
   const { user } = useAuth();
   const isGuest = !user;
+  const firstName = firstNameFrom(user?.displayName, user?.email);
   const decideRef = useRef<DecideFlowHandle>(null);
 
   return (
     <Screen scroll>
       <Text style={styles.brand}>FoodPadi</Text>
-      <Text style={styles.greeting}>{greeting()}</Text>
+      <Text style={styles.greeting}>
+        {greeting()}
+        {firstName ? `, ${firstName}` : ''}
+      </Text>
 
       <Text style={styles.heading}>What should I eat?</Text>
       <Text style={styles.subtitle}>
@@ -53,7 +63,7 @@ export function HomeScreen({ onRequestLogin, navigation }: Props) {
       ) : null}
 
       <View style={styles.decideWrap}>
-        <DecideFlow ref={decideRef} onRequestLogin={onRequestLogin} />
+        <DecideFlow ref={decideRef} onRequestLogin={onRequestLogin} navigation={navigation} />
       </View>
 
       {isGuest ? (

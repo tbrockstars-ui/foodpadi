@@ -5,6 +5,45 @@
   margin: 0 0 var(--space-xs);
 }
 
+/* Shown only when the list belongs to an active Cooking Journey — returns the
+   user to the exact cook they left, not a generic Cook landing (brief §7). */
+.backToCooking {
+  display: inline-block;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-bottom: var(--space-md);
+}
+
+.backToCooking:hover {
+  color: var(--text);
+}
+
+.readyToCook {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.readyToCookText {
+  font-size: 15px;
+  color: var(--text);
+  margin: 0 0 var(--space-md);
+}
+
+.readyToCookButton {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--primary-text);
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-lg);
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+}
+
 .subtitle {
   font-size: 15px;
   color: var(--text-muted);

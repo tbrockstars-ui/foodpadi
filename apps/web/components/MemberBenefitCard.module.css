@@ -38,7 +38,7 @@
   content: '✓';
   position: absolute;
   left: 0;
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 700;
 }
 

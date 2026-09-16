@@ -1,7 +1,18 @@
-import { Controller, Delete, Get, HttpCode, HttpStatus, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Patch,
+  Post,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser, CurrentUserPayload } from '../../common/current-user.decorator';
 import { UsersService } from './users.service';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @Controller('users/me')
 @UseGuards(JwtAuthGuard)
@@ -11,6 +22,12 @@ export class UsersController {
   @Get()
   getProfile(@CurrentUser() user: CurrentUserPayload) {
     return this.usersService.getProfile(user.userId);
+  }
+
+  /** Partial profile update — country of residence, display name. */
+  @Patch()
+  updateProfile(@CurrentUser() user: CurrentUserPayload, @Body() dto: UpdateProfileDto) {
+    return this.usersService.updateProfile(user.userId, dto);
   }
 
   @Post('disclaimer-acknowledge')

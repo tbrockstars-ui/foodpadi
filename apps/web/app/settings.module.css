@@ -153,7 +153,7 @@
   padding: 2px 10px;
   border-radius: var(--radius-pill);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .muted {

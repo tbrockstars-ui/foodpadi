@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { CurrentUser, CurrentUserPayload } from '../../common/current-user.decorator';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AddPantryItemsDto } from './dto/add-pantry-items.dto';
@@ -20,5 +20,10 @@ export class ScanController {
   @Post('pantry/items')
   addPantryItems(@Body() dto: AddPantryItemsDto, @CurrentUser() user: CurrentUserPayload) {
     return this.scanService.addPantryItems(dto, user.userId);
+  }
+
+  @Get('pantry/items')
+  listPantryItems(@CurrentUser() user: CurrentUserPayload) {
+    return this.scanService.listPantryItems(user.userId);
   }
 }

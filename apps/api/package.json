@@ -12,7 +12,11 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:deploy": "prisma migrate deploy",
     "admin:create-staff-user": "ts-node scripts/create-admin-staff-user.ts",
-    "seed:food-ideas": "ts-node scripts/seed-food-ideas.ts"
+    "seed:food-ideas": "ts-node scripts/seed-food-ideas.ts",
+    "seed:demo-dealers": "ts-node scripts/seed-demo-dealer.ts",
+    "stripe:setup": "ts-node scripts/stripe-setup.ts",
+    "stripe:dealer-setup": "ts-node scripts/stripe-dealer-setup.ts",
+    "flw:setup": "ts-node scripts/flutterwave-setup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.27.3",
@@ -30,7 +34,9 @@
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "sharp": "^0.33.5",
+    "stripe": "^17.7.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.4.5",

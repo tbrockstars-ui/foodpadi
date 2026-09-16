@@ -33,7 +33,7 @@
 .chipSelected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
 }
 
@@ -56,7 +56,7 @@
 }
 
 .lockedNudge a {
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
   text-decoration: none;
 }
@@ -238,7 +238,7 @@
 .suggestionItem:hover,
 .suggestionItem:focus-visible {
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .focusInput {
@@ -257,7 +257,7 @@
   border: 1px solid var(--primary);
   border-radius: var(--radius-md);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;
@@ -370,7 +370,7 @@
 .itemActionText {
   background: none;
   border: none;
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -400,7 +400,20 @@
 .reminderNote {
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-ink);
+  margin: 0 0 var(--space-sm);
+}
+
+/* --- Smart start time — recipe-aware, distinct from the reminder above --- */
+.startTimeNote {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.startTimeWarning {
+  font-size: 13px;
+  color: var(--warning);
   margin: 0 0 var(--space-sm);
 }
 
@@ -429,6 +442,12 @@
   font-size: 12px;
   color: var(--text-faint);
   margin: 0 0 var(--space-sm);
+}
+
+.defaultsBlock {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
 }
 
 /* --- Saved plans list (apps/web/app/plan/saved) --- */

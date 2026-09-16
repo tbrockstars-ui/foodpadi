@@ -1,4 +1,11 @@
-import { isVeganFood, type HomeIdeaDifficulty, type HomeIdeaPriceBand, type HomeIdeaView } from '@foodpadi/shared';
+import {
+  haveItemsCoverIngredient,
+  isVeganFood,
+  normalizeIngredientName,
+  type HomeIdeaDifficulty,
+  type HomeIdeaPriceBand,
+  type HomeIdeaView,
+} from '@foodpadi/shared';
 import { CURATED_RECIPES } from '../ai/curated-recipes';
 import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 
@@ -77,24 +84,11 @@ const MEAT_FISH = [
   'fish', 'mince', 'steak', 'drumstick', 'thigh', 'ham',
 ];
 
-function normalize(value: string): string {
-  return value.trim().toLowerCase();
-}
-
-/** A pantry item covers a recipe ingredient if either name contains the other (after normalising). */
-function pantryCoversIngredient(pantryItems: string[], ingredientName: string): boolean {
-  const ing = normalize(ingredientName);
-  return pantryItems.some((p) => {
-    const item = normalize(p);
-    return item.length > 1 && (ing.includes(item) || item.includes(ing));
-  });
-}
-
 export function pantryMatchPercent(recipe: RecipeLike, pantryItems: string[]): number | null {
   if (pantryItems.length === 0) return null;
   const total = recipe.ingredients.length;
   if (total === 0) return null;
-  const have = recipe.ingredients.filter((i) => pantryCoversIngredient(pantryItems, i.name)).length;
+  const have = recipe.ingredients.filter((i) => haveItemsCoverIngredient(pantryItems, i.name)).length;
   return Math.round((have / total) * 100);
 }
 
@@ -107,7 +101,7 @@ export function difficultyOf(recipe: RecipeLike): HomeIdeaDifficulty {
 }
 
 export function priceBandOf(recipe: RecipeLike): HomeIdeaPriceBand {
-  const names = recipe.ingredients.map((i) => normalize(i.name)).join(' ');
+  const names = recipe.ingredients.map((i) => normalizeIngredientName(i.name)).join(' ');
   const count = recipe.ingredients.length;
   if (count >= 8 || PREMIUM_INGREDIENTS.some((p) => names.includes(p))) return '£££';
   const hasMeatOrFish = MEAT_FISH.some((m) => names.includes(m));
@@ -116,7 +110,7 @@ export function priceBandOf(recipe: RecipeLike): HomeIdeaPriceBand {
 }
 
 function slugify(title: string): string {
-  return normalize(title).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return normalizeIngredientName(title).replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 }
 
 function scoreRecipe(
@@ -126,7 +120,7 @@ function scoreRecipe(
   priceBand: HomeIdeaPriceBand,
 ): number {
   let score = matchPercent ?? 0;
-  if (recipe.cuisine && ctx.favouriteCuisines.includes(normalize(recipe.cuisine))) score += 20;
+  if (recipe.cuisine && ctx.favouriteCuisines.includes(normalizeIngredientName(recipe.cuisine))) score += 20;
   if (ctx.activeGoals.includes('quick_meals') && recipe.cookTimeMinutes <= 25) score += 12;
   if (ctx.activeGoals.includes('reduce_spending') && priceBand === '£') score += 12;
   if (ctx.activeGoals.includes('reduce_waste')) score += (matchPercent ?? 0) * 0.3;

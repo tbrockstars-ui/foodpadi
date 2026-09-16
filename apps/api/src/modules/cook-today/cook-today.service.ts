@@ -1,6 +1,7 @@
 import { ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { FoodGoal } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { AiAccessService } from '../ai/ai-access.service';
 import { pickCuratedRecipes } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
@@ -8,6 +9,7 @@ import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { RequestActor } from '../auth/guest-or-auth.guard';
+import { CookingInsightsService } from '../feedback/cooking-insights.service';
 import { GenerateRecipesDto } from './dto/generate-recipes.dto';
 import { SaveRecipeDto } from './dto/save-recipe.dto';
 import { ToggleFavoriteDto } from './dto/toggle-favorite.dto';
@@ -39,6 +41,8 @@ export class CookTodayService {
     private readonly claude: ClaudeService,
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly aiAccess: AiAccessService,
+    private readonly cookingInsights: CookingInsightsService,
   ) {}
 
   async generate(dto: GenerateRecipesDto, actor: RequestActor): Promise<RecipeView[]> {
@@ -50,11 +54,21 @@ export class CookTodayService {
       return this.generateForGuest(dto, actor);
     }
 
+    // Guest/Trial/Paid gate — a trial user is metered, a post-trial (guest
+    // entitlement) user is blocked before any paid AI call. Curated guest
+    // path above is untouched.
+    await this.aiAccess.assertCanUseAi(actor.userId, 'cook_today');
+
     // Signed-in users get recipes shaped by their Preferences + Goals
     // (favourite cuisines, avoided ingredients, food goals) — same treatment
     // Eat Now and Plan Ahead already give. Also reached via DecideService, so
     // the "cook it" options in "What should I eat?" are personalised too.
     const personalisation = await this.loadPersonalisation(actor);
+    // Cook Today has no single dish title to key off (it generates from raw
+    // ingredients), so we use the dish-agnostic aggregate across all recent
+    // cooks rather than CookingInsightsService.getInsightForDish. Already
+    // null-safe internally — never throws, never blocks generation.
+    const communityNotes = (await this.cookingInsights.getGeneralGuidance()) ?? undefined;
 
     const raw = await this.claude.generateCookTodayRecipes({
       ingredients: dto.ingredients,
@@ -63,6 +77,8 @@ export class CookTodayService {
       favouriteCuisines: personalisation.favouriteCuisines,
       avoidedIngredients: personalisation.avoidedIngredients,
       goalGuidance: personalisation.goalGuidance,
+      excludeTitles: dto.excludeTitles,
+      communityNotes,
     });
 
     const validated = raw
@@ -112,6 +128,7 @@ export class CookTodayService {
   ): Promise<RecipeView[]> {
     const raw = pickCuratedRecipes(dto.ingredients.join(' '), 3, {
       maxMinutes: dto.timeConstraintMinutes,
+      excludeTitles: dto.excludeTitles,
     });
     const recipes = raw
       .map((candidate) => sanitizeRecipeCandidate(candidate))

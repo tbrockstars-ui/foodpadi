@@ -43,6 +43,34 @@ describe('curated-recipes (guest / demo pool helpers)', () => {
       const picked = pickCuratedRecipes('', CURATED_RECIPES.length + 50);
       expect(picked.length).toBeLessThanOrEqual(CURATED_RECIPES.length);
     });
+
+    describe('excludeTitles ("None of these? Try another set")', () => {
+      it('never returns an excluded title', () => {
+        const first = pickCuratedRecipes('', 3);
+        const again = pickCuratedRecipes('', 3, { excludeTitles: titles(first) });
+        for (const t of titles(again)) expect(titles(first)).not.toContain(t);
+      });
+
+      it('returns a genuinely different set for a blank hint (pool has room)', () => {
+        const first = pickCuratedRecipes('', 3);
+        const again = pickCuratedRecipes('', 3, { excludeTitles: titles(first) });
+        expect(again).toHaveLength(3);
+      });
+
+      it('ignores the exclusion rather than returning empty when it would exclude everything', () => {
+        const everyTitle = titles(CURATED_RECIPES);
+        const picked = pickCuratedRecipes('', 3, { excludeTitles: everyTitle });
+        expect(picked).toHaveLength(3); // fell back to the full pool instead of nothing
+      });
+
+      it('is case- and whitespace-insensitive', () => {
+        const first = pickCuratedRecipes('', 1);
+        const again = pickCuratedRecipes('', 3, {
+          excludeTitles: [`  ${String(first[0].title).toUpperCase()}  `],
+        });
+        expect(titles(again)).not.toContain(String(first[0].title));
+      });
+    });
   });
 
   describe('curatedPlanForDays', () => {

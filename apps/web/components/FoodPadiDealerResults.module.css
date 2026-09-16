@@ -1,0 +1,99 @@
+/* "FoodPadi Dealers" section — always rendered ABOVE the external
+   OpenStreetMap "nearby places" results (Network-first ordering, dealer brief
+   §22/§46 + user instruction 2026-09-09). Clearly distinct from an external
+   venue result: its own heading, Sponsored / Verified labels. */
+
+.section {
+  margin-bottom: var(--space-lg);
+}
+.heading {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px;
+}
+.sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm);
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-md);
+  margin-bottom: var(--space-sm);
+}
+.cardSponsored {
+  border-color: var(--primary);
+}
+.badges {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.sponsored {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--primary-dark, var(--primary));
+  background: var(--primary-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+.verified {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--success);
+  background: var(--success-soft);
+  border-radius: var(--radius-pill);
+  padding: 2px 8px;
+}
+.nameRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+}
+.name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.meta {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 2px 0 0;
+}
+.matched {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.matchedChip {
+  font-size: 11px;
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+}
+.actionLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-ink);
+  text-decoration: none;
+}
+.viewLink {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-ink);
+  text-decoration: none;
+}

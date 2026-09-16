@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ClaudeService } from '../ai/claude.service';
+import { AiAccessService } from '../ai/ai-access.service';
 import { demoScenario, demoScenarioForPhoto } from './demo-scan-analyzer';
 import { demoFoodContentForPhoto } from './demo-food-content-analyzer';
 import { AddPantryItemsDto } from './dto/add-pantry-items.dto';
@@ -24,6 +25,7 @@ export class ScanService {
     private readonly claude: ClaudeService,
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly aiAccess: AiAccessService,
   ) {}
 
   /**
@@ -53,6 +55,7 @@ export class ScanService {
         raw = demoScenarioForPhoto(dto.imageBase64);
         demo = true;
       } else {
+        await this.aiAccess.assertCanUseAi(userId, 'scan_photo');
         raw = await this.claude.analyzeFoodPhoto(dto.imageBase64, dto.mediaType);
         demo = false;
       }
@@ -74,6 +77,9 @@ export class ScanService {
    */
   async scanFoodContent(dto: ScanFoodContentDto, userId: string): Promise<ScanFoodContentResult> {
     const demoModeEnabled = process.env.SCAN_DEMO_MODE === 'true';
+    if (!demoModeEnabled) {
+      await this.aiAccess.assertCanUseAi(userId, 'scan_food_content');
+    }
     const raw = demoModeEnabled
       ? demoFoodContentForPhoto(dto.imageBase64)
       : await this.claude.analyzeFoodContent(dto.imageBase64, dto.mediaType);
@@ -105,5 +111,23 @@ export class ScanService {
     await this.analytics.track('scan_pantry_updated', { userId }, { itemCount: created.count });
 
     return { added: created.count };
+  }
+
+  /** Oldest-added first — see PantryItemView's comment (packages/shared) for
+   * why "oldest" is the honest stand-in for "needs using soon" here. */
+  async listPantryItems(userId: string) {
+    const items = await this.prisma.pantryItem.findMany({
+      where: { userId, deletedAt: null },
+      orderBy: { createdAt: 'asc' },
+    });
+    return {
+      items: items.map((item) => ({
+        id: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        unit: item.unit,
+        createdAt: item.createdAt.toISOString(),
+      })),
+    };
   }
 }

@@ -9,6 +9,8 @@ const NAV_ITEMS = [
   { href: '/admin/users', label: 'Users', icon: UsersIcon, exact: false },
   { href: '/admin/waitlist', label: 'Waitlist', icon: WaitlistIcon, exact: false },
   { href: '/admin/food-ideas', label: 'Food ideas', icon: FoodIcon, exact: false },
+  { href: '/admin/dealers', label: 'Food Dealers', icon: DealerIcon, exact: false },
+  { href: '/admin/billing', label: 'Subscription', icon: BillingIcon, exact: false },
 ] as const;
 
 export function AdminSidebarNav() {
@@ -83,6 +85,25 @@ function FoodIcon() {
   return (
     <svg {...iconProps()}>
       <path d="M5 3v7a2 2 0 0 0 2 2v9M5 3v5M7 3v5M9 3v7a2 2 0 0 1-2 2M18 3c-2 1.5-2 4-2 6s0 3 2 3v9" />
+    </svg>
+  );
+}
+
+function BillingIcon() {
+  return (
+    <svg {...iconProps()}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <path d="M2.5 10h19M6 15h4" />
+    </svg>
+  );
+}
+
+function DealerIcon() {
+  return (
+    <svg {...iconProps()}>
+      <path d="M4 9.5 5.5 4h13L20 9.5" />
+      <path d="M4 9.5h16v3a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-3Z" />
+      <path d="M6 14.5V20h12v-5.5" />
     </svg>
   );
 }

@@ -1,18 +1,19 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { redirect } from 'next/navigation';
 import type { UserSummary } from '@foodpadi/shared';
 import { ApiError, isAuthenticated, serverFetch } from '../lib/serverApi';
 import { HeroContent } from './HeroContent';
+import { HeroPhoneShowcase } from './HeroPhoneShowcase';
+import { HeroFeatureList } from './HeroFeatureList';
 import { TryFoodPadiButton } from './TryFoodPadiButton';
 import { WaitlistForm } from './WaitlistForm';
 import { ScrollReveal } from '../components/motion/ScrollReveal';
-import { FloatingFoodCards } from '../components/motion/FloatingFoodCards';
-import { HeroDecor } from '../components/motion/HeroDecor';
 import { ChipRow } from '../components/motion/ChipRow';
 import { FoodCarousel } from '../components/motion/FoodCarousel';
 import { WeekStrip } from '../components/motion/WeekStrip';
 import { HomeHub, type HomeIdeasSearchParams } from './HomeHub';
+import { AppDownloadSection } from '../components/AppDownloadSection';
+import { Logo } from '../components/Logo';
 import styles from './page.module.css';
 
 // Placeholder support address — swap for the real inbox once set up.
@@ -72,13 +73,24 @@ function firstParam(value: string | string[] | undefined): string | undefined {
 export default async function LandingPage({
   searchParams,
 }: {
-  searchParams?: { mood?: string | string[]; maxTime?: string | string[]; maxBudget?: string | string[] };
+  searchParams?: {
+    mood?: string | string[];
+    maxTime?: string | string[];
+    maxBudget?: string | string[];
+    // Acquisition attribution (?source=tiktok&campaign=askfoodpadi) — read
+    // once here and passed straight through to WaitlistForm; see
+    // WaitlistService.join for how it's stored (first-touch only).
+    source?: string | string[];
+    campaign?: string | string[];
+  };
 }) {
   const ideasSearchParams: HomeIdeasSearchParams = {
     mood: firstParam(searchParams?.mood),
     maxTime: firstParam(searchParams?.maxTime),
     maxBudget: firstParam(searchParams?.maxBudget),
   };
+  const waitlistSource = firstParam(searchParams?.source);
+  const waitlistCampaign = firstParam(searchParams?.campaign);
 
   if (isAuthenticated()) {
     // Same gate as mobile's RootNavigator: disclaimer is mandatory before
@@ -115,44 +127,46 @@ export default async function LandingPage({
   return (
     <>
       <section className={styles.hero}>
-        <HeroDecor />
-
         <nav className={styles.heroNav} aria-label="Primary">
-          <a className={styles.navLink} href="#how-it-works">
-            How it works
-          </a>
-          <a className={styles.navLink} href="#about">
-            About
-          </a>
-          <a className={styles.navLink} href="#contact">
-            Contact
-          </a>
-          <Link className={styles.navLink} href="/login">
-            Log in
-          </Link>
-          <TryFoodPadiButton className={styles.navPrimaryButton}>Try FoodPadi</TryFoodPadiButton>
+          <Logo href="/" size={120} wordmarkSize={57} onDark priority />
+
+          <div className={styles.heroNavLinks}>
+            <a className={styles.navLink} href="#how-it-works">
+              How it works
+            </a>
+            <a className={styles.navLink} href="#about">
+              About
+            </a>
+            <Link className={styles.navLink} href="/dealers">
+              For food dealers
+            </Link>
+            <a className={styles.navLink} href="#contact">
+              Contact
+            </a>
+            <Link className={styles.navLink} href="/login">
+              Log in
+            </Link>
+            <TryFoodPadiButton className={styles.navPrimaryButton}>Ask FoodPadi</TryFoodPadiButton>
+          </div>
         </nav>
 
+        {/* HeroPhoneShowcase/HeroFeatureList are absolutely positioned
+            against .heroGrid's own edges (desktop only — see each
+            component's .wrap), sized independently of .heroContent's
+            narrower centred column instead of fighting it for grid-track
+            space (user instruction 2026-09-16: "twice their current
+            size... at the edges... align properly"). They're nested inside
+            .heroGrid rather than .hero directly so their absolute
+            positioning anchors to the row *below* the nav, not the nav
+            itself. */}
         <div className={styles.heroGrid}>
-          <div className={styles.heroLogoCol}>
-            <Image
-              src="/decor/logo.png"
-              alt="FoodPadi — your instant meal companion"
-              width={504}
-              height={504}
-              sizes="(max-width: 720px) 264px, 480px"
-              className={styles.heroLogoImg}
-              priority
-            />
-          </div>
+          <HeroPhoneShowcase />
 
           <div className={styles.heroContent}>
             <HeroContent />
           </div>
 
-          <div className={styles.heroVisual} aria-hidden="true">
-            <FloatingFoodCards />
-          </div>
+          <HeroFeatureList />
         </div>
       </section>
 
@@ -189,6 +203,16 @@ export default async function LandingPage({
           </ScrollReveal>
         </section>
 
+        {/* Product-section placement of the download CTA (Play Store CTA
+            brief, 2026-09-16) — right after "how FoodPadi works", before the
+            "why we're different" pitch: having just shown the product, this
+            is where "now get it" naturally belongs. */}
+        <section className={styles.section}>
+          <ScrollReveal>
+            <AppDownloadSection heading="Take FoodPadi with you" />
+          </ScrollReveal>
+        </section>
+
         <section id="about" className={`${styles.section} ${styles.sectionAlt}`}>
           <ScrollReveal>
             <h2 className={styles.sectionHeading}>
@@ -214,7 +238,7 @@ export default async function LandingPage({
               <p className={styles.sectionSubtext}>
                 No account needed to see what FoodPadi comes up with for you.
               </p>
-              <TryFoodPadiButton className={styles.waitlistButton}>Try FoodPadi</TryFoodPadiButton>
+              <TryFoodPadiButton className={styles.waitlistButton}>Ask FoodPadi</TryFoodPadiButton>
               {/* New features (not "the product" — that already works, above)
                   land steadily; this is for anyone who wants a heads-up
                   rather than checking back. Deliberately quiet/secondary —
@@ -222,8 +246,39 @@ export default async function LandingPage({
               <p className={styles.waitlistLead}>
                 Or leave your email and we&apos;ll let you know as new features land.
               </p>
-              <WaitlistForm />
+              <WaitlistForm source={waitlistSource} campaign={waitlistCampaign} />
             </div>
+          </ScrollReveal>
+        </section>
+
+        <section className={`${styles.section} ${styles.sectionAlt}`}>
+          <ScrollReveal>
+            <div className={styles.dealerBand}>
+              <h2 className={styles.sectionHeading}>For food dealers</h2>
+              <p className={styles.sectionSubtext}>
+                Reach people looking for food near you. Join the FoodPadi Food Dealer Network and
+                make your business easier to discover when customers are deciding what to eat.
+              </p>
+              <ul className={styles.dealerBandChecks}>
+                <li>Local FoodPadi discovery</li>
+                <li>Searchable dealer profile</li>
+                <li>Products and categories</li>
+                <li>Featured visibility</li>
+                <li>Customer contact and ordering links</li>
+              </ul>
+              <Link href="/dealers" className={styles.dealerBandLink}>
+                Become a Food Dealer
+              </Link>
+            </div>
+          </ScrollReveal>
+        </section>
+
+        {/* Final download CTA (Play Store CTA brief, 2026-09-16) — the last
+            thing before the footer, matching the intended journey: try the
+            product first, then take it with you. */}
+        <section className={styles.section}>
+          <ScrollReveal>
+            <AppDownloadSection heading="Get FoodPadi on your phone" />
           </ScrollReveal>
         </section>
 
@@ -232,7 +287,11 @@ export default async function LandingPage({
           <span className={styles.footerDivider}>·</span>
           <Link href="/legal/privacy">Privacy</Link>
           <span className={styles.footerDivider}>·</span>
-          <a href={`mailto:${SUPPORT_EMAIL}`}>Support</a>
+          <Link href="/legal/terms">Terms</Link>
+          <span className={styles.footerDivider}>·</span>
+          <Link href="/legal/cookies">Cookies</Link>
+          <span className={styles.footerDivider}>·</span>
+          <Link href="/legal/contact">Contact</Link>
         </footer>
       </main>
 

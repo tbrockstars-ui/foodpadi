@@ -12,9 +12,9 @@ import { REF_COOKIE, refCookieOptions, sanitizeRefParam } from './lib/referral';
 
 export const config = {
   // `/`, `/register`, `/login` are here for referral capture only (see
-  // captureReferral). `/invite`, `/profile`, `/favorites`, `/plan`,
-  // `/shopping-list`, `/api/proxy` are the session-refresh paths — every
-  // account-only server-rendered route needs to be here, or an expired
+  // captureReferral). `/invite`, `/profile`, `/premium`, `/favorites`,
+  // `/plan`, `/shopping-list`, `/api/proxy` are the session-refresh paths —
+  // every account-only server-rendered route needs to be here, or an expired
   // access token is never refreshed on it and the page dead-ends on a
   // "couldn't load" error instead. `/eat-now`, `/cook-today` (+ `/plan`)
   // also mint a guest session for an anonymous visitor (see
@@ -25,11 +25,15 @@ export const config = {
     '/login',
     '/invite',
     '/profile',
+    '/premium/:path*',
     '/favorites/:path*',
     '/eat-now/:path*',
     '/cook-today/:path*',
     '/plan/:path*',
     '/shopping-list/:path*',
+    // FoodPadi Food Dealer Network portal — account-only (onboarding wizard +
+    // dashboard); needs session-refresh like every other protected route.
+    '/dealers/:path*',
     '/api/proxy/:path*',
   ],
 };

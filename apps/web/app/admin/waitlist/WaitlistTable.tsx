@@ -62,12 +62,15 @@ export function WaitlistTable({ initial }: Props) {
             <tr>
               <th>Email</th>
               <th>Joined</th>
+              <th>Purpose</th>
+              <th>Source</th>
+              <th>Marketing</th>
             </tr>
           </thead>
           <tbody>
             {result.signups.length === 0 ? (
               <tr>
-                <td colSpan={2} className={styles.emptyRow}>
+                <td colSpan={5} className={styles.emptyRow}>
                   No signups yet.
                 </td>
               </tr>
@@ -76,6 +79,9 @@ export function WaitlistTable({ initial }: Props) {
                 <tr key={signup.id}>
                   <td>{signup.email}</td>
                   <td>{new Date(signup.createdAt).toLocaleDateString('en-GB')}</td>
+                  <td>{signup.purpose === 'ios_waitlist' ? 'iOS waitlist' : 'General'}</td>
+                  <td>{[signup.source, signup.campaign].filter(Boolean).join(' / ') || '—'}</td>
+                  <td>{signup.marketingConsent ? 'Opted in' : '—'}</td>
                 </tr>
               ))
             )}

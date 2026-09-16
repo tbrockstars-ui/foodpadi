@@ -64,6 +64,48 @@ describe('FeedbackService.create', () => {
       service.create('u1', { entityType: 'RECIPE', entityId: 'r1', context: 'COOK', rating: 3 }),
     ).resolves.toBeDefined();
   });
+
+  // Cooking-experience free-text — feeds CookingInsightsService's
+  // cross-customer aggregate, never this cook's own Memory (patterns.recompute
+  // above is the per-user side; this just checks the comment itself persists).
+  it('persists an optional comment and reports hasComment to analytics', async () => {
+    const { service, prisma, analytics } = buildService();
+    await service.create('u1', {
+      entityType: 'RECIPE',
+      entityId: 'r1',
+      context: 'COOK',
+      rating: 3,
+      tags: ['timings_off'],
+      comment: 'The sauce step took much longer than stated.',
+    });
+
+    expect(prisma.foodFeedback.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ comment: 'The sauce step took much longer than stated.' }),
+    });
+    expect(analytics.track).toHaveBeenCalledWith(
+      'feedback_submitted',
+      { userId: 'u1' },
+      expect.objectContaining({ hasComment: true, tagCount: 1 }),
+    );
+  });
+
+  it('reports hasComment: false when no comment is given, and for a whitespace-only one', async () => {
+    const { service, analytics } = buildService();
+    await service.create('u1', { entityType: 'RECIPE', entityId: 'r1', context: 'COOK', rating: 4 });
+    expect(analytics.track).toHaveBeenCalledWith(
+      'feedback_submitted',
+      { userId: 'u1' },
+      expect.objectContaining({ hasComment: false }),
+    );
+
+    analytics.track.mockClear();
+    await service.create('u1', { entityType: 'RECIPE', entityId: 'r1', context: 'COOK', rating: 4, comment: '   ' });
+    expect(analytics.track).toHaveBeenCalledWith(
+      'feedback_submitted',
+      { userId: 'u1' },
+      expect.objectContaining({ hasComment: false }),
+    );
+  });
 });
 
 describe('FeedbackService ownership', () => {
@@ -90,6 +132,22 @@ describe('FeedbackService ownership', () => {
     prisma.foodFeedback.findUnique.mockResolvedValue({ id: 'f1', userId: 'u1', deletedAt: null, rating: 3 });
     const updated = await service.update('u1', 'f1', { rating: 5 });
     expect(updated).toMatchObject({ rating: 5 });
+  });
+
+  // The post-cook screen's PATCH — cooking-experience tags + free-text note,
+  // sent together after the rating is already saved (CookingSession.tsx /
+  // CookingSessionScreen.tsx's saveTags).
+  it('persists tags and comment together on update', async () => {
+    const { service, prisma } = buildService();
+    prisma.foodFeedback.findUnique.mockResolvedValue({ id: 'f1', userId: 'u1', deletedAt: null, rating: 3 });
+    await service.update('u1', 'f1', {
+      tags: ['timings_off', 'quantities_off'],
+      comment: 'Needed way more stock than listed.',
+    });
+    expect(prisma.foodFeedback.update).toHaveBeenCalledWith({
+      where: { id: 'f1' },
+      data: { tags: ['timings_off', 'quantities_off'], comment: 'Needed way more stock than listed.' },
+    });
   });
 
   it('soft-deletes rather than hard-deleting', async () => {

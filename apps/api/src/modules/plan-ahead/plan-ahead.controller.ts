@@ -4,9 +4,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PlanAheadService } from './plan-ahead.service';
 import { GeneratePlanDto } from './dto/generate-plan.dto';
 import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
+import { UpdatePlanDefaultsDto } from './dto/update-plan-defaults.dto';
 import { RegeneratePlanItemDto } from './dto/regenerate-plan-item.dto';
 import { GenerateShoppingListDto } from './dto/generate-shopping-list.dto';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
+import { CreateStandaloneShoppingListDto } from './dto/create-standalone-shopping-list.dto';
 
 // Account-first by design (docs/FOODPADI_ONBOARDING_SPEC.md) — every route
 // here requires a real account, unlike Cook Today's guest-or-auth guard.
@@ -48,6 +50,20 @@ export class PlanAheadController {
   @Post(':planId/accept')
   accept(@Param('planId') planId: string, @CurrentUser() user: CurrentUserPayload) {
     return this.planAheadService.accept(planId, user.userId);
+  }
+
+  // Plan-wide default eating time + reminder lead time — "set once, applies
+  // to every day that hasn't been individually overridden" (see
+  // UpdatePlanDefaultsDto / PlanAheadService.updatePlanDefaults). Declared
+  // here rather than folded into the item-update route since it targets the
+  // plan itself, not one item.
+  @Patch(':planId')
+  updatePlanDefaults(
+    @Param('planId') planId: string,
+    @Body() dto: UpdatePlanDefaultsDto,
+    @CurrentUser() user: CurrentUserPayload,
+  ) {
+    return this.planAheadService.updatePlanDefaults(planId, user.userId, dto);
   }
 
   // Rebuild the whole plan (all days) — same scope/budget — for when the plan
@@ -102,6 +118,16 @@ export class PlanAheadController {
     @CurrentUser() user: CurrentUserPayload,
   ) {
     return this.planAheadService.generateShoppingList(planId, user.userId, dto);
+  }
+
+  // A list built directly from an ingredient set (Cook Today's fridge-check),
+  // not from an accepted plan — mealPlanId is null on the result. Declared
+  // before the `:listId` routes below for the same "literal segment first"
+  // reason as meal-ideas above, though POST vs GET/PATCH/DELETE means there's
+  // no actual path collision here either way.
+  @Post('shopping-lists')
+  createStandaloneShoppingList(@Body() dto: CreateStandaloneShoppingListDto, @CurrentUser() user: CurrentUserPayload) {
+    return this.planAheadService.createStandaloneShoppingList(user.userId, dto);
   }
 
   @Get('shopping-lists/:listId')

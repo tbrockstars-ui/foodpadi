@@ -171,11 +171,16 @@ export function CookingAssistantPanel({ recipe, stepIndex, isLastStep, timerRef,
       timerRef.current?.startWithSeconds(seconds);
       return;
     }
-    if (/^(start|resume)( the)? timer$/.test(t)) {
+    // "timer"/"the" are optional on both — a cook says "resume" or "pause"
+    // on their own far more often than the formal "resume the timer", and
+    // requiring the full phrase silently fell through to the AI Q&A below
+    // (which then fails with no ANTHROPIC_API_KEY configured, surfacing as
+    // an unrelated-looking "couldn't answer that" error for a plain "resume").
+    if (/^(start|resume)(?: the)?(?: timer)?$/.test(t)) {
       timerRef.current?.startWithSeconds();
       return;
     }
-    if (/^pause( the timer)?$/.test(t)) {
+    if (/^pause(?: the)?(?: timer)?$/.test(t)) {
       timerRef.current?.pause();
       return;
     }

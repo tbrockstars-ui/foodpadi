@@ -11,6 +11,10 @@ export function SavedRecipesList({ initialRecipes }: { initialRecipes: SavedReci
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [cookingRecipe, setCookingRecipe] = useState<SavedRecipeView | null>(null);
+  // Bulk-select for "delete several at once" — separate from expandedId/
+  // deletingId above, which are both single-recipe concerns.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const removeRecipe = async (id: string) => {
     setDeletingId(id);
@@ -18,8 +22,52 @@ export function SavedRecipesList({ initialRecipes }: { initialRecipes: SavedReci
       await fetch(`/api/proxy/cook-today/recipes/${id}`, { method: 'DELETE' });
       setRecipes((current) => current.filter((r) => r.id !== id));
       if (expandedId === id) setExpandedId(null);
+      setSelectedIds((current) => {
+        if (!current.has(id)) return current;
+        const next = new Set(current);
+        next.delete(id);
+        return next;
+      });
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
+  const allSelected = recipes.length > 0 && selectedIds.size === recipes.length;
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(recipes.map((r) => r.id)) : new Set());
+  };
+
+  // Same single-recipe DELETE endpoint as removeRecipe above, just fired for
+  // every selected id at once — there's no separate bulk-delete endpoint, and
+  // one wasn't worth adding for a handful of recipes at a time.
+  const deleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    const ids = [...selectedIds];
+    setBulkDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        ids.map((id) => fetch(`/api/proxy/cook-today/recipes/${id}`, { method: 'DELETE' })),
+      );
+      const removedIds = new Set(ids.filter((_, i) => results[i].status === 'fulfilled'));
+      setRecipes((current) => current.filter((r) => !removedIds.has(r.id)));
+      if (expandedId && removedIds.has(expandedId)) setExpandedId(null);
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        for (const id of removedIds) next.delete(id);
+        return next;
+      });
+    } finally {
+      setBulkDeleting(false);
     }
   };
 
@@ -47,10 +95,48 @@ export function SavedRecipesList({ initialRecipes }: { initialRecipes: SavedReci
 
   return (
     <>
+      <div className={styles.bulkBar}>
+        <label className={styles.checkRow}>
+          <input
+            type="checkbox"
+            className={styles.checkboxInput}
+            checked={allSelected}
+            onChange={(e) => toggleSelectAll(e.target.checked)}
+            aria-label="Select all saved recipes"
+          />
+          <span className={styles.bulkBarLabel}>
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : 'Select all'}
+          </span>
+        </label>
+        {selectedIds.size > 0 ? (
+          <button
+            type="button"
+            className={styles.bulkDeleteButton}
+            onClick={deleteSelected}
+            disabled={bulkDeleting}
+          >
+            {bulkDeleting ? 'Removing…' : `Remove ${selectedIds.size}`}
+          </button>
+        ) : null}
+      </div>
+
       {recipes.map((recipe) => {
         const expanded = expandedId === recipe.id;
+        const selected = selectedIds.has(recipe.id);
         return (
           <div key={recipe.id} className={styles.resultCard} style={{ position: 'relative' }}>
+            <label
+              className={styles.cardCheckbox}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Select ${recipe.title}`}
+            >
+              <input
+                type="checkbox"
+                className={styles.checkboxInput}
+                checked={selected}
+                onChange={(e) => toggleSelected(recipe.id, e.target.checked)}
+              />
+            </label>
             <div style={{ position: 'absolute', top: 'var(--space-md)', right: 'var(--space-md)' }}>
               <LikeHeart label={recipe.title} recipeId={recipe.id} initialLiked={recipe.isFavorite} />
             </div>
@@ -67,7 +153,7 @@ export function SavedRecipesList({ initialRecipes }: { initialRecipes: SavedReci
                   setExpandedId(expanded ? null : recipe.id);
                 }
               }}
-              style={{ cursor: 'pointer', paddingRight: 32 }}
+              style={{ cursor: 'pointer', paddingRight: 32, paddingLeft: 32 }}
             >
               <p className={styles.resultTitle}>{recipe.title}</p>
               <div className={styles.tagRow}>

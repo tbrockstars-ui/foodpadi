@@ -58,7 +58,7 @@
 .chipSelected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
 }
 
@@ -144,5 +144,73 @@
 
 .secondaryButton:disabled {
   opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* "Foods I choose to avoid" onboarding step — custom (non-common) entries
+   shown as removable chips, plus a free-text add row. Mirrors the Profile
+   editor's look (profile.module.css) within the onboarding visual language. */
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-md);
+}
+
+.removableTag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  border-radius: var(--radius-pill);
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.removeIcon {
+  background: none;
+  border: none;
+  color: var(--primary-ink);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.addRow {
+  display: flex;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+
+.addInput {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  background: var(--background);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  font-family: inherit;
+}
+
+.addButton {
+  border: none;
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: 0 var(--space-lg);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.addButton:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }

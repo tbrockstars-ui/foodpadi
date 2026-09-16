@@ -1,15 +1,17 @@
 import type { Metadata } from 'next';
-import { Plus_Jakarta_Sans } from 'next/font/google';
+import { Inter } from 'next/font/google';
+import { CookieNotice } from '../components/CookieNotice';
 import './globals.css';
 
-// Self-hosted by Next.js at build time (no runtime request to Google) —
-// a free-license geometric sans chosen for a similar friendly, confident
-// feel to what we noticed on Samsung Food's site, without using their
-// actual (proprietary, non-licensable) SamsungOne/SamsungSharpSans fonts.
-const plusJakartaSans = Plus_Jakarta_Sans({
+// Inter — self-hosted by Next.js at build time (no runtime request to
+// Google). A modern, highly readable neutral sans: editorial and confident
+// for large headings, calm for body. Replaces Plus Jakarta Sans, whose
+// rounder letterforms read a touch softer than the premium-food direction.
+const sans = Inter({
   subsets: ['latin'],
-  weight: ['500', '600', '700', '800'],
+  weight: ['400', '500', '600', '700', '800'],
   variable: '--font-sans',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {
@@ -25,11 +27,14 @@ const THEME_INIT = `(function(){try{if(localStorage.getItem('foodpadi-theme')!==
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-GB" className={plusJakartaSans.variable} suppressHydrationWarning>
+    <html lang="en-GB" className={sans.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <CookieNotice />
+      </body>
     </html>
   );
 }

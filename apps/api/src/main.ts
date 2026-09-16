@@ -1,11 +1,20 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { json, urlencoded } from 'express';
+import { json, raw, urlencoded } from 'express';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // bodyParser is disabled here so we can control parser order: the Stripe
+  // webhook needs the raw, unparsed body for signature verification, and it
+  // must be registered BEFORE the JSON parser so the JSON parser never
+  // consumes it. Every other route keeps the same JSON/urlencoded behaviour
+  // (and the raised limit below) it had before.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
+  app.use('/billing/webhook', raw({ type: '*/*', limit: '1mb' }));
+  // Food Dealer Network subscription webhook — same raw-body requirement as the
+  // Premium one, its own signing secret (dealer brief §13).
+  app.use('/dealers/billing/webhook', raw({ type: '*/*', limit: '1mb' }));
   // Express's default JSON body limit is 100kb — fine for every other
   // endpoint, but Scan sends a real phone photo as a base64 string in the
   // JSON body (POST /scan/photo). A single uncompressed-ish photo at

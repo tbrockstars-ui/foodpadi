@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { FoodProviderResult, LocalFoodSearchResponse } from '@foodpadi/shared';
 import { SearchingNearby } from '../../components/motion/SearchingNearby';
+import { FoodPadiDealerResults } from '../../components/FoodPadiDealerResults';
 import { trackLocalFoodSearchInteraction as track } from '../../lib/localFoodSearchTracking';
 import styles from './eat-now.module.css';
 
@@ -58,6 +59,15 @@ export function LocalFoodSearch({
   // a one-off GPS timeout and for "you'll never get a prompt again until you
   // fix this in your browser's site settings".
   const [permissionBlocked, setPermissionBlocked] = useState(false);
+  // The resolved search origin (coords or typed location) — reused to query the
+  // FoodPadi Food Dealer Network alongside the OpenStreetMap search, so
+  // subscribed dealers show FIRST, above the external results (Network-first
+  // ordering — dealer brief §22/§46).
+  const [dealerOrigin, setDealerOrigin] = useState<{
+    latitude?: number;
+    longitude?: number;
+    locationText?: string;
+  } | null>(null);
 
   // "Place viewed" (brief §16) — this list of cards *is* the place detail
   // view here (no separate "open details" step), so a result actually
@@ -71,6 +81,7 @@ export function LocalFoodSearch({
   }, [stage]);
 
   const runSearch = async (body: { latitude?: number; longitude?: number; locationText?: string }) => {
+    setDealerOrigin(body);
     setStage('searching');
     setErrorMessage(null);
     try {
@@ -145,6 +156,18 @@ export function LocalFoodSearch({
 
   return (
     <div className={styles.nearbySection}>
+      {/* FoodPadi's own Food Dealer Network — always ABOVE the OpenStreetMap
+          results below. Renders nothing when no subscribed dealer matches, so
+          the existing local discovery is never disrupted (brief §60/§82). */}
+      {dealerOrigin ? (
+        <FoodPadiDealerResults
+          query={query}
+          latitude={dealerOrigin.latitude}
+          longitude={dealerOrigin.longitude}
+          locationText={dealerOrigin.locationText}
+        />
+      ) : null}
+
       {!autoStart ? (
         <>
           <h2 className={styles.nearbyHeading}>Find it near you</h2>

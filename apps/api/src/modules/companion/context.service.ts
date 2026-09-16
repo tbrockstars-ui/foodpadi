@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { effectivePlannedTime } from '@foodpadi/shared';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PatternService } from './pattern.service';
 import type { FoodPattern } from '@prisma/client';
@@ -74,7 +75,14 @@ export class ContextService {
       }),
       this.prisma.mealPlanItem.findMany({
         where: { mealPlan: { userId, deletedAt: null }, plannedDate: { gte: todayStart, lte: todayEnd } },
-        include: { recipe: { select: { title: true } } },
+        include: {
+          recipe: { select: { title: true } },
+          // Only for effectivePlannedTime below — a day with no plannedTime
+          // of its own inherits the plan's default (packages/shared/src/
+          // planTiming.ts), so Companion must resolve the same effective
+          // time the UI shows, not the item's raw (possibly null) column.
+          mealPlan: { select: { defaultMealTime: true, defaultReminderOffsetMinutes: true } },
+        },
       }),
       this.prisma.pantryItem.findMany({
         where: { userId, deletedAt: null },
@@ -88,14 +96,20 @@ export class ContextService {
       this.patterns.getActivePatterns(userId),
     ]);
 
-    const todayPlanItems: TodayPlanItem[] = planItems.map((item) => ({
-      id: item.id,
-      mealPlanId: item.mealPlanId,
-      recipeTitle: item.recipe?.title ?? null,
-      mealChoice: item.mealChoice,
-      plannedTime: item.plannedTime,
-      minutesUntil: minutesUntilPlannedTime(now, item.plannedTime),
-    }));
+    const todayPlanItems: TodayPlanItem[] = planItems.map((item) => {
+      const plannedTime = effectivePlannedTime(
+        { plannedTime: item.plannedTime, reminderOffsetMinutes: item.reminderOffsetMinutes },
+        item.mealPlan,
+      );
+      return {
+        id: item.id,
+        mealPlanId: item.mealPlanId,
+        recipeTitle: item.recipe?.title ?? null,
+        mealChoice: item.mealChoice,
+        plannedTime,
+        minutesUntil: minutesUntilPlannedTime(now, plannedTime),
+      };
+    });
 
     const upcomingPlanItem =
       todayPlanItems.find((i) => i.minutesUntil !== null && i.minutesUntil >= 0 && i.minutesUntil <= UPCOMING_WINDOW_MINUTES) ??

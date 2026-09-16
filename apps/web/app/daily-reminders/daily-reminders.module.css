@@ -1,0 +1,196 @@
+.globalRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+
+.globalLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.globalHint {
+  font-size: 13px;
+  color: var(--text-faint);
+  margin: 2px 0 0;
+}
+
+.dayGroup {
+  margin-bottom: var(--space-lg);
+}
+
+.dayHeading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin: 0 0 var(--space-sm);
+}
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  border-bottom: 1px solid var(--border);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowLabel {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rowHint {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 2px 0 0;
+}
+
+.timeInput {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-sunken);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  width: 118px;
+}
+
+.timeInput:disabled {
+  opacity: 0.45;
+}
+
+/* A checkbox styled as an ON/OFF pill switch — no extra dependency. */
+.switch {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+}
+
+.switchInput {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+.switchTrack {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: var(--border);
+  transition: background-color 0.15s ease;
+  pointer-events: none;
+}
+
+.switchInput:checked + .switchTrack {
+  background: var(--primary);
+}
+
+.switchThumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s ease;
+  pointer-events: none;
+}
+
+.switchInput:checked ~ .switchThumb {
+  transform: translateX(18px);
+}
+
+.permissionNotice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  background: var(--surface-sunken);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+
+.permissionText {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.permissionButton {
+  flex-shrink: 0;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text, var(--primary-contrast, #fff));
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.savedNotice {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-ink);
+  margin: 0 0 var(--space-md);
+}
+
+.skipLink {
+  display: block;
+  width: 100%;
+  text-align: center;
+  margin-top: var(--space-md);
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.skipLink:hover {
+  text-decoration: underline;
+}
+
+.skipLink:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

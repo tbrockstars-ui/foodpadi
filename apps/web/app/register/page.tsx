@@ -1,11 +1,12 @@
 'use client';
 
-import { Suspense, useState, type FormEvent } from 'react';
+import { Suspense, useEffect, useState, type FormEvent } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '../../components/Button';
 import { EyeIcon } from '../../components/EyeIcon';
 import { Logo } from '../../components/Logo';
+import { CountrySelect, guessCountryFromBrowser } from '../../components/CountrySelect';
 import { GoogleSignInButton } from '../GoogleSignInButton';
 import styles from '../auth.module.css';
 
@@ -25,10 +26,16 @@ function RegisterForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [country, setCountry] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // Pre-fill the country from the browser locale so most people just confirm it.
+  useEffect(() => {
+    setCountry((c) => c || guessCountryFromBrowser());
+  }, []);
 
   const passwordLongEnough = password.length >= 8;
   const passwordsMatch = confirmPassword.length === 0 || confirmPassword === password;
@@ -46,13 +53,17 @@ function RegisterForm() {
       setError('Passwords do not match.');
       return;
     }
+    if (!country) {
+      setError('Please choose your country of residence.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim(), password }),
+        body: JSON.stringify({ email: email.trim(), password, countryCode: country }),
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { message?: string | string[] };
@@ -128,6 +139,15 @@ function RegisterForm() {
             </button>
           </div>
           {!passwordsMatch ? <p className={styles.hint}>Passwords don&apos;t match</p> : null}
+
+          <CountrySelect
+            className={styles.input}
+            value={country}
+            onChange={setCountry}
+            required
+            aria-label="Country of residence"
+          />
+          <p className={styles.hint}>Sets your currency and price for FoodPadi Premium.</p>
 
           {error ? <p className={styles.error}>{error}</p> : null}
 

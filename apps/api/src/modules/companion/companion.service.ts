@@ -11,6 +11,7 @@ import { CompanionActionValue } from './dto/companion-action.dto';
 import { UpdateCompanionPreferencesDto } from './dto/update-companion-preferences.dto';
 import { ContextService, type FoodContext, type TodayPlanItem } from './context.service';
 import { PatternService } from './pattern.service';
+import { EntitlementService } from '../billing/entitlement.service';
 
 const DEFAULT_PREFERENCES = {
   enabled: true,
@@ -68,6 +69,7 @@ export class CompanionService {
     private readonly context: ContextService,
     private readonly patterns: PatternService,
     private readonly analytics: AnalyticsService,
+    private readonly entitlements: EntitlementService,
   ) {}
 
   async getPreferences(userId: string): Promise<CompanionPreferencesView> {
@@ -106,6 +108,11 @@ export class CompanionService {
   }
 
   async getSuggestion(userId: string, now: Date = new Date()): Promise<CompanionSuggestionView | null> {
+    // FoodPadi Memory (persistent behavioural suggestions + eating/cooking
+    // habit learning) is a Paid-only capability. A guest or trial user simply
+    // gets no suggestion — nothing is recomputed, delivered, or stored.
+    if ((await this.entitlements.getUserEntitlement(userId)) !== 'paid') return null;
+
     const prefs = await this.upsertPreferenceRow(userId, {});
     if (!prefs.enabled) return null;
 

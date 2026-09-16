@@ -7,6 +7,10 @@ import {
   MealPlanView,
   PlanPreviewDay,
   PlanScope,
+  effectivePlannedTime,
+  effectiveReminderOffsetMinutes,
+  reminderShortfallMinutes,
+  suggestedStartTime,
 } from '@foodpadi/shared';
 import { useAuth } from '../auth/AuthContext';
 import { api, ApiError } from '../api/client';
@@ -99,14 +103,26 @@ function planErrorMessage(e: unknown): string {
   return 'Something went wrong creating your plan. Please try again.';
 }
 
-/** The reminder fires 30 minutes before plannedTime — shown so "30 min before X" isn't left for the user to do the maths on. */
-function formatReminderTime(plannedTime: string): string {
+/** The reminder fires `offsetMinutes` before plannedTime — shown so "N min before X" isn't left for the user to do the maths on. */
+function formatReminderTime(plannedTime: string, offsetMinutes: number): string {
   const [hours, minutes] = plannedTime.split(':').map(Number);
-  const total = (hours * 60 + minutes - 30 + 24 * 60) % (24 * 60);
+  const total = (hours * 60 + minutes - offsetMinutes + 24 * 60) % (24 * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
+
+// The reminder-lead-time options offered wherever the user picks one — plan
+// default and per-day override alike. 0 = "no reminder".
+const REMINDER_OFFSET_OPTIONS: { label: string; value: number }[] = [
+  { label: 'No reminder', value: 0 },
+  { label: '10 min before', value: 10 },
+  { label: '15 min before', value: 15 },
+  { label: '20 min before', value: 20 },
+  { label: '30 min before', value: 30 },
+  { label: '45 min before', value: 45 },
+  { label: '60 min before', value: 60 },
+];
 
 export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
   const { colors } = useTheme();
@@ -157,6 +173,14 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
   // the committed plannedTime so typing doesn't fire a request per keystroke.
   const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
   const [timeError, setTimeError] = useState<string | null>(null);
+  // The plan-wide default editor — closed by default, one shared control
+  // rather than per-day, since "set once, applies to every day" is the
+  // point. Draft text separate from the committed value for the same
+  // debounce-free-typing reason timeDrafts is.
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [defaultTimeDraft, setDefaultTimeDraft] = useState('');
+  const [defaultsBusy, setDefaultsBusy] = useState(false);
+  const [defaultsError, setDefaultsError] = useState<string | null>(null);
 
   const focusDraft = focusOpenId ? (focusDrafts[focusOpenId] ?? '') : '';
 
@@ -205,8 +229,10 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
         // Re-arm reminders on load — local notifications are scheduled by
         // *this device*, so a reinstalled app or a plan edited from
         // elsewhere needs them re-synced rather than assumed still pending.
+        // Unconditional: scheduleMealReminder itself no-ops safely when a
+        // day has no effective time/reminder, no need to pre-filter here.
         for (const item of current.items) {
-          if (item.plannedTime) scheduleMealReminder(item);
+          scheduleMealReminder(item, current);
         }
       }
       setCheckingExisting(false);
@@ -277,7 +303,7 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
       // The recipe changed but mealChoice/plannedTime didn't — re-schedule
       // so the reminder's body text reflects the new meal, not the old one.
       const item = updated.items.find((i) => i.id === itemId);
-      if (item?.plannedTime) scheduleMealReminder(item);
+      if (item) scheduleMealReminder(item, updated);
     } catch (e) {
       setError(
         e instanceof ApiError && e.status < 500 && e.message
@@ -298,7 +324,7 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
       setPlan(updated);
       setExpandedId(null);
       for (const item of updated.items) {
-        if (item.plannedTime) scheduleMealReminder(item);
+        scheduleMealReminder(item, updated);
       }
     } catch (e) {
       setError(
@@ -339,7 +365,7 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
       const updated = await api.updatePlanItem(plan.id, itemId, { mealChoice });
       setPlan(updated);
       const item = updated.items.find((i) => i.id === itemId);
-      if (item?.plannedTime) scheduleMealReminder(item); // wording differs by choice — resync
+      if (item) scheduleMealReminder(item, updated); // wording differs by choice — resync
       // Switching away from "Eat out" hides any nearby results open for it.
       if (mealChoice !== 'eat_out' && nearbyOpenId === itemId) {
         setNearbyOpenId(null);
@@ -374,8 +400,12 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
     }
   };
 
-  const applyPlannedTime = async (item: MealPlanItemView) => {
-    const draft = (timeDrafts[item.id] ?? '').trim();
+  // `overrideDraft` lets a caller apply a specific value (e.g. "clear back
+  // to the plan default") without going through timeDrafts state first —
+  // reading timeDrafts here would otherwise race a setTimeDrafts call made
+  // in the same handler (React state updates aren't visible synchronously).
+  const applyPlannedTime = async (item: MealPlanItemView, overrideDraft?: string) => {
+    const draft = (overrideDraft ?? timeDrafts[item.id] ?? '').trim();
     setTimeError(null);
     if (draft && !TIME_PATTERN.test(draft)) {
       setTimeError('Enter a time as HH:mm, e.g. 18:30.');
@@ -384,19 +414,69 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
     if (!plan) return;
     setBusyItemId(item.id);
     try {
+      // Blank clears the override — the day then inherits the plan default
+      // (if any) rather than losing its reminder outright.
       const updated = await api.updatePlanItem(plan.id, item.id, { plannedTime: draft || null });
       setPlan(updated);
       const updatedItem = updated.items.find((i) => i.id === item.id);
       if (updatedItem) {
-        if (updatedItem.plannedTime) {
-          const scheduled = await scheduleMealReminder(updatedItem);
-          if (!scheduled) setTimeError("That time's already passed today — no reminder was set.");
-        } else {
-          await cancelMealReminder(item.id);
+        const scheduled = await scheduleMealReminder(updatedItem, updated);
+        if (!scheduled && effectivePlannedTime(updatedItem, updated)) {
+          setTimeError("That time's already passed today — no reminder was set.");
         }
       }
     } finally {
       setBusyItemId(null);
+    }
+  };
+
+  // Per-day reminder-lead-time override. Chip-select applies immediately,
+  // same precedent as setMealChoice above — unlike the time field, there's
+  // no free-typing to debounce.
+  const applyReminderOffset = async (item: MealPlanItemView, offsetMinutes: number | null) => {
+    if (!plan) return;
+    setBusyItemId(item.id);
+    try {
+      const updated = await api.updatePlanItem(plan.id, item.id, { reminderOffsetMinutes: offsetMinutes });
+      setPlan(updated);
+      const updatedItem = updated.items.find((i) => i.id === item.id);
+      if (updatedItem) await scheduleMealReminder(updatedItem, updated);
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
+  // Plan-wide default eating time — "set once, applies to every day that
+  // hasn't been individually overridden" (packages/shared/src/planTiming.ts).
+  // Never touches item rows; every non-overridden day's reminder is
+  // re-armed below purely because its *effective* time just changed.
+  const applyDefaultMealTime = async () => {
+    const draft = defaultTimeDraft.trim();
+    setDefaultsError(null);
+    if (draft && !TIME_PATTERN.test(draft)) {
+      setDefaultsError('Enter a time as HH:mm, e.g. 19:00.');
+      return;
+    }
+    if (!plan) return;
+    setDefaultsBusy(true);
+    try {
+      const updated = await api.updatePlanDefaults(plan.id, { defaultMealTime: draft || null });
+      setPlan(updated);
+      for (const item of updated.items) scheduleMealReminder(item, updated);
+    } finally {
+      setDefaultsBusy(false);
+    }
+  };
+
+  const applyDefaultReminderOffset = async (offsetMinutes: number) => {
+    if (!plan) return;
+    setDefaultsBusy(true);
+    try {
+      const updated = await api.updatePlanDefaults(plan.id, { defaultReminderOffsetMinutes: offsetMinutes });
+      setPlan(updated);
+      for (const item of updated.items) scheduleMealReminder(item, updated);
+    } finally {
+      setDefaultsBusy(false);
     }
   };
 
@@ -532,8 +612,76 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
         />
         {timeError ? <Text style={styles.errorText}>{timeError}</Text> : null}
 
+        <Card style={styles.defaultsCard}>
+          <TouchableOpacity
+            onPress={() => {
+              animate();
+              if (!defaultsOpen) setDefaultTimeDraft(plan.defaultMealTime ?? '');
+              setDefaultsOpen((v) => !v);
+            }}
+            accessibilityRole="button"
+          >
+            <Text style={styles.itemActionText}>
+              {plan.defaultMealTime
+                ? `Default: eat at ${plan.defaultMealTime}, reminder ${
+                    plan.defaultReminderOffsetMinutes > 0 ? `${plan.defaultReminderOffsetMinutes} min before` : 'off'
+                  }`
+                : 'Set a default eating time for every day →'}
+            </Text>
+          </TouchableOpacity>
+          {defaultsOpen ? (
+            <View style={styles.defaultsBlock}>
+              <Text style={styles.fieldLabel}>When do you usually want to eat?</Text>
+              <View style={styles.timeRow}>
+                <TextInput
+                  style={styles.timeInput}
+                  placeholder="HH:mm, e.g. 19:00"
+                  placeholderTextColor={colors.textFaint}
+                  keyboardType="numbers-and-punctuation"
+                  value={defaultTimeDraft}
+                  onChangeText={setDefaultTimeDraft}
+                  onSubmitEditing={applyDefaultMealTime}
+                  autoComplete="off"
+                />
+                <TouchableOpacity onPress={applyDefaultMealTime} disabled={defaultsBusy}>
+                  <Text style={styles.itemActionText}>{plan.defaultMealTime ? 'Update' : 'Set default'}</Text>
+                </TouchableOpacity>
+              </View>
+              {defaultsError ? <Text style={styles.errorText}>{defaultsError}</Text> : null}
+
+              <Text style={[styles.fieldLabel, styles.actionSpacing]}>Remind me</Text>
+              <View style={styles.chipWrapTight}>
+                {REMINDER_OFFSET_OPTIONS.map((option) => (
+                  <Chip
+                    key={option.value}
+                    label={option.label}
+                    role="radio"
+                    selected={plan.defaultReminderOffsetMinutes === option.value}
+                    onPress={() => applyDefaultReminderOffset(option.value)}
+                  />
+                ))}
+              </View>
+              <Text style={styles.hintText}>
+                Applies to every day below that hasn&apos;t been set individually — you can still override any
+                single day under &quot;Edit day&quot;.
+              </Text>
+            </View>
+          ) : null}
+        </Card>
+
         {plan.items.map((item, index) => {
           const isEditing = editOpenId === item.id;
+          const effectiveTime = effectivePlannedTime(item, plan);
+          const effectiveOffset = effectiveReminderOffsetMinutes(item, plan);
+          const isTimeOverride = item.plannedTime !== null;
+          // Smart start time — a distinct, purely informational companion to
+          // the reminder above: recipe-aware ("start at 18:25 to eat by
+          // 19:00") rather than a flat lead time. "Cook it" days with a
+          // recipe only — "Get it" has no cook duration to count back from.
+          const recipeCookTimeMinutes =
+            item.mealChoice === 'cook' && item.recipe && effectiveTime ? item.recipe.cookTimeMinutes : null;
+          const shortfall =
+            recipeCookTimeMinutes !== null ? reminderShortfallMinutes(effectiveOffset, recipeCookTimeMinutes) : 0;
           return (
             <FadeInView key={item.id} delay={index * 40}>
               <Card style={styles.mealCard}>
@@ -558,10 +706,27 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
                   </View>
                 </View>
 
-                {item.plannedTime ? (
+                {effectiveTime ? (
                   <Text style={styles.reminderNote}>
-                    🔔 Reminder at {formatReminderTime(item.plannedTime)} — 30 min before it&apos;s time to{' '}
-                    {item.mealChoice === 'eat_out' ? 'order' : 'start cooking'}.
+                    {effectiveOffset > 0
+                      ? `🔔 Reminder at ${formatReminderTime(effectiveTime, effectiveOffset)} — ${effectiveOffset} min before it's time to ${
+                          item.mealChoice === 'eat_out' ? 'order' : 'start cooking'
+                        }.`
+                      : `Eating at ${effectiveTime} — no reminder set.`}
+                    {!isTimeOverride ? ' (plan default)' : ''}
+                  </Text>
+                ) : null}
+
+                {recipeCookTimeMinutes !== null ? (
+                  <Text style={styles.startTimeNote}>
+                    Start around {suggestedStartTime(effectiveTime!, recipeCookTimeMinutes)} to be ready by{' '}
+                    {effectiveTime}.
+                  </Text>
+                ) : null}
+                {shortfall > 0 ? (
+                  <Text style={styles.startTimeWarning}>
+                    This recipe takes about {recipeCookTimeMinutes} min — your {effectiveOffset}-min reminder may
+                    leave you about {shortfall} min short.
                   </Text>
                 ) : null}
 
@@ -680,10 +845,13 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
                       </View>
                     ) : null}
 
+                    <Text style={styles.fieldLabel}>
+                      {plan.defaultMealTime ? 'Override this day\'s time' : 'Eating time'}
+                    </Text>
                     <View style={styles.timeRow}>
                       <TextInput
                         style={styles.timeInput}
-                        placeholder="HH:mm, e.g. 18:30"
+                        placeholder={plan.defaultMealTime ? `Default: ${plan.defaultMealTime}` : 'HH:mm, e.g. 18:30'}
                         placeholderTextColor={colors.textFaint}
                         keyboardType="numbers-and-punctuation"
                         value={timeDrafts[item.id] ?? item.plannedTime ?? ''}
@@ -692,9 +860,49 @@ export function PlanAheadScreen({ navigation, onRequestLogin }: Props) {
                         autoComplete="off"
                       />
                       <TouchableOpacity onPress={() => applyPlannedTime(item)} disabled={busyItemId === item.id}>
-                        <Text style={styles.itemActionText}>{item.plannedTime ? 'Update' : 'Set time'}</Text>
+                        <Text style={styles.itemActionText}>{isTimeOverride ? 'Update' : 'Set time'}</Text>
                       </TouchableOpacity>
                     </View>
+                    {isTimeOverride && plan.defaultMealTime ? (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setTimeDrafts((current) => ({ ...current, [item.id]: '' }));
+                          applyPlannedTime(item, '');
+                        }}
+                        disabled={busyItemId === item.id}
+                      >
+                        <Text style={styles.itemActionText}>Use plan default ({plan.defaultMealTime}) instead</Text>
+                      </TouchableOpacity>
+                    ) : null}
+
+                    {effectiveTime ? (
+                      <>
+                        <Text style={[styles.fieldLabel, styles.actionSpacing]}>Remind me</Text>
+                        <View style={styles.chipWrapTight}>
+                          {REMINDER_OFFSET_OPTIONS.map((option) => (
+                            <Chip
+                              key={option.value}
+                              label={option.label}
+                              role="radio"
+                              selected={effectiveOffset === option.value}
+                              onPress={() => applyReminderOffset(item, option.value)}
+                            />
+                          ))}
+                        </View>
+                        {item.reminderOffsetMinutes !== null && plan.defaultMealTime ? (
+                          <TouchableOpacity
+                            onPress={() => applyReminderOffset(item, null)}
+                            disabled={busyItemId === item.id}
+                          >
+                            <Text style={styles.itemActionText}>
+                              Use plan default ({plan.defaultReminderOffsetMinutes > 0
+                                ? `${plan.defaultReminderOffsetMinutes} min before`
+                                : 'off'}) instead
+                            </Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </>
+                    ) : null}
 
                     <View style={styles.itemActions}>
                       <TouchableOpacity onPress={() => regenerate(item.id)} disabled={busyItemId === item.id}>
@@ -949,6 +1157,9 @@ function makeStyles(c: ThemeColors) {
       paddingHorizontal: 10,
       marginBottom: spacing.sm,
     },
+    defaultsCard: { marginBottom: spacing.md },
+    defaultsBlock: { marginTop: spacing.md, paddingTop: spacing.md, borderTopWidth: 1, borderTopColor: c.border },
+    hintText: { ...typography.caption, color: c.textFaint, marginTop: spacing.sm, lineHeight: 17 },
     mealCard: { marginBottom: spacing.md },
     mealHeaderRow: { flexDirection: 'row', gap: spacing.md },
     mealImage: { width: 72, height: 72, borderRadius: radius.md, backgroundColor: c.surfaceSunken },
@@ -1036,5 +1247,7 @@ function makeStyles(c: ThemeColors) {
       flex: 1,
     },
     reminderNote: { ...typography.caption, color: c.textMuted, marginTop: spacing.sm },
+    startTimeNote: { ...typography.caption, color: c.textMuted, marginTop: spacing.xs },
+    startTimeWarning: { ...typography.caption, color: c.warning, marginTop: spacing.xs },
   });
 }

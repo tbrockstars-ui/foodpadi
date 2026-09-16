@@ -28,7 +28,12 @@ export class AuthController {
   @Post('google')
   @HttpCode(HttpStatus.OK)
   google(@Body() dto: GoogleAuthDto, @Req() req: Request) {
-    return this.authService.loginWithGoogle(dto.idToken, dto.referralCode, clientIp(req));
+    return this.authService.loginWithGoogle(
+      dto.idToken,
+      dto.referralCode,
+      clientIp(req),
+      dto.countryCode,
+    );
   }
 
   @Post('refresh')

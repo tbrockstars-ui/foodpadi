@@ -1,26 +1,49 @@
-/* Mirrors apps/mobile/src/theme/colors.ts exactly, as CSS custom properties,
-   so web and mobile stay one visual identity instead of drifting apart. */
+/* FoodPadi design tokens — one visual identity shared with
+   apps/mobile/src/theme/colors.ts. Structure = charcoal/cream neutrals;
+   lime (--primary/--accent) = action + intelligence, used sparingly;
+   amber (--secondary/--accent-warm) = food, warmth, highlights; photography
+   carries the emotion. Never make every element lime. */
+
+/* LIGHT THEME (default) */
 :root {
-  --background: #fbfaf7;
+  --background: #fafaf7;
   --surface: #ffffff;
-  --surface-sunken: #f4f2ec;
-  --text: #181c19;
-  --text-muted: #6b7268;
-  --text-faint: #9a9e94;
-  --primary: #2f6b4f;
-  --primary-dark: #204a37;
-  --primary-soft: #eaf3ee;
-  --primary-text: #ffffff;
-  --secondary: #c2760c;
-  --secondary-soft: #fbf0de;
-  --success: #3b7a3b;
-  --success-soft: #eaf3ea;
-  --warning: #b7791f;
-  --warning-soft: #fbf1e2;
-  --border: #e7e4db;
-  --border-strong: #d4d0c4;
-  --danger: #b3261e;
-  --danger-soft: #fbebea;
+  --surface-elevated: #ffffff;
+  --surface-sunken: #f1f1ec;
+
+  --text: #171a16;
+  --text-muted: #626860;
+  --text-faint: #9ba097;
+
+  --border: #dde2d8;
+  --border-strong: #c7cdbf;
+
+  /* lime — action / AI. `--primary` is a FILL colour (dark text on top);
+     `--primary-ink` is the legible-on-page accent for text, icons and links. */
+  --primary: #9acd32;
+  --primary-dark: #86b92a;
+  --primary-soft: #eef6db;
+  --primary-text: #1c2e00;
+  --primary-ink: #4f7d12;
+
+  /* amber — food warmth / contextual highlights */
+  --secondary: #d98b00;
+  --secondary-dark: #bd7900;
+  --secondary-soft: #fbeed7;
+  --secondary-text: #3a2500;
+
+  --success: #3e9b57;
+  --success-soft: #e8f3ea;
+  --warning: #c68a1e;
+  --warning-soft: #fbf1e0;
+  --danger: #c4362b;
+  --danger-soft: #fbeceb;
+
+  /* Spec-named semantic aliases (docs/FOODPADI_DESIGN_SYSTEM.md) */
+  --accent: var(--primary);
+  --accent-warm: var(--secondary);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
 
   --space-xs: 4px;
   --space-sm: 8px;
@@ -35,47 +58,69 @@
   --radius-xl: 24px;
   --radius-pill: 999px;
 
-  --shadow-sm: 0 2px 10px rgba(20, 21, 15, 0.05);
-  --shadow-md: 0 8px 24px rgba(20, 21, 15, 0.12);
-  --shadow-lg: 0 10px 24px rgba(20, 21, 15, 0.14);
-  --shadow-badge: 0 2px 8px rgba(20, 21, 15, 0.2);
-  --shadow-fab: 0 4px 16px rgba(20, 21, 15, 0.22);
+  /* restrained elevation — soft, small */
+  --shadow-sm: 0 1px 2px rgba(23, 26, 22, 0.04), 0 2px 8px rgba(23, 26, 22, 0.05);
+  --shadow-md: 0 4px 16px rgba(23, 26, 22, 0.08);
+  --shadow-lg: 0 12px 32px rgba(23, 26, 22, 0.1);
+  --shadow-badge: 0 2px 6px rgba(23, 26, 22, 0.14);
+  --shadow-fab: 0 6px 20px rgba(23, 26, 22, 0.16);
+  --focus-ring: 0 0 0 3px rgba(154, 205, 50, 0.28);
 
   color-scheme: light;
 }
 
-/* Dark theme — opt in via data-theme="dark" on <html>, set by the settings
-   menu (persisted to localStorage) and applied before first paint by the
-   inline script in layout.tsx so there's no flash. Only the colour tokens
-   flip; every component already reads them, so nothing else needs to change.
-   The green is lightened so it keeps enough contrast on a dark surface. */
-:root[data-theme='dark'] {
-  --background: #14171a;
-  --surface: #1c2025;
-  --surface-sunken: #23282e;
-  --text: #f2f1ec;
-  --text-muted: #a7aea9;
-  --text-faint: #79807b;
-  --primary: #5bbd8f;
-  --primary-dark: #47a97b;
-  --primary-soft: #1e3a2d;
-  --primary-text: #0c1f17;
-  --secondary: #e0a24a;
-  --secondary-soft: #3a2c14;
-  --success: #5fae5f;
-  --success-soft: #1f331f;
-  --warning: #d9a441;
-  --warning-soft: #3a2f16;
-  --border: #333a41;
-  --border-strong: #47505a;
-  --danger: #e2685f;
-  --danger-soft: #3a1f1d;
+/* Explicit light selector so the settings toggle wins both directions. */
+:root[data-theme='light'] {
+  color-scheme: light;
+}
 
-  --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.45);
-  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.55);
-  --shadow-lg: 0 10px 24px rgba(0, 0, 0, 0.6);
-  --shadow-badge: 0 2px 8px rgba(0, 0, 0, 0.6);
-  --shadow-fab: 0 4px 16px rgba(0, 0, 0, 0.55);
+/* DARK THEME — opt in via data-theme="dark" on <html>, set by the settings
+   menu (persisted to localStorage) and applied before first paint by the
+   inline script in layout.tsx so there's no flash. Deep, near-black green
+   ground (not pure black); lime "glows" through contrast without going neon.
+   Designed for dark — not an inversion of the light palette. */
+:root[data-theme='dark'] {
+  --background: #080a08;
+  --surface: #141814;
+  --surface-elevated: #1a1f19;
+  --surface-sunken: #0e110e;
+
+  --text: #f7f7f2;
+  --text-muted: #b8bdb5;
+  --text-faint: #7e847b;
+
+  --border: #343a32;
+  --border-strong: #48503f;
+
+  --primary: #c8f34a;
+  --primary-dark: #b4e236;
+  --primary-soft: #1d2a10;
+  --primary-text: #0c1a00;
+  --primary-ink: #c8f34a;
+
+  --secondary: #ffb52e;
+  --secondary-dark: #eaa11c;
+  --secondary-soft: #2e2410;
+  --secondary-text: #1c1300;
+
+  --success: #63c77f;
+  --success-soft: #142718;
+  --warning: #e7a93c;
+  --warning-soft: #2c2210;
+  --danger: #f0685e;
+  --danger-soft: #2e1614;
+
+  --accent: var(--primary);
+  --accent-warm: var(--secondary);
+  --text-primary: var(--text);
+  --text-secondary: var(--text-muted);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.5);
+  --shadow-badge: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-fab: 0 6px 20px rgba(0, 0, 0, 0.5);
+  --focus-ring: 0 0 0 3px rgba(200, 243, 74, 0.3);
 
   color-scheme: dark;
 }
@@ -123,9 +168,28 @@ body {
   margin: 0;
   background: var(--background);
   color: var(--text);
-  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-sans), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Editorial headings — confident, tight, not web-form. Components keep their
+   own sizes; this only sets the shared feel. */
+h1,
+h2,
+h3 {
+  letter-spacing: -0.02em;
 }
 
 a {
-  color: var(--primary);
+  color: var(--primary-ink);
+}
+
+/* One consistent keyboard-focus treatment — a calm lime ring, never the
+   browser's blue outline. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
 }

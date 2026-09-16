@@ -1,0 +1,70 @@
+/* Absolutely positioned against the hero's own left edge (desktop only) so
+   it's sized independently of the centred text column instead of fighting
+   it for grid space — see page.tsx's comment. Below 1180px it drops back
+   into normal document flow, stacked above the text like every other hero
+   element there. pointer-events:none because it's purely decorative and
+   must never intercept a click meant for the text/CTAs that sit in front of
+   it in z-index.
+
+   left: calc(50% - 50vw - 64px) is the standard "break out of a centred
+   max-width container to the true viewport edge" trick: 50% (of .heroGrid,
+   the positioned ancestor) minus 50vw always resolves to exactly the
+   viewport's left edge regardless of .heroGrid's own max-width/centering —
+   unlike the previous left:-32px (relative to .heroGrid, capped at 1320px),
+   which only reached .heroGrid's own edge and left a large, growing gap to
+   the *real* viewport edge on anything wider than ~1350px (user report,
+   2026-09-16: "too small and too close to the centre" — reproduced at
+   1920px). The -64px bleeds it past the true edge — generous on purpose: a
+   real browser's scrollbar/DPI-scaling can shave a little off a
+   viewport-unit calculation in ways a headless check doesn't always catch,
+   and a live-screenshot follow-up (2026-09-16) still showed a hairline gap
+   at -24px, so this overshoots rather than risk landing short again.
+   .hero's own overflow:hidden clips it cleanly, so this can never cause
+   horizontal scroll. */
+/* bottom: -96px replaces top:50%/translateY centring (user report,
+   2026-09-16: visible gap under the image) — centring split the leftover
+   height (the image is shorter than .heroGrid's own ~480px+) evenly above
+   and below, leaving a gap on both edges instead of none. Anchoring to the
+   bottom moves all of that slack to the top (behind the nav row, where it
+   isn't visible) and bleeds past .hero's own 64px bottom padding the same
+   way left: already bleeds past its horizontal padding — 64px to cancel the
+   padding, 32px further for the same real-browser safety margin. */
+.wrap {
+  position: absolute;
+  left: calc(50% - 50vw - 64px);
+  bottom: -96px;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bannerImg {
+  display: block;
+  /* Fluid between the two anchor points below, not just bigger-everywhere —
+     a fixed large width safe at 1920px would overlap .heroContent at
+     1366px, and one safe at 1366px would look small and centre-hugging at
+     1920px (the exact complaint this replaces). 672px = the old 560px
+     ceiling scaled up 20% (user instruction, 2026-09-16); 390px is NOT the
+     old 320px floor scaled the same way — that only left ~11px of headline
+     clearance right at the (then-)1180px breakpoint, too tight to trust
+     across real browsers. 390px is recalibrated against the new 1280px
+     breakpoint below instead, verified live to leave ~50px+ clearance
+     there and beyond. */
+  width: clamp(390px, 44.1vw - 174px, 672px);
+  height: auto;
+}
+
+@media (max-width: 1280px) {
+  .wrap {
+    position: relative;
+    left: auto;
+    top: auto;
+    bottom: auto;
+    width: fit-content;
+    margin: 0 auto 8px;
+  }
+
+  .bannerImg {
+    width: 680px; /* 2x the previous 340px */
+    max-width: 92vw;
+  }
+}

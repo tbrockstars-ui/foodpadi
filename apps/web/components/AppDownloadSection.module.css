@@ -1,0 +1,71 @@
+.wrap {
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.heading {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  margin: 0 0 32px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 24px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 32px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+/* Fixed brand green, matching this page's other CTAs (.dealerBandLink,
+   .waitlistButton in page.module.css) — the marketing page keeps one
+   consistent light look rather than following the authenticated app's
+   dark-theme CSS variables. */
+.brand {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #1d7a52;
+}
+
+.tagline {
+  margin: 0 0 6px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.iosButton {
+  display: inline-block;
+  background: transparent;
+  color: #1d7a52;
+  padding: 12px 26px;
+  border-radius: 999px;
+  border: 1px solid #1d7a52;
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.iosButton:hover {
+  background: #1d7a52;
+  color: #fff;
+}
+
+@media (max-width: 560px) {
+  .heading {
+    font-size: 26px;
+  }
+}

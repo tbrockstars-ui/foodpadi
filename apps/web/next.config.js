@@ -1,4 +1,5 @@
 /** @type {import('next').NextConfig} */
+// (touched again to force a clean dev-server route-table rebuild)
 const nextConfig = {
   reactStrictMode: true,
 
@@ -24,6 +25,21 @@ const nextConfig = {
   },
 
   productionBrowserSourceMaps: false,
+
+  // The canonical legal pages live under /legal/* (existing convention —
+  // /legal/disclaimer predates this), but a launch brief and any external
+  // links/ads may reasonably point at the bare paths. Redirect rather than
+  // duplicate the pages.
+  async redirects() {
+    return [
+      { source: '/privacy', destination: '/legal/privacy', permanent: false },
+      { source: '/terms', destination: '/legal/terms', permanent: false },
+      { source: '/cookies', destination: '/legal/cookies', permanent: false },
+      { source: '/contact', destination: '/legal/contact', permanent: false },
+      { source: '/delete-account', destination: '/legal/delete-account', permanent: false },
+      { source: '/data-request', destination: '/legal/data-request', permanent: false },
+    ];
+  },
 };
 
 module.exports = nextConfig;

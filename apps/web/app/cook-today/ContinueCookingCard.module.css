@@ -1,0 +1,99 @@
+/* Co-located so it never has to touch cook-today.module.css. Uses the same
+   design tokens as the rest of the app (globals.css). */
+
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-sunken);
+  padding: var(--space-lg);
+  margin-bottom: var(--space-xl);
+}
+
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-xs);
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+
+.line {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-md);
+}
+
+.primary {
+  display: inline-block;
+  background: var(--primary);
+  color: var(--primary-text);
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 12px var(--space-lg);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.startElse {
+  display: block;
+  margin-top: var(--space-sm);
+  background: none;
+  border: none;
+  padding: var(--space-xs) 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.confirmRow {
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border);
+}
+
+.confirmText {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-sm);
+}
+
+.confirmButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.secondary,
+.danger {
+  border-radius: var(--radius-md);
+  padding: 10px var(--space-lg);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.secondary {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.danger {
+  background: none;
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}

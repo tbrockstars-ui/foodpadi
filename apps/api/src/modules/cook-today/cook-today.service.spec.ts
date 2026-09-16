@@ -1,7 +1,20 @@
 import { CookTodayService } from './cook-today.service';
 import { ClaudeService } from '../ai/claude.service';
+import { AiAccessService } from '../ai/ai-access.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { CookingInsightsService } from '../feedback/cooking-insights.service';
+
+// Cross-customer learning signal — default to "no signal yet" so existing
+// assertions are unchanged; cooking-insights.service.spec.ts covers the
+// aggregation logic itself.
+const cookingInsightsStub = { getGeneralGuidance: jest.fn().mockResolvedValue(null) };
+beforeEach(() => cookingInsightsStub.getGeneralGuidance.mockClear());
+
+// Trial/Paid AI gate — default to a no-op (allowed) so existing member-path
+// assertions are unchanged; a dedicated spec covers the gate itself.
+const aiAccessStub = { assertCanUseAi: jest.fn().mockResolvedValue(undefined) };
+beforeEach(() => aiAccessStub.assertCanUseAi.mockClear());
 import type { AuthenticatedActor, GuestActor } from '../auth/guest-or-auth.guard';
 
 const GUEST: GuestActor = { type: 'guest', sessionId: 'guest-1', disclaimerAcknowledged: true };
@@ -38,6 +51,8 @@ describe('CookTodayService.generate — guest never triggers AI', () => {
       claude as unknown as ClaudeService,
       prisma as unknown as PrismaService,
       analytics as unknown as AnalyticsService,
+      aiAccessStub as unknown as AiAccessService,
+      cookingInsightsStub as unknown as CookingInsightsService,
     );
   });
 
@@ -80,6 +95,39 @@ describe('CookTodayService.generate — guest never triggers AI', () => {
     expect(claude.generateCookTodayRecipes).toHaveBeenCalledTimes(1);
     expect(recipes[0].title).toBe('AI Chicken Bowl');
   });
+
+  it('checks the AI access gate before calling Claude on the member path', async () => {
+    await service.generate({ ingredients: ['chicken'] }, USER);
+    expect(aiAccessStub.assertCanUseAi).toHaveBeenCalledWith('u1', 'cook_today');
+  });
+
+  it('never consults the AI access gate for a guest (curated path)', async () => {
+    await service.generate({ ingredients: ['pizza'] }, GUEST);
+    expect(aiAccessStub.assertCanUseAi).not.toHaveBeenCalled();
+  });
+
+  it('a blocked member (gate throws) never reaches Claude', async () => {
+    aiAccessStub.assertCanUseAi.mockRejectedValueOnce(new Error('AI_TRIAL_LIMIT_REACHED'));
+    await expect(service.generate({ ingredients: ['chicken'] }, USER)).rejects.toThrow();
+    expect(claude.generateCookTodayRecipes).not.toHaveBeenCalled();
+  });
+
+  it('forwards a non-null community note from CookingInsightsService to Claude', async () => {
+    cookingInsightsStub.getGeneralGuidance.mockResolvedValueOnce('Cooks reported timings ran long.');
+    await service.generate({ ingredients: ['chicken'] }, USER);
+    expect(claude.generateCookTodayRecipes).toHaveBeenCalledWith(
+      expect.objectContaining({ communityNotes: 'Cooks reported timings ran long.' }),
+    );
+  });
+
+  it('still generates when CookingInsightsService has no signal yet', async () => {
+    cookingInsightsStub.getGeneralGuidance.mockResolvedValueOnce(null);
+    const recipes = await service.generate({ ingredients: ['chicken'] }, USER);
+    expect(claude.generateCookTodayRecipes).toHaveBeenCalledWith(
+      expect.objectContaining({ communityNotes: undefined }),
+    );
+    expect(recipes[0].title).toBe('AI Chicken Bowl');
+  });
 });
 
 describe('CookTodayService favorites engine', () => {
@@ -100,6 +148,8 @@ describe('CookTodayService favorites engine', () => {
       {} as unknown as ClaudeService,
       prisma as unknown as PrismaService,
       analytics as unknown as AnalyticsService,
+      aiAccessStub as unknown as AiAccessService,
+      cookingInsightsStub as unknown as CookingInsightsService,
     );
   });
 

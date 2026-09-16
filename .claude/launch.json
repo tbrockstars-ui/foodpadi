@@ -26,6 +26,12 @@
       "port": 8081
     },
     {
+      "name": "mobile-web-8090",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "start", "--workspace=@foodpadi/mobile", "--", "--web", "--port", "8090"],
+      "port": 8090
+    },
+    {
       "name": "api",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "api:dev"],

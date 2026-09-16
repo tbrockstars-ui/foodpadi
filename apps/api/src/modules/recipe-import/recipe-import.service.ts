@@ -1,7 +1,7 @@
-import { lookup } from 'dns/promises';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { RawRecipeCandidate } from '../ai/claude.service';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
+import { assertPublicHttpUrl } from '../../common/ssrf-guard.util';
 import { ImportRecipeDto } from './dto/import-recipe.dto';
 
 const FETCH_TIMEOUT_MS = 8000;
@@ -20,16 +20,6 @@ const INGREDIENT_RE = new RegExp(
   `^([\\d.\\/\\s]+)?\\s*(${UNIT_WORDS.join('|')})?\\b\\.?\\s*(?:of\\s+)?(.+)$`,
   'i',
 );
-
-function isPrivateAddress(ip: string): boolean {
-  if (ip === '::1' || ip.toLowerCase().startsWith('fc') || ip.toLowerCase().startsWith('fd')) {
-    return true; // IPv6 loopback / unique local
-  }
-  const parts = ip.split('.').map(Number);
-  if (parts.length !== 4 || parts.some((p) => Number.isNaN(p))) return false;
-  const [a, b] = parts;
-  return a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
-}
 
 function parseIsoDurationMinutes(value: unknown): number | undefined {
   if (typeof value !== 'string') return undefined;
@@ -138,23 +128,7 @@ export class RecipeImportService {
   }
 
   private async fetchHtml(url: string): Promise<string> {
-    const parsed = new URL(url);
-    if (parsed.hostname === 'localhost' || parsed.hostname.endsWith('.local')) {
-      throw new BadRequestException(UNREACHABLE_MESSAGE);
-    }
-
-    // Best-effort SSRF guard: reject links that resolve to a private/loopback
-    // address. This doesn't close a DNS-rebinding gap between this check and
-    // the fetch below — an acceptable gap for an MVP, not a full defence.
-    try {
-      const { address } = await lookup(parsed.hostname);
-      if (isPrivateAddress(address)) {
-        throw new BadRequestException(UNREACHABLE_MESSAGE);
-      }
-    } catch (e) {
-      if (e instanceof BadRequestException) throw e;
-      throw new BadRequestException(UNREACHABLE_MESSAGE);
-    }
+    const parsed = await assertPublicHttpUrl(url, UNREACHABLE_MESSAGE);
 
     let response: Response;
     try {

@@ -1,6 +1,16 @@
-import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import type { FoodGoal, PlanPreviewResponse } from '@foodpadi/shared';
+import { isShoppingComplete } from '@foodpadi/shared';
 import { ClaudeService } from '../ai/claude.service';
+import { AiAccessService } from '../ai/ai-access.service';
 import { curatedPlanForDays } from '../ai/curated-recipes';
 import { goalGuidanceLine } from '../ai/goal-guidance';
 import { RecipeView, sanitizeRecipeCandidate } from '../ai/recipe-validation';
@@ -8,11 +18,15 @@ import { dropRecipesWithAvoided } from '../../common/avoided-ingredients';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import type { RequestActor } from '../auth/guest-or-auth.guard';
+import { EntitlementService } from '../billing/entitlement.service';
+import { CookingInsightsService } from '../feedback/cooking-insights.service';
 import { AddShoppingListItemDto, UpdateShoppingListItemDto } from './dto/shopping-list-item.dto';
 import { GeneratePlanDto, PlanScope } from './dto/generate-plan.dto';
 import { UpdateMealPlanItemDto } from './dto/update-meal-plan-item.dto';
+import { UpdatePlanDefaultsDto } from './dto/update-plan-defaults.dto';
 import { RegeneratePlanItemDto } from './dto/regenerate-plan-item.dto';
 import { GenerateShoppingListDto } from './dto/generate-shopping-list.dto';
+import { CreateStandaloneShoppingListDto } from './dto/create-standalone-shopping-list.dto';
 
 const SCOPE_DAYS: Record<Exclude<PlanScope, 'custom'>, number> = {
   today: 1,
@@ -22,6 +36,17 @@ const SCOPE_DAYS: Record<Exclude<PlanScope, 'custom'>, number> = {
 };
 
 const MAX_PLAN_DAYS = 14;
+
+// Plan Ahead is Premium-only past a single day (user instruction 2026-09-12):
+// guest and trial can plan 'today'/'tomorrow' — the two 1-day scopes — but
+// '3day'/'week'/'custom' need a paid subscription. Checked server-side in
+// generate() (the authoritative gate) and mirrored client-side (web's
+// PlanScopeForm, mobile's PlanAheadScreen) purely for UX — a request that
+// skips the UI and hits the API directly still gets rejected here.
+const SCOPES_REQUIRING_PREMIUM: PlanScope[] = ['3day', 'week', 'custom'];
+// Anonymous guests have no entitlement row at all — same 1-day cap as a
+// registered non-paid user, enforced in preview() below.
+const GUEST_MAX_PREVIEW_DAYS = 1;
 
 function startOfToday(): Date {
   const now = new Date();
@@ -51,7 +76,22 @@ export class PlanAheadService {
     private readonly claude: ClaudeService,
     private readonly prisma: PrismaService,
     private readonly analytics: AnalyticsService,
+    private readonly aiAccess: AiAccessService,
+    private readonly entitlements: EntitlementService,
+    private readonly cookingInsights: CookingInsightsService,
   ) {}
+
+  // Cross-customer "what other cooks reported" signal for the AI prompt. A
+  // named focus (a specific dish) resolves to the per-dish aggregate; with no
+  // focus (a whole-plan generation) falls back to the dish-agnostic aggregate
+  // across all recent cooks. Both are already null-safe internally — this
+  // never throws and never blocks a plan from generating.
+  private async resolveCommunityNotes(focus?: string): Promise<string | undefined> {
+    const note = focus?.trim()
+      ? await this.cookingInsights.getPromptNote(focus)
+      : await this.cookingInsights.getGeneralGuidance();
+    return note ?? undefined;
+  }
 
   // Favourite cuisines, avoided ingredients and food goals for one user,
   // shaped for ClaudeService.generatePlanMeals. Same three signals Cook Today
@@ -91,6 +131,17 @@ export class PlanAheadService {
     return scope === 'tomorrow' ? addDays(startOfToday(), 1) : startOfToday();
   }
 
+  // Highest day-count preview() will honour for this caller — 1 for an
+  // anonymous guest or a registered non-paid user (trial/lapsed), 7 for a
+  // Premium subscriber. `GuestOrAuthGuard` lets either actor type reach
+  // preview(), even though today's clients only ever call it while signed
+  // out (see app/plan/page.tsx) — this covers both regardless of who calls it.
+  private async maxPreviewDays(actor: RequestActor): Promise<number> {
+    if (actor.type === 'guest') return GUEST_MAX_PREVIEW_DAYS;
+    const entitlement = await this.entitlements.getUserEntitlement(actor.userId);
+    return entitlement === 'paid' ? 7 : GUEST_MAX_PREVIEW_DAYS;
+  }
+
   /**
    * Guest / signed-out Plan Ahead preview (guest-mode brief §8) — a few
    * curated dinner ideas for the chosen number of days. No AI (curated pool,
@@ -98,7 +149,8 @@ export class PlanAheadService {
    * reminders and per-day edits still needs an account (generate() above).
    */
   async preview(days: number, actor: RequestActor): Promise<PlanPreviewResponse> {
-    const clamped = Math.min(Math.max(1, Math.round(days || 3)), 7);
+    const maxDays = await this.maxPreviewDays(actor);
+    const clamped = Math.min(Math.max(1, Math.round(days || 3)), maxDays);
     const recipes = curatedPlanForDays(clamped)
       .map((candidate) => sanitizeRecipeCandidate(candidate))
       .filter((recipe): recipe is RecipeView => recipe !== null);
@@ -113,9 +165,24 @@ export class PlanAheadService {
   }
 
   async generate(dto: GeneratePlanDto, userId: string) {
+    if (SCOPES_REQUIRING_PREMIUM.includes(dto.scope)) {
+      const entitlement = await this.entitlements.getUserEntitlement(userId);
+      if (entitlement !== 'paid') {
+        throw new HttpException(
+          {
+            message:
+              'Planning more than one day ahead is a FoodPadi Premium feature. Upgrade to unlock the full week and custom-length plans.',
+            code: 'PLAN_SCOPE_REQUIRES_PREMIUM',
+          },
+          HttpStatus.PAYMENT_REQUIRED,
+        );
+      }
+    }
+    await this.aiAccess.assertCanUseAi(userId, 'plan_ahead_generate');
     const days = this.resolveDayCount(dto);
 
     const personalisation = await this.loadPersonalisation(userId);
+    const communityNotes = await this.resolveCommunityNotes(dto.prompt);
 
     const raw = await this.claude.generatePlanMeals({
       days,
@@ -127,6 +194,7 @@ export class PlanAheadService {
       // in generatePlanMeals already phrases it correctly for either one day
       // ("this day") or several ("these days").
       focus: dto.prompt,
+      communityNotes,
     });
 
     const sanitized = raw
@@ -253,6 +321,7 @@ export class PlanAheadService {
   }
 
   async regenerateItem(planId: string, itemId: string, userId: string, dto: RegeneratePlanItemDto = {}) {
+    await this.aiAccess.assertCanUseAi(userId, 'plan_ahead_regenerate_item');
     const plan = await this.ownedPlan(planId, userId);
     const item = plan.items.find((i) => i.id === itemId);
     if (!item) {
@@ -260,11 +329,13 @@ export class PlanAheadService {
     }
 
     const personalisation = await this.loadPersonalisation(userId);
+    const communityNotes = await this.resolveCommunityNotes(dto.focus);
 
     const raw = await this.claude.generatePlanMeals({
       days: 1,
       ...personalisation,
       focus: dto.focus,
+      communityNotes,
     });
     const sanitized = raw.map((c) => sanitizeRecipeCandidate(c)).filter((r): r is RecipeView => r !== null);
     // Same hard backstop as generate()/regeneratePlan() — don't let a
@@ -313,16 +384,19 @@ export class PlanAheadService {
   // the whole plan misses rather than a single day. Keeps the plan's id,
   // start date and status; re-derives an existing shopping list.
   async regeneratePlan(planId: string, userId: string) {
+    await this.aiAccess.assertCanUseAi(userId, 'plan_ahead_regenerate_plan');
     const plan = await this.ownedPlan(planId, userId);
     const days = Math.min(daysBetweenInclusive(plan.startDate, plan.endDate), MAX_PLAN_DAYS);
 
     const personalisation = await this.loadPersonalisation(userId);
+    const communityNotes = await this.resolveCommunityNotes();
 
     const raw = await this.claude.generatePlanMeals({
       days,
       budgetPence: plan.budgetPence ?? undefined,
       ...personalisation,
       allowGenericFallback: true,
+      communityNotes,
     });
 
     const sanitized = raw
@@ -388,6 +462,7 @@ export class PlanAheadService {
       data: {
         ...(dto.mealChoice !== undefined ? { mealChoice: dto.mealChoice } : {}),
         ...(dto.plannedTime !== undefined ? { plannedTime: dto.plannedTime } : {}),
+        ...(dto.reminderOffsetMinutes !== undefined ? { reminderOffsetMinutes: dto.reminderOffsetMinutes } : {}),
       },
     });
 
@@ -396,6 +471,38 @@ export class PlanAheadService {
       itemId,
       mealChoice: dto.mealChoice,
       hasTime: dto.plannedTime !== undefined ? dto.plannedTime !== null : undefined,
+      hasReminderOffsetOverride:
+        dto.reminderOffsetMinutes !== undefined ? dto.reminderOffsetMinutes !== null : undefined,
+    });
+
+    const fresh = await this.prisma.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: this.planInclude() });
+    return this.serialize(fresh);
+  }
+
+  /**
+   * Sets the plan-wide default eating time and/or reminder lead time — "set
+   * once, applies to every day that hasn't been individually overridden".
+   * Deliberately never touches MealPlanItem rows: see UpdatePlanDefaultsDto's
+   * own comment for why that's what makes this safe to change repeatedly
+   * without ever clobbering a day the user explicitly customised.
+   */
+  async updatePlanDefaults(planId: string, userId: string, dto: UpdatePlanDefaultsDto) {
+    await this.ownedPlan(planId, userId); // ownership check; throws if not found/owned
+
+    await this.prisma.mealPlan.update({
+      where: { id: planId },
+      data: {
+        ...(dto.defaultMealTime !== undefined ? { defaultMealTime: dto.defaultMealTime } : {}),
+        ...(dto.defaultReminderOffsetMinutes !== undefined
+          ? { defaultReminderOffsetMinutes: dto.defaultReminderOffsetMinutes }
+          : {}),
+      },
+    });
+
+    await this.analytics.track('plan_ahead_defaults_updated', { userId }, {
+      planId,
+      hasDefaultTime: dto.defaultMealTime !== undefined ? dto.defaultMealTime !== null : undefined,
+      defaultReminderOffsetMinutes: dto.defaultReminderOffsetMinutes,
     });
 
     const fresh = await this.prisma.mealPlan.findUniqueOrThrow({ where: { id: planId }, include: this.planInclude() });
@@ -451,6 +558,79 @@ export class PlanAheadService {
     return list;
   }
 
+  /**
+   * A shopping list created directly from an ingredient list rather than
+   * from an accepted plan — e.g. Cook Today's fridge-check "you need to buy"
+   * set (FridgeCheck.tsx). Same ShoppingList/ShoppingListItem model and the
+   * same shape generateShoppingList's own `create` call above already uses,
+   * just without the plan/accepted-status requirement — mealPlanId is null,
+   * which the shared ShoppingListView type and the shopping-list web page
+   * already anticipate ("Null for a standalone list").
+   */
+  async createStandaloneShoppingList(userId: string, dto: CreateStandaloneShoppingListDto) {
+    // If this list is being created inside a Cooking Journey's fridge-check,
+    // validate that journey up front so we never leave an orphan list.
+    let linkJourneyId: string | null = null;
+    if (dto.cookingJourneyId) {
+      const journey = await this.prisma.cookingJourney.findUnique({
+        where: { id: dto.cookingJourneyId },
+        select: { userId: true, status: true, stage: true },
+      });
+      if (!journey || journey.userId !== userId) {
+        throw new NotFoundException('Cooking journey not found.');
+      }
+      if (journey.status === 'active') linkJourneyId = dto.cookingJourneyId;
+    }
+
+    const list = await this.prisma.shoppingList.create({
+      data: {
+        userId,
+        mealPlanId: null,
+        items: {
+          create: dto.items.map((item) => ({
+            ingredientName: item.ingredientName,
+            quantity: item.quantity,
+            unit: item.unit,
+            addedManually: true,
+          })),
+        },
+      },
+      include: { items: true, cookingJourney: true },
+    });
+
+    if (linkJourneyId) {
+      await this.prisma.cookingJourney.update({
+        where: { id: linkJourneyId },
+        data: { shoppingListId: list.id, stage: 'shopping', lastActivityAt: new Date() },
+      });
+      await this.analytics.track('cooking_journey_stage_changed', { userId }, {
+        journeyId: linkJourneyId,
+        from: 'ingredient_check',
+        to: 'shopping',
+      });
+      // Re-read so the response carries the freshly linked journey.
+      const relinked = await this.prisma.shoppingList.findUnique({
+        where: { id: list.id },
+        include: { items: true, cookingJourney: true },
+      });
+      await this.analytics.track('shopping_list_generated', { userId }, {
+        planId: null,
+        itemCount: dto.items.length,
+        source: 'standalone',
+        linkedToJourney: true,
+      });
+      return this.serializeShoppingList(relinked ?? list);
+    }
+
+    await this.analytics.track('shopping_list_generated', { userId }, {
+      planId: null,
+      itemCount: dto.items.length,
+      source: 'standalone',
+    });
+
+    return this.serializeShoppingList(list);
+  }
+
   // Replace a list's auto-derived items with a fresh consolidation of the
   // plan's current meals; anything the user added by hand (addedManually) is
   // left in place.
@@ -476,16 +656,25 @@ export class PlanAheadService {
   }
 
   async getShoppingList(listId: string, userId: string) {
-    const list = await this.prisma.shoppingList.findUnique({ where: { id: listId }, include: { items: true } });
+    const list = await this.prisma.shoppingList.findUnique({
+      where: { id: listId },
+      include: { items: true, cookingJourney: true },
+    });
     if (!list || list.userId !== userId) {
       throw new NotFoundException('Shopping list not found.');
     }
-    return list;
+    return this.serializeShoppingList(list);
   }
 
   async updateShoppingListItem(listId: string, itemId: string, userId: string, dto: UpdateShoppingListItemDto) {
     await this.getShoppingList(listId, userId); // ownership check
-    return this.prisma.shoppingListItem.update({ where: { id: itemId }, data: dto });
+    const updated = await this.prisma.shoppingListItem.update({ where: { id: itemId }, data: dto });
+    // Keep a linked Cooking Journey in step: ticking the last item off moves
+    // it to "ready to cook", un-ticking one moves it back to "shopping".
+    if (dto.checked !== undefined) {
+      await this.syncLinkedJourneyStage(listId, userId);
+    }
+    return updated;
   }
 
   async addShoppingListItem(listId: string, userId: string, dto: AddShoppingListItemDto) {
@@ -498,6 +687,78 @@ export class PlanAheadService {
   async removeShoppingListItem(listId: string, itemId: string, userId: string) {
     await this.getShoppingList(listId, userId);
     await this.prisma.shoppingListItem.delete({ where: { id: itemId } });
+    await this.syncLinkedJourneyStage(listId, userId);
+  }
+
+  // Shapes a ShoppingList row (+ its optional linked CookingJourney) into the
+  // ShoppingListView the clients expect. `cookingJourney` is populated only
+  // for a list that belongs to an active journey — plan-derived and plain
+  // standalone lists get null, so the shopping screen's "← Back to Cooking"
+  // header only shows in a real cook (brief §23).
+  private serializeShoppingList(list: {
+    id: string;
+    status: string;
+    mealPlanId: string | null;
+    items: Array<{
+      id: string;
+      ingredientName: string;
+      quantity: string | null;
+      unit: string | null;
+      checked: boolean;
+      addedManually: boolean;
+    }>;
+    cookingJourney?: { id: string; stage: string; status: string; recipeSnapshot: unknown } | null;
+  }) {
+    const journey =
+      list.cookingJourney && list.cookingJourney.status === 'active' ? list.cookingJourney : null;
+    const recipeTitle =
+      (journey?.recipeSnapshot as { title?: string } | null)?.title ?? 'your recipe';
+
+    return {
+      id: list.id,
+      status: list.status,
+      mealPlanId: list.mealPlanId,
+      cookingJourney: journey ? { id: journey.id, recipeTitle, stage: journey.stage } : null,
+      items: list.items.map((i) => ({
+        id: i.id,
+        ingredientName: i.ingredientName,
+        quantity: i.quantity,
+        unit: i.unit,
+        checked: i.checked,
+        addedManually: i.addedManually,
+      })),
+    };
+  }
+
+  // Ticking a linked journey's shopping list toward / away from complete moves
+  // that journey between the "shopping" and "ready_to_cook" stages, so the
+  // Cook landing card and the shopping screen agree without an extra client
+  // call. Only ever touches an ACTIVE journey sitting in one of those two
+  // stages.
+  private async syncLinkedJourneyStage(listId: string, userId: string): Promise<void> {
+    const journey = await this.prisma.cookingJourney.findUnique({
+      where: { shoppingListId: listId },
+      select: { id: true, stage: true, status: true },
+    });
+    if (!journey || journey.status !== 'active') return;
+    if (journey.stage !== 'shopping' && journey.stage !== 'ready_to_cook') return;
+
+    const items = await this.prisma.shoppingListItem.findMany({
+      where: { shoppingListId: listId },
+      select: { checked: true },
+    });
+    const nextStage = isShoppingComplete(items) ? 'ready_to_cook' : 'shopping';
+    if (nextStage === journey.stage) return;
+
+    await this.prisma.cookingJourney.update({
+      where: { id: journey.id },
+      data: { stage: nextStage, lastActivityAt: new Date() },
+    });
+    await this.analytics.track(
+      nextStage === 'ready_to_cook' ? 'shopping_completed' : 'cooking_journey_stage_changed',
+      { userId },
+      { journeyId: journey.id, from: journey.stage, to: nextStage },
+    );
   }
 
   private consolidateIngredients(items: PlanItemsForConsolidation) {

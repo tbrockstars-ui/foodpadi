@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { AISLE_ORDER, categorizeIngredient, type ShoppingListItemView, type ShoppingListView } from '@foodpadi/shared';
 import styles from '../shopping-list.module.css';
 
@@ -9,6 +10,12 @@ export function ShoppingListClient({ initialList }: { initialList: ShoppingListV
   const [list, setList] = useState(initialList);
   const [newItem, setNewItem] = useState('');
   const [rebuilding, setRebuilding] = useState(false);
+
+  // Set only when this list belongs to an active Cooking Journey (created from
+  // Cook Today's fridge-check). Drives the "← Back to Cooking" header and the
+  // "you're ready to cook" state — absent for plan/standalone lists, which
+  // render exactly as before.
+  const journey = list.cookingJourney ?? null;
 
   const rebuildFromPlan = async () => {
     if (!list.mealPlanId) return;
@@ -67,8 +74,38 @@ export function ShoppingListClient({ initialList }: { initialList: ShoppingListV
 
   return (
     <div>
-      <h1 className={styles.title}>Shopping list</h1>
-      <p className={styles.subtitle}>{remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}</p>
+      {journey ? (
+        <Link href="/cook-today" className={styles.backToCooking}>
+          ← Back to Cooking
+        </Link>
+      ) : null}
+
+      {journey ? (
+        <>
+          <h1 className={styles.title}>Shopping for {journey.recipeTitle}</h1>
+          <p className={styles.subtitle}>
+            {remaining === 0
+              ? "You have everything you need."
+              : `${remaining} item${remaining === 1 ? '' : 's'} remaining`}
+          </p>
+        </>
+      ) : (
+        <>
+          <h1 className={styles.title}>Shopping list</h1>
+          <p className={styles.subtitle}>
+            {remaining === 0 ? 'All done!' : `${remaining} item${remaining === 1 ? '' : 's'} left`}
+          </p>
+        </>
+      )}
+
+      {journey && remaining === 0 && list.items.length > 0 ? (
+        <div className={styles.readyToCook}>
+          <p className={styles.readyToCookText}>You&apos;re ready to cook {journey.recipeTitle}.</p>
+          <Link href="/cook-today" className={styles.readyToCookButton}>
+            Back to Cooking
+          </Link>
+        </div>
+      ) : null}
 
       {list.mealPlanId ? (
         <button

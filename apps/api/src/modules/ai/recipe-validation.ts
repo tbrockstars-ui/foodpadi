@@ -14,6 +14,63 @@ export interface RecipeView {
   cuisine: string | null;
   ingredients: RecipeIngredientView[];
   steps: string[];
+  /** Cook Today only — one entry per step (same length as `steps`), seconds
+   * for a step with a genuine duration, null for one that doesn't have a
+   * reliable timer. Absent entirely for Plan Ahead / curated / guest
+   * recipes, which never had this asked of them — the client falls back to
+   * its own best-effort text guess in that case. */
+  stepDurationsSeconds?: (number | null)[];
+  /** Cook Today only — the prep-only portion of cookTimeMinutes, when the AI
+   * could genuinely estimate one. Absent for Plan Ahead / curated / guest
+   * recipes, and for any Cook Today recipe with no distinct prep phase — the
+   * client shows only the plain total in that case, same as before this
+   * field existed. Always strictly less than cookTimeMinutes (see
+   * sanitizePrepTimeMinutes), so `cookTimeMinutes - prepTimeMinutes` is
+   * always a positive "active cook" figure when present. */
+  prepTimeMinutes?: number;
+}
+
+const MAX_STEP_DURATION_SECONDS = 3 * 60 * 60; // 3 hours — generous ceiling, never a fabricated marathon step
+
+/**
+ * Validates the optional stepDurationsSeconds candidate against an already-
+ * accepted `steps` array. Never partially trusted: any mismatch (wrong
+ * length, non-finite, negative, absurdly long) drops the WHOLE field for
+ * this recipe rather than keeping some entries and guessing at others — the
+ * recipe itself is still kept, the client just falls back to its own
+ * best-effort text guess for every step, same as it does when the field is
+ * absent entirely.
+ */
+function sanitizeStepDurations(candidate: unknown, stepCount: number): (number | null)[] | undefined {
+  if (!Array.isArray(candidate) || candidate.length !== stepCount) return undefined;
+  const durations: (number | null)[] = [];
+  for (const entry of candidate) {
+    if (entry === null) {
+      durations.push(null);
+      continue;
+    }
+    const seconds = Number(entry);
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_STEP_DURATION_SECONDS) return undefined;
+    durations.push(Math.round(seconds));
+  }
+  return durations;
+}
+
+/**
+ * Validates the optional prepTimeMinutes candidate against the already-
+ * accepted `cookTimeMinutes`. Never partially trusted: not-a-number, zero or
+ * negative, or a prep time that isn't strictly less than the total (e.g. the
+ * AI mistakenly repeats cookTimeMinutes, or claims a prep phase longer than
+ * the whole recipe) drops the field entirely rather than showing a
+ * nonsensical or zero-length "cook" portion — the recipe itself is still
+ * kept, the client just falls back to showing the plain total, same as when
+ * the field is absent entirely.
+ */
+function sanitizePrepTimeMinutes(candidate: unknown, cookTimeMinutes: number): number | undefined {
+  if (candidate === null || candidate === undefined) return undefined;
+  const minutes = Number(candidate);
+  if (!Number.isFinite(minutes) || minutes <= 0 || minutes >= cookTimeMinutes) return undefined;
+  return Math.round(minutes);
 }
 
 const logger = new Logger('RecipeValidation');
@@ -74,5 +131,8 @@ export function sanitizeRecipeCandidate(
     return null;
   }
 
-  return { title, cookTimeMinutes, servings, cuisine, ingredients, steps };
+  const stepDurationsSeconds = sanitizeStepDurations(candidate.stepDurationsSeconds, steps.length);
+  const prepTimeMinutes = sanitizePrepTimeMinutes(candidate.prepTimeMinutes, cookTimeMinutes);
+
+  return { title, cookTimeMinutes, servings, cuisine, ingredients, steps, stepDurationsSeconds, prepTimeMinutes };
 }

@@ -1,0 +1,73 @@
+.badge {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+}
+
+.badgeImg {
+  height: 54px;
+  width: auto;
+  display: block;
+}
+
+.comingSoon {
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: default;
+}
+
+.comingSoon .badgeImg {
+  opacity: 0.45;
+  filter: grayscale(60%);
+}
+
+.comingSoonLabel {
+  font-size: 12px;
+  font-weight: 600;
+  /* Inherits the surrounding section's text colour (white on the dark hero,
+     muted grey elsewhere) rather than a fixed value, since this badge is
+     reused on both. */
+  color: inherit;
+  opacity: 0.75;
+  letter-spacing: 0.02em;
+}
+
+/* Direct-APK download badge — deliberately NOT Google's Play Store artwork
+   (see PlayStoreBadge.tsx's doc comment), but matched to its ~54px height
+   and black-pill weight so it sits comfortably next to AppStoreBadge. */
+.apkBadge {
+  gap: 10px;
+  height: 54px;
+  padding: 0 16px;
+  border-radius: 10px;
+  background: #000;
+  color: #fff;
+  transition: background 0.15s ease;
+}
+
+.apkBadge:hover {
+  background: #222;
+}
+
+.apkIcon {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+}
+
+.apkText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.apkTextSmall {
+  font-size: 10px;
+  opacity: 0.85;
+}
+
+.apkTextBig {
+  font-size: 16px;
+  font-weight: 600;
+}

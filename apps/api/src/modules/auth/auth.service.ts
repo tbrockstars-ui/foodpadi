@@ -10,10 +10,14 @@ import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { parseDurationMs } from '../../common/duration.util';
+import { normaliseCountryCode } from '../../common/country.util';
 import { MailerService } from '../../common/mailer.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { ReferralsService } from '../referrals/referrals.service';
 import { normaliseReferralCode } from '../referrals/referral-code.util';
+import { EntitlementService } from '../billing/entitlement.service';
+import { BillingConfigService } from '../billing/billing-config.service';
+import { TRIAL_DURATION_DAYS } from '../billing/trial.constants';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 
@@ -49,7 +53,23 @@ export class AuthService {
     private readonly mailer: MailerService,
     private readonly referrals: ReferralsService,
     private readonly analytics: AnalyticsService,
+    private readonly entitlements: EntitlementService,
+    private readonly billingConfig: BillingConfigService,
   ) {}
+
+  /** Trial window for a brand-new account — admin-tunable, constant fallback. */
+  private async newTrialWindow(): Promise<{ trialStartedAt: Date; trialEndsAt: Date }> {
+    let days = TRIAL_DURATION_DAYS;
+    try {
+      days = (await this.billingConfig.getResolved()).appTrialDays;
+    } catch {
+      // Billing config unreadable (e.g. DB race at first boot) — fall back to
+      // the constant rather than fail the signup.
+    }
+    const trialStartedAt = new Date();
+    const trialEndsAt = new Date(trialStartedAt.getTime() + days * 86_400_000);
+    return { trialStartedAt, trialEndsAt };
+  }
 
   async register(dto: RegisterDto, signupIp?: string | null) {
     const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
@@ -58,6 +78,7 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const { trialStartedAt, trialEndsAt } = await this.newTrialWindow();
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
@@ -65,6 +86,9 @@ export class AuthService {
         profile: {
           create: {
             displayName: dto.displayName,
+            countryCode: normaliseCountryCode(dto.countryCode),
+            trialStartedAt,
+            trialEndsAt,
           },
         },
       },
@@ -72,6 +96,9 @@ export class AuthService {
     });
 
     await this.applyReferral(user.id, dto.referralCode, signupIp);
+    void this.analytics.track('trial_started', { userId: user.id }, {
+      endsAt: trialEndsAt.toISOString(),
+    });
 
     return this.issueTokens(user.id, user.email, user.profile);
   }
@@ -135,7 +162,12 @@ export class AuthService {
    * and a brand-new email creates a passwordless `authProvider: "google"`
    * account. Never creates or overwrites a password.
    */
-  async loginWithGoogle(idToken: string, referralCode?: string, signupIp?: string | null) {
+  async loginWithGoogle(
+    idToken: string,
+    referralCode?: string,
+    signupIp?: string | null,
+    countryCode?: string,
+  ) {
     const { email, name } = await this.verifyGoogleToken(idToken);
 
     const existing = await this.prisma.user.findUnique({
@@ -153,16 +185,27 @@ export class AuthService {
       return this.issueTokens(existing.id, existing.email, existing.profile);
     }
 
+    const { trialStartedAt, trialEndsAt } = await this.newTrialWindow();
     const user = await this.prisma.user.create({
       data: {
         email,
         authProvider: 'google',
-        profile: { create: { displayName: name ?? null } },
+        profile: {
+          create: {
+            displayName: name ?? null,
+            countryCode: normaliseCountryCode(countryCode),
+            trialStartedAt,
+            trialEndsAt,
+          },
+        },
       },
       include: { profile: true },
     });
 
     await this.applyReferral(user.id, referralCode, signupIp);
+    void this.analytics.track('trial_started', { userId: user.id }, {
+      endsAt: trialEndsAt.toISOString(),
+    });
 
     return this.issueTokens(user.id, user.email, user.profile);
   }
@@ -288,7 +331,13 @@ export class AuthService {
   private async issueTokens(
     userId: string,
     email: string,
-    profile: { displayName: string | null; onboardingCompletedAt: Date | null; disclaimerAcknowledgedAt: Date | null } | null,
+    profile: {
+      displayName: string | null;
+      countryCode?: string | null;
+      onboardingCompletedAt: Date | null;
+      disclaimerAcknowledgedAt: Date | null;
+      trialEndsAt?: Date | null;
+    } | null,
   ) {
     const accessToken = this.jwt.sign(
       { sub: userId, email },
@@ -309,6 +358,8 @@ export class AuthService {
       },
     });
 
+    const entitlement = await this.entitlements.getUserEntitlement(userId);
+
     return {
       accessToken,
       refreshToken: rawRefreshToken,
@@ -316,8 +367,11 @@ export class AuthService {
         id: userId,
         email,
         displayName: profile?.displayName ?? null,
+        countryCode: profile?.countryCode ?? null,
         onboardingCompletedAt: profile?.onboardingCompletedAt?.toISOString() ?? null,
         disclaimerAcknowledgedAt: profile?.disclaimerAcknowledgedAt?.toISOString() ?? null,
+        entitlement,
+        trialEndsAt: profile?.trialEndsAt?.toISOString() ?? null,
       },
     };
   }

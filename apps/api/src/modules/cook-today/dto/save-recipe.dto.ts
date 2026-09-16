@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsBoolean,
@@ -62,4 +63,22 @@ export class SaveRecipeDto {
   @IsOptional()
   @IsBoolean()
   isFavorite?: boolean;
+
+  // The client always echoes back the RecipeView it has on screen, which may
+  // carry these two Cook Today-only fields (recipe-validation.ts). Recipe has
+  // no column for either — accepted here only so the global whitelist
+  // ValidationPipe doesn't 400 the whole save ("property ... should not
+  // exist"), then silently dropped by CookTodayService.save. A saved/resumed
+  // recipe simply falls back to the client's own per-step estimate, same as
+  // every curated/guest recipe already does without this field.
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  stepDurationsSeconds?: (number | null)[];
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(600)
+  prepTimeMinutes?: number;
 }

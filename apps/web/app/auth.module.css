@@ -37,6 +37,28 @@
   margin: 8px 0 32px;
 }
 
+/* "Signing in from 🇬🇧 United Kingdom" — detected-location hint on the login
+   page. Sits between the subtitle and the form. */
+.locationHint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: fit-content;
+  margin: -20px auto 22px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill, 999px);
+  background: var(--surface-sunken, var(--surface));
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.locationHint span[aria-hidden='true'] {
+  font-size: 16px;
+  line-height: 1;
+}
+
 .input {
   display: block;
   width: 100%;
@@ -102,7 +124,7 @@
 }
 
 .success {
-  color: var(--primary);
+  color: var(--primary-ink);
   margin-bottom: 16px;
   font-size: 14px;
   text-align: center;
@@ -115,7 +137,7 @@
 
 .switchModeText {
   display: block;
-  color: var(--primary);
+  color: var(--primary-ink);
   text-align: center;
   margin-top: 20px;
   font-size: 14px;
@@ -130,7 +152,7 @@
 }
 .switchModeText {
   display: block;
-  color: var(--primary);
+  color: var(--primary-ink);
   text-align: center;
   margin-top: 20px;
   font-size: 14px;

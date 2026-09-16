@@ -1,0 +1,190 @@
+.filters {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-md);
+}
+.filters input,
+.filters select {
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong, var(--border));
+  border-radius: var(--radius-sm);
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.table th {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.table tr:hover td {
+  background: var(--surface-sunken);
+}
+.rowLink {
+  color: var(--primary-ink);
+  text-decoration: none;
+  font-weight: 600;
+}
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+}
+.pillActive {
+  background: var(--success-soft);
+  color: var(--success);
+}
+.pillPending {
+  background: var(--primary-soft);
+  color: var(--primary-dark);
+}
+.pillOff {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.pillWarn {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+/* admin overview strip */
+.overviewStrip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-sm);
+  margin-bottom: var(--space-lg);
+}
+.overviewTile {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: var(--space-sm) var(--space-md);
+}
+.overviewValue {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.overviewLabel {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.noteBox {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-sm);
+  padding: var(--space-sm) var(--space-md);
+  font-size: 14px;
+  margin: var(--space-sm) 0;
+}
+.audit {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 6px;
+  font-size: 13px;
+}
+.audit li {
+  padding: 8px 10px;
+  border-left: 2px solid var(--border-strong, var(--border));
+}
+.auditTime {
+  color: var(--text-faint);
+  font-size: 12px;
+  display: block;
+}
+.reportBadge {
+  background: var(--danger);
+  color: #fff;
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* detail panel */
+.detailGrid {
+  display: grid;
+  gap: var(--space-lg);
+  grid-template-columns: 1fr;
+  max-width: 760px;
+}
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+  background: var(--surface);
+}
+.card h2 {
+  margin: 0 0 var(--space-sm);
+  font-size: 15px;
+}
+.kv {
+  display: grid;
+  grid-template-columns: 160px 1fr;
+  gap: 4px 12px;
+  font-size: 14px;
+}
+.kv dt {
+  color: var(--text-muted);
+}
+.kv dd {
+  margin: 0;
+}
+.actionRow {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  margin-top: var(--space-md);
+}
+.btn {
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong, var(--border));
+  background: var(--background);
+  color: var(--text);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.btnPrimary {
+  background: var(--primary);
+  color: var(--primary-text);
+  border-color: var(--primary);
+}
+.btnDanger {
+  color: var(--danger);
+  border-color: var(--danger);
+}
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.listItem {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+.err {
+  color: var(--danger);
+  font-size: 13px;
+}

@@ -1,60 +1,72 @@
 export type ThemeScheme = 'default' | 'dark';
 
+// FoodPadi design tokens — mirrors apps/web/app/globals.css exactly so web and
+// mobile stay one visual identity. Structure = charcoal/cream neutrals;
+// `primary` (lime) = action + intelligence, used sparingly; `secondary`
+// (amber) = food warmth / highlights. `primary` is a FILL colour (dark text
+// on top); `primaryInk` is the legible-on-page accent for text / icons.
 export const lightColors = {
-  background: '#FBFAF7',
+  background: '#FAFAF7',
   surface: '#FFFFFF',
-  surfaceSunken: '#F4F2EC',
-  text: '#181C19',
-  textMuted: '#6B7268',
-  textFaint: '#9A9E94',
-  primary: '#2F6B4F',
-  primaryDark: '#204A37',
-  primarySoft: '#EAF3EE',
-  primaryText: '#FFFFFF',
-  // "accent" is kept as an alias for existing call sites (Tag uses it);
-  // "secondary" is the same colour, named per docs/FOODPADI_DESIGN_SYSTEM.md's
-  // design-system table — new code should reach for `secondary`.
-  accent: '#C2760C',
-  accentSoft: '#FBF0DE',
-  secondary: '#C2760C',
-  secondarySoft: '#FBF0DE',
-  success: '#3B7A3B',
-  successSoft: '#EAF3EA',
-  warning: '#B7791F',
-  warningSoft: '#FBF1E2',
-  border: '#E7E4DB',
-  borderStrong: '#D4D0C4',
-  danger: '#B3261E',
-  dangerSoft: '#FBEBEA',
+  surfaceElevated: '#FFFFFF',
+  surfaceSunken: '#F1F1EC',
+  text: '#171A16',
+  textMuted: '#626860',
+  textFaint: '#9BA097',
+  primary: '#9ACD32',
+  primaryDark: '#86B92A',
+  primarySoft: '#EEF6DB',
+  primaryText: '#1C2E00',
+  primaryInk: '#4F7D12',
+  // "accent" / "accentSoft" kept as aliases for existing call sites (Tag);
+  // new code should reach for `secondary`.
+  accent: '#D98B00',
+  accentSoft: '#FBEED7',
+  secondary: '#D98B00',
+  secondaryDark: '#BD7900',
+  secondarySoft: '#FBEED7',
+  secondaryText: '#3A2500',
+  success: '#3E9B57',
+  successSoft: '#E8F3EA',
+  warning: '#C68A1E',
+  warningSoft: '#FBF1E0',
+  border: '#DDE2D8',
+  borderStrong: '#C7CDBF',
+  danger: '#C4362B',
+  dangerSoft: '#FBECEB',
 };
 
 export type ThemeColors = typeof lightColors;
 
-// Mirrors apps/web's :root[data-theme="dark"] token override — same intent,
-// same hue shifts (green lightened for contrast on a dark surface).
+// Deep near-black green ground (not pure black); lime "glows" through
+// contrast without going neon. Designed for dark, not inverted from light.
 export const darkColors: ThemeColors = {
-  background: '#14171A',
-  surface: '#1C2025',
-  surfaceSunken: '#23282E',
-  text: '#F2F1EC',
-  textMuted: '#A7AEA9',
-  textFaint: '#79807B',
-  primary: '#5BBD8F',
-  primaryDark: '#47A97B',
-  primarySoft: '#1E3A2D',
-  primaryText: '#0C1F17',
-  accent: '#E0A24A',
-  accentSoft: '#3A2C14',
-  secondary: '#E0A24A',
-  secondarySoft: '#3A2C14',
-  success: '#5FAE5F',
-  successSoft: '#1F331F',
-  warning: '#D9A441',
-  warningSoft: '#3A2F16',
-  border: '#333A41',
-  borderStrong: '#47505A',
-  danger: '#E2685F',
-  dangerSoft: '#3A1F1D',
+  background: '#080A08',
+  surface: '#141814',
+  surfaceElevated: '#1A1F19',
+  surfaceSunken: '#0E110E',
+  text: '#F7F7F2',
+  textMuted: '#B8BDB5',
+  textFaint: '#7E847B',
+  primary: '#C8F34A',
+  primaryDark: '#B4E236',
+  primarySoft: '#1D2A10',
+  primaryText: '#0C1A00',
+  primaryInk: '#C8F34A',
+  accent: '#FFB52E',
+  accentSoft: '#2E2410',
+  secondary: '#FFB52E',
+  secondaryDark: '#EAA11C',
+  secondarySoft: '#2E2410',
+  secondaryText: '#1C1300',
+  success: '#63C77F',
+  successSoft: '#142718',
+  warning: '#E7A93C',
+  warningSoft: '#2C2210',
+  border: '#343A32',
+  borderStrong: '#48503F',
+  danger: '#F0685E',
+  dangerSoft: '#2E1614',
 };
 
 export function colorsFor(scheme: ThemeScheme): ThemeColors {

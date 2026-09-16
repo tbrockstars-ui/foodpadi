@@ -7,7 +7,18 @@ import { SettingsMenu } from '../app/SettingsMenu';
 import { UserAvatar } from './UserAvatar';
 import { AppShellNav } from './AppShellNav';
 import { ThemeToggle } from './ThemeToggle';
+import { DailyReminderSync } from './DailyReminderSync';
 import styles from './AppShell.module.css';
+
+/** "FoodPadi Trial · 5 days left" — server-rendered from the authoritative
+ *  trialEndsAt, so it needs no client clock. */
+function trialChipLabel(trialEndsAt: string | null): string {
+  if (!trialEndsAt) return 'FoodPadi Trial';
+  const msLeft = new Date(trialEndsAt).getTime() - Date.now();
+  const daysLeft = Math.max(0, Math.ceil(msLeft / 86_400_000));
+  if (daysLeft <= 0) return 'Trial ending — Upgrade';
+  return `FoodPadi Trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`;
+}
 
 /**
  * Persistent sidebar + topbar wrapping every main-app page (Home, Cook
@@ -19,20 +30,30 @@ import styles from './AppShell.module.css';
  */
 export async function AppShell({ guest, children }: { guest: boolean; children: React.ReactNode }) {
   let me: UserSummary | null = null;
+  let isDealer = false;
   if (!guest) {
-    try {
-      me = await serverFetch<UserSummary>('/users/me');
-    } catch (e) {
-      // Stale/invalid cookie — same "fall through rather than crash the
-      // route" precedent as app/page.tsx and app/guest/page.tsx. The page's
-      // own requireSession() already handles the real redirect; this only
-      // guards the topbar's optional avatar.
-      if (!(e instanceof ApiError && (e.status === 401 || e.status === 404))) throw e;
+    const [meResult, dealerResult] = await Promise.allSettled([
+      serverFetch<UserSummary>('/users/me'),
+      serverFetch('/dealers/me'),
+    ]);
+    if (meResult.status === 'fulfilled') {
+      me = meResult.value;
+    } else if (meResult.reason instanceof ApiError && meResult.reason.status >= 500) {
+      throw meResult.reason;
+    }
+    if (dealerResult.status === 'fulfilled') {
+      isDealer = true;
+    } else if (dealerResult.reason instanceof ApiError && dealerResult.reason.status >= 500) {
+      throw dealerResult.reason;
     }
   }
 
   return (
     <div className={styles.shell}>
+      {/* Account-only (brief §19 — same posture as every other preference
+          surface: FoodGoal/FoodPreference/AvoidedIngredient/
+          CompanionPreference are all account-only too). */}
+      {!guest ? <DailyReminderSync /> : null}
       <aside className={styles.sidebar}>
         <Logo href="/" size={34} withWordmark className={styles.sidebarBrand} />
         <AppShellNav guest={guest} />
@@ -59,8 +80,13 @@ export async function AppShell({ guest, children }: { guest: boolean; children: 
             </span>
           ) : (
             <span className={styles.memberActions}>
-              <SettingsMenu />
-              {me ? <UserAvatar displayName={me.displayName} email={me.email} /> : null}
+              {me?.entitlement === 'trial' ? (
+                <Link href="/premium" className={styles.trialChip}>
+                  <span aria-hidden="true">✨</span> {trialChipLabel(me.trialEndsAt)}
+                </Link>
+              ) : null}
+              <SettingsMenu isDealer={isDealer} />
+              {me ? <UserAvatar displayName={me.displayName} email={me.email} avatarId={me.avatarId} /> : null}
             </span>
           )}
         </header>

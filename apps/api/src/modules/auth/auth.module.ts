@@ -9,9 +9,10 @@ import { GuestSessionController } from './guest-session.controller';
 import { GuestSessionService } from './guest-session.service';
 import { GuestOrAuthGuard } from './guest-or-auth.guard';
 import { ReferralsModule } from '../referrals/referrals.module';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
-  imports: [PassportModule, JwtModule.register({}), ReferralsModule],
+  imports: [PassportModule, JwtModule.register({}), ReferralsModule, BillingModule],
   controllers: [AuthController, GuestSessionController],
   providers: [AuthService, JwtStrategy, MailerService, GuestSessionService, GuestOrAuthGuard],
   exports: [AuthService, GuestSessionService, GuestOrAuthGuard, JwtModule],

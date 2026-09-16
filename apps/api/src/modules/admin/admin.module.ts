@@ -9,14 +9,22 @@ import { AdminFoodIdeasController } from './admin-food-ideas.controller';
 import { AdminFoodIdeasService } from './admin-food-ideas.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AdminAnalyticsService } from './admin-analytics.service';
+import { AdminBillingController } from './admin-billing.controller';
+import { AdminDealersController } from './admin-dealers.controller';
+import { AdminDealersService } from './admin-dealers.service';
+import { BillingModule } from '../billing/billing.module';
+import { DealersModule } from '../dealers/dealers.module';
 
 @Module({
+  imports: [BillingModule, DealersModule],
   controllers: [
     AdminUsersController,
     AdminWaitlistController,
     AdminAuthController,
     AdminFoodIdeasController,
     AdminAnalyticsController,
+    AdminBillingController,
+    AdminDealersController,
   ],
   providers: [
     AdminUsersService,
@@ -24,6 +32,7 @@ import { AdminAnalyticsService } from './admin-analytics.service';
     AdminAuthService,
     AdminFoodIdeasService,
     AdminAnalyticsService,
+    AdminDealersService,
   ],
 })
 export class AdminModule {}

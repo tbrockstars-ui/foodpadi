@@ -49,7 +49,7 @@
   align-items: center;
   gap: var(--space-xs);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   border-radius: var(--radius-pill);
   padding: 6px 14px;
   font-size: 13px;
@@ -59,7 +59,7 @@
 .removeIcon {
   background: none;
   border: none;
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 13px;
   line-height: 1;
   cursor: pointer;
@@ -125,7 +125,7 @@
 .chipSelected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
 }
 
@@ -240,7 +240,7 @@
 .readMoreLink {
   background: none;
   border: none;
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -252,4 +252,66 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
+}
+
+/* Birth-month avatar picker (user instruction 2026-09-11) */
+.avatarPreviewRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+.avatarPreview {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+}
+.linkButton {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  color: var(--danger);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.avatarMonthLabel {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: var(--space-md);
+  max-width: 260px;
+}
+.avatarSwatchRow {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.avatarSwatch {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease;
+}
+.avatarSwatch:hover:not(:disabled) {
+  transform: scale(1.08);
+}
+.avatarSwatch:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }

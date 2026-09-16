@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useTheme } from '../components/useTheme';
+import { SubscriptionMenuSection } from './SubscriptionMenuSection';
 import styles from './settings.module.css';
 
 function GearIcon() {
@@ -30,7 +31,7 @@ function GearIcon() {
  * payment placeholders behind one gear button so the header stays clean.
  * Mobile counterpart: apps/mobile/src/screens/SettingsScreen.tsx.
  */
-export function SettingsMenu() {
+export function SettingsMenu({ isDealer }: { isDealer: boolean }) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
@@ -85,6 +86,9 @@ export function SettingsMenu() {
           <Link href="/invite" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
             Invite a friend
           </Link>
+          <Link href="/daily-reminders" className={styles.item} role="menuitem" onClick={() => setOpen(false)}>
+            Daily reminders
+          </Link>
 
           <div className={styles.divider} />
 
@@ -110,15 +114,23 @@ export function SettingsMenu() {
 
           <div className={styles.divider} />
 
-          <p className={styles.sectionLabel}>Subscription</p>
-          <div className={styles.infoRow}>
-            <span className={styles.infoKey}>Plan</span>
-            <span className={styles.planBadge}>Free</span>
-          </div>
-          <p className={styles.muted}>You&apos;re on the free plan. Paid plans aren&apos;t available yet.</p>
+          <SubscriptionMenuSection onNavigate={() => setOpen(false)} />
 
-          <p className={styles.sectionLabel}>Payment history</p>
-          <p className={styles.muted}>No payments yet.</p>
+          {isDealer ? (
+            <>
+              <div className={styles.divider} />
+
+              <p className={styles.sectionLabel}>For businesses</p>
+              <Link
+                href="/dealers/dashboard"
+                className={styles.item}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+              >
+                Food Dealer dashboard
+              </Link>
+            </>
+          ) : null}
 
           <div className={styles.divider} />
 

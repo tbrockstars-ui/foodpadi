@@ -9,6 +9,15 @@ export interface RawRecipeCandidate {
   cuisine?: unknown;
   ingredients: unknown;
   steps: unknown;
+  /** Cook Today only — optional parallel array of per-step durations, same
+   * length as `steps`. Untrusted until sanitizeRecipeCandidate validates it
+   * (see recipe-validation.ts). */
+  stepDurationsSeconds?: unknown;
+  /** Cook Today only — optional prep-time-only portion of cookTimeMinutes
+   * (e.g. chopping/marinating before any actual cooking starts), so the
+   * client can show "Prep: 10 min / Cook: 25 min" instead of one bare total.
+   * Untrusted until sanitizeRecipeCandidate validates it. */
+  prepTimeMinutes?: unknown;
 }
 
 export interface CookTodayGenerationInput {
@@ -21,6 +30,18 @@ export interface CookTodayGenerationInput {
   avoidedIngredients?: string[];
   /** One pre-built sentence of soft goal guidance (goal-guidance.ts), or undefined. */
   goalGuidance?: string;
+  /** "None of these? Try another set" — recipe titles already shown for this
+   * same request, so a second call doesn't just hand back identical options.
+   * Steers the live model; hard-filters the no-API-key curated fallback. */
+  excludeTitles?: string[];
+  /**
+   * Anonymous, aggregate "what other cooks reported" guidance from
+   * CookingInsightsService (apps/api/src/modules/feedback) — cross-customer
+   * learning from post-cook feedback, e.g. "timings often run long, be more
+   * specific with quantities". Style guidance only: never lets a caller
+   * change ingredients, allergens or avoided-ingredient rules.
+   */
+  communityNotes?: string;
 }
 
 export interface PlanGenerationInput {
@@ -47,6 +68,9 @@ export interface PlanGenerationInput {
    * an honest "couldn't find that" is the right answer there.
    */
   allowGenericFallback?: boolean;
+  /** Same anonymous cross-customer signal as CookTodayGenerationInput's field
+   * of the same name — see its doc comment. */
+  communityNotes?: string;
 }
 
 export interface RawScannedItem {
@@ -102,13 +126,15 @@ const COOK_TODAY_SYSTEM_PROMPT = `You are the recipe-generation component inside
 
 Rules you must follow:
 - Return ONLY valid JSON, no prose before or after it, matching exactly this shape:
-  {"recipes": [{"title": string, "cookTimeMinutes": number, "servings": number, "cuisine": string | null, "ingredients": [{"name": string, "quantity": string | null, "unit": string | null}], "steps": [string, ...]}]}
+  {"recipes": [{"title": string, "cookTimeMinutes": number, "servings": number, "cuisine": string | null, "ingredients": [{"name": string, "quantity": string | null, "unit": string | null}], "steps": [string, ...], "stepDurationsSeconds": [number | null, ...], "prepTimeMinutes": number | null}]}
 - Return between 2 and 3 recipes.
 - Prefer recipes that use mostly the ingredients the user listed. You may assume common pantry staples (salt, pepper, oil, water) are available even if not listed, but do not assume specialty or allergen-relevant ingredients (dairy, nuts, gluten-containing items, etc.) are available unless the user listed them or a very close equivalent.
 - If a time constraint is given, every recipe's cookTimeMinutes must be at or under that limit.
 - If a favourite-cuisine list is given, lean toward it where it fits the ingredients, but don't force every recipe into those cuisines.
 - If an avoided-ingredients list is given, do not include any of those ingredients in any recipe.
 - If food goals are given, treat them as soft steering only — never state or imply a recipe is healthy, medical, or weight-loss related.
+- "stepDurationsSeconds" MUST be the same length as "steps", one entry per step, in order. For a step with a genuine, reasonable active/passive cooking duration (simmer, bake, rest, fry, boil, etc.), give your best realistic estimate in seconds. For a step that has no real duration of its own (add an ingredient, season to taste, plate up, stir something in, a one-off action), use null for that entry — never invent a duration for a step that doesn't have one.
+- "prepTimeMinutes" is the portion of "cookTimeMinutes" spent on prep before any actual cooking starts (chopping, marinating, measuring out, etc.) — only give a number when you can genuinely estimate it from the steps and it is clearly less than "cookTimeMinutes"; otherwise use null. Never fabricate a precise-looking split for a recipe that's really just "cook it for N minutes" with no distinct prep phase.
 - ${SAFETY_RULES}`;
 
 const PLAN_AHEAD_SYSTEM_PROMPT = `You are the meal-planning component inside FoodPadi, a UK food companion app. You are called only for the "Plan Ahead" feature: a user wants a dinner planned for each of several days.
@@ -192,11 +218,22 @@ export class ClaudeService {
     return this.client;
   }
 
-  private curatedFallback(count: number, hint?: string): RawRecipeCandidate[] {
+  private curatedFallback(count: number, hint?: string, excludeTitles?: string[]): RawRecipeCandidate[] {
     this.logger.warn(`ANTHROPIC_API_KEY not set — serving ${count} curated recipe(s) instead of a live AI call.`);
 
+    // "Try another set" support, same "never worse than not excluding"
+    // philosophy as pickCuratedRecipes: only exclude titles that still leave
+    // something to return.
+    const excluded = new Set((excludeTitles ?? []).map((t) => t.trim().toLowerCase()));
+    const notExcluded = (pool: RawRecipeCandidate[]) => {
+      if (excluded.size === 0) return pool;
+      const filtered = pool.filter((r) => !excluded.has(String(r.title).trim().toLowerCase()));
+      return filtered.length > 0 ? filtered : pool;
+    };
+
     if (!hint?.trim()) {
-      return Array.from({ length: count }, (_, i) => CURATED_RECIPES[i % CURATED_RECIPES.length]);
+      const pool = notExcluded(CURATED_RECIPES);
+      return Array.from({ length: count }, (_, i) => pool[i % pool.length]);
     }
 
     // Deliberately NOT topped up to `count` when matches are thin or absent
@@ -207,7 +244,7 @@ export class ClaudeService {
     // result is the safer failure mode than a confidently wrong one. (The
     // guest path uses pickCuratedRecipes in ./curated-recipes.ts, which DOES
     // top up — a guest with no "get it" fallback must never see nothing.)
-    return scoreCuratedByHint(hint).slice(0, count).map((s) => s.recipe);
+    return notExcluded(scoreCuratedByHint(hint).map((s) => s.recipe)).slice(0, count);
   }
 
   // Plan Ahead's demo fallback. Unlike curatedFallback above, this ALWAYS
@@ -237,7 +274,7 @@ export class ClaudeService {
 
   async generateCookTodayRecipes(input: CookTodayGenerationInput): Promise<RawRecipeCandidate[]> {
     if (!process.env.ANTHROPIC_API_KEY) {
-      return this.curatedFallback(3, input.ingredients.join(' '));
+      return this.curatedFallback(3, input.ingredients.join(' '), input.excludeTitles);
     }
 
     const userMessage = [
@@ -249,12 +286,16 @@ export class ClaudeService {
         ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.`
         : null,
       input.goalGuidance ?? null,
+      input.excludeTitles?.length
+        ? `I've already been shown these dishes for this same request — suggest something different this time, don't repeat any of them: ${input.excludeTitles.join(', ')}.`
+        : null,
+      input.communityNotes ?? null,
     ]
       .filter(Boolean)
       .join(' ');
 
     return this.callForRecipes(COOK_TODAY_SYSTEM_PROMPT, userMessage, 1500, () =>
-      this.curatedFallback(3, input.ingredients.join(' ')),
+      this.curatedFallback(3, input.ingredients.join(' '), input.excludeTitles),
     );
   }
 
@@ -279,6 +320,7 @@ export class ClaudeService {
       input.avoidedIngredients?.length ? `Avoid these ingredients entirely: ${input.avoidedIngredients.join(', ')}.` : null,
       input.budgetPence ? `Weekly food budget is roughly £${(input.budgetPence / 100).toFixed(2)}.` : null,
       input.goalGuidance ?? null,
+      input.communityNotes ?? null,
     ]
       .filter(Boolean)
       .join(' ');

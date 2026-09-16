@@ -4,6 +4,10 @@ export interface AdminWaitlistSignup {
   id: string;
   email: string;
   createdAt: string;
+  marketingConsent: boolean;
+  purpose: string;
+  source: string | null;
+  campaign: string | null;
 }
 
 export interface AdminWaitlistListResponse {

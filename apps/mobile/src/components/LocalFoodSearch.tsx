@@ -5,6 +5,7 @@ import type { FoodProviderResult, LocalFoodSearchInteractionType, LocalFoodSearc
 import { api, ApiError } from '../api/client';
 import { Button } from './Button';
 import { Card } from './Card';
+import { FoodPadiDealerResults } from './FoodPadiDealerResults';
 import { radius, spacing, typography, type ThemeColors } from '../theme/colors';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -48,6 +49,14 @@ export function LocalFoodSearch({
   const [results, setResults] = useState<FoodProviderResult[]>([]);
   const [source, setSource] = useState<LocalFoodSearchResponse['source']>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  // Resolved search origin — reused to query the FoodPadi Food Dealer Network
+  // alongside the OSM search so subscribed dealers appear FIRST, above the
+  // external results (Network-first ordering — dealer brief §22/§46).
+  const [dealerOrigin, setDealerOrigin] = useState<{
+    latitude?: number;
+    longitude?: number;
+    locationText?: string;
+  } | null>(null);
 
   useEffect(() => {
     onStageChange?.(stage);
@@ -68,6 +77,7 @@ export function LocalFoodSearch({
   }, [stage, results]);
 
   const runSearch = async (body: { latitude?: number; longitude?: number; locationText?: string }) => {
+    setDealerOrigin(body);
     setStage('searching');
     setErrorMessage(null);
     try {
@@ -132,6 +142,18 @@ export function LocalFoodSearch({
 
   return (
     <View style={[styles.container, autoStart && styles.containerEmbedded]}>
+      {/* FoodPadi's own Food Dealer Network — always ABOVE the OpenStreetMap
+          results below. Renders nothing when no subscribed dealer matches. */}
+      {dealerOrigin ? (
+        <FoodPadiDealerResults
+          query={query}
+          latitude={dealerOrigin.latitude}
+          longitude={dealerOrigin.longitude}
+          locationText={dealerOrigin.locationText}
+          getToken={getToken}
+        />
+      ) : null}
+
       {!autoStart ? (
         <>
           <Text style={styles.heading}>Find it near you</Text>

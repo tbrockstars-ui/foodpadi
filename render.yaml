@@ -71,5 +71,65 @@ services:
       # Comma-separated allowed browser origins. Set to your Vercel production
       # URL (and any preview URL you want to allow). The web app calls the API
       # server-to-server so this only gates real browser-origin callers.
+      # Also used to build Stripe Checkout's success/cancel URLs.
       - key: WEB_APP_URL
+        sync: false
+      # --- FoodPadi Premium / Stripe (billing module). With the first three
+      #     unset the API still boots and /billing/* returns 503. Run
+      #     `npm run stripe:setup --workspace=@foodpadi/api` once to mint the
+      #     $4.99 USD/month product + price, then add the webhook endpoint
+      #     (https://<this-service>/billing/webhook) in the Stripe Dashboard. ---
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_ID
+        sync: false
+      # Needed for the admin "change base price" action (mints a new Price).
+      - key: STRIPE_PRODUCT_ID
+        sync: false
+      # Optional tuning — safe to leave unset.
+      - key: STRIPE_TRIAL_DAYS
+        sync: false
+      - key: STRIPE_AUTOMATIC_TAX
+        sync: false
+      - key: STRIPE_PAST_DUE_GRACE_DAYS
+        sync: false
+      # --- FoodPadi Premium / Flutterwave (Nigeria). With these unset, Nigeria
+      #     falls back to Stripe card-in-USD. Run
+      #     `npm run flw:setup --workspace=@foodpadi/api` once to mint the NGN
+      #     monthly plan, then set a webhook URL + "Secret hash" in Flutterwave
+      #     (endpoint https://<this-service>/billing/flutterwave/webhook). ---
+      - key: FLW_SECRET_KEY
+        sync: false
+      - key: FLW_SECRET_HASH
+        sync: false
+      - key: FLW_PLAN_ID
+        sync: false
+      # MVP demo: "true" runs the Nigeria journey with no Flutterwave account
+      # and no real money (local /premium/demo-checkout page). Set "false" once
+      # real keys are in place.
+      - key: FLW_DEMO_MODE
+        value: "true"
+      - key: FLW_NGN_AMOUNT
+        value: "7500"
+      # --- FoodPadi Food Dealer Network (apps/api/src/modules/dealers) — the
+      #     B2B dealer subscription. A SEPARATE product from Premium: its own
+      #     Stripe Price + webhook secret, its own Flutterwave plan, never
+      #     sharing the `subscriptions` row. In demo mode (STRIPE_DEMO_MODE /
+      #     FLW_DEMO_MODE) the whole dealer journey works with no provider
+      #     account. For real keys run `npm run stripe:dealer-setup
+      #     --workspace=@foodpadi/api` and add a Stripe webhook for
+      #     https://<this-service>/dealers/billing/webhook. ---
+      - key: STRIPE_DEALER_PRICE_ID
+        sync: false
+      - key: STRIPE_DEALER_WEBHOOK_SECRET
+        sync: false
+      - key: FLW_DEALER_PLAN_ID
+        sync: false
+      - key: DEALER_SUB_PRICE_CENTS
+        value: "499"
+      - key: DEALER_SUB_NGN_AMOUNT
+        value: "7500"
+      - key: DEALER_PAST_DUE_GRACE_DAYS
         sync: false

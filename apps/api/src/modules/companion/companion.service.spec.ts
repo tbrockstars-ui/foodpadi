@@ -3,6 +3,12 @@ import { ContextService, type FoodContext } from './context.service';
 import { PatternService } from './pattern.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { EntitlementService } from '../billing/entitlement.service';
+
+// FoodPadi Memory is Paid-only — default the entitlement stub to 'paid' so the
+// existing suggestion behaviour is exercised; individual tests can override.
+const entitlementsStub = { getUserEntitlement: jest.fn().mockResolvedValue('paid') };
+beforeEach(() => entitlementsStub.getUserEntitlement.mockResolvedValue('paid'));
 
 function emptyContext(overrides: Partial<FoodContext> = {}): FoodContext {
   return {
@@ -78,6 +84,7 @@ describe('CompanionService.getSuggestion', () => {
       contextService as unknown as ContextService,
       patternService as unknown as PatternService,
       analytics as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
   });
 
@@ -92,6 +99,15 @@ describe('CompanionService.getSuggestion', () => {
     contextService.buildContext.mockResolvedValue(emptyContext({ patterns: [fakePattern()] }));
     const result = await service.getSuggestion('u1');
     expect(result).toBeNull();
+  });
+
+  it('FoodPadi Memory is Paid-only — a trial user gets no suggestion and no pattern recompute', async () => {
+    entitlementsStub.getUserEntitlement.mockResolvedValue('trial');
+    contextService.buildContext.mockResolvedValue(emptyContext({ patterns: [fakePattern()] }));
+    const result = await service.getSuggestion('u1');
+    expect(result).toBeNull();
+    expect(patternService.recompute).not.toHaveBeenCalled();
+    expect(prisma.companionSuggestion.create).not.toHaveBeenCalled();
   });
 
   it('respects the daily cap', async () => {
@@ -211,6 +227,7 @@ describe('CompanionService.recordAction', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       analytics as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     await service.recordAction('u1', 'sug-1', 'do_not_remind');
@@ -237,6 +254,7 @@ describe('CompanionService.recordAction', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       analytics as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     await service.recordAction('u1', 'sug-1', 'opened');
@@ -262,6 +280,7 @@ describe('CompanionService.recordAction', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       analytics as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     await service.recordAction('u1', 'sug-1', 'opened');
@@ -280,6 +299,7 @@ describe('CompanionService.recordAction', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       analytics as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
     await service.recordAction('someone-else', 'sug-1', 'accepted');
     expect(prisma.companionSuggestion.update).not.toHaveBeenCalled();
@@ -298,6 +318,7 @@ describe('CompanionService.resetMemory', () => {
       {} as unknown as ContextService,
       patterns as unknown as PatternService,
       {} as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     await service.resetMemory('u1');
@@ -319,6 +340,7 @@ describe('CompanionService preferences', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       {} as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     const prefs = await service.getPreferences('u1');
@@ -340,6 +362,7 @@ describe('CompanionService preferences', () => {
       {} as unknown as ContextService,
       {} as unknown as PatternService,
       {} as unknown as AnalyticsService,
+      entitlementsStub as unknown as EntitlementService,
     );
 
     await service.updatePreferences('u1', { notificationsEnabled: false });

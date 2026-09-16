@@ -3,14 +3,28 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { PlanScope } from '@foodpadi/shared';
+import { PremiumUpsellCard } from '../../components/PremiumUpsellCard';
 import styles from './plan.module.css';
 
-// Two primary choices — plan just the next day, or the whole week. Anything
-// in between lives behind "More options" as a custom day count (1-14).
-const SCOPE_OPTIONS: { label: string; value: PlanScope }[] = [
-  { label: 'Just tomorrow', value: 'tomorrow' },
-  { label: 'This week', value: 'week' },
+// Four choices — today, tomorrow, the whole week, or (behind "More options")
+// a custom day count (1-14). `premiumOnly` mirrors the server-side gate in
+// PlanAheadService.generate() (user instruction 2026-09-12, extended
+// 2026-09-12 to add 'today'): guest/trial get 'today' and 'tomorrow' free, a
+// paid subscription unlocks 'week' and the custom day-count option below.
+// This is UX only — generate() rejects a gated scope regardless of what this
+// form does, so there is no way to submit one by working around the client.
+const SCOPE_OPTIONS: { label: string; value: PlanScope; premiumOnly?: boolean }[] = [
+  { label: 'Today', value: 'today' },
+  { label: 'Tomorrow', value: 'tomorrow' },
+  { label: 'This week', value: 'week', premiumOnly: true },
 ];
+
+const LOCK_ICON = (
+  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+    <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="2" />
+    <path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="currentColor" strokeWidth="2" />
+  </svg>
+);
 
 // Lightweight prompt suggestions — same pattern as Decide's PROMPT_CHIPS:
 // each just populates the same free-text field the user could type into by
@@ -32,20 +46,32 @@ const PROMPT_SUGGESTIONS: { label: string; text: string }[] = [
 ];
 
 /** Web counterpart to apps/mobile/src/screens/PlanAheadScreen.tsx's scope step. */
-export function PlanScopeForm() {
+export function PlanScopeForm({ isPremium }: { isPremium: boolean }) {
   const router = useRouter();
-  const [scope, setScope] = useState<PlanScope>('week');
+  // Non-premium starts on the one scope actually available to them —
+  // previously always 'week' regardless of entitlement, which a trial/guest
+  // account could never actually submit.
+  const [scope, setScope] = useState<PlanScope>(isPremium ? 'week' : 'today');
   const [showCustom, setShowCustom] = useState(false);
   const [customDays, setCustomDays] = useState('3');
   const [budget, setBudget] = useState('');
   const [prompt, setPrompt] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showPremiumNudge, setShowPremiumNudge] = useState(false);
 
   const effectiveScope: PlanScope = showCustom ? 'custom' : scope;
 
   const createPlan = async () => {
     setError(null);
+    // Belt-and-braces — the click handlers above already prevent selecting a
+    // gated scope while !isPremium, but re-check here too (e.g. a
+    // subscription lapsing mid-session) rather than relying solely on the
+    // round trip to generate()'s own authoritative rejection.
+    if (effectiveScope !== 'tomorrow' && !isPremium) {
+      setShowPremiumNudge(true);
+      return;
+    }
     if (effectiveScope === 'custom') {
       const parsed = Number(customDays);
       if (!Number.isInteger(parsed) || parsed < 1 || parsed > 14) {
@@ -85,30 +111,53 @@ export function PlanScopeForm() {
   return (
     <div>
       <h1 className={styles.title}>How far ahead?</h1>
-      <p className={styles.subtitle}>Plan just the next day, or the whole week.</p>
+      <p className={styles.subtitle}>Plan today, tomorrow, or the whole week.</p>
 
       <div className={styles.chipWrap}>
-        {SCOPE_OPTIONS.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            className={`${styles.chip} ${!showCustom && scope === option.value ? styles.chipSelected : ''}`}
-            onClick={() => {
-              setShowCustom(false);
-              setScope(option.value);
-            }}
-          >
-            {option.label}
-          </button>
-        ))}
+        {SCOPE_OPTIONS.map((option) => {
+          const locked = option.premiumOnly && !isPremium;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              className={`${styles.chip} ${!showCustom && scope === option.value && !locked ? styles.chipSelected : ''} ${locked ? styles.chipLocked : ''}`}
+              aria-disabled={locked}
+              title={locked ? 'Planning more than tomorrow needs FoodPadi Premium' : undefined}
+              onClick={() => {
+                if (locked) {
+                  setShowPremiumNudge(true);
+                  return;
+                }
+                setShowPremiumNudge(false);
+                setShowCustom(false);
+                setScope(option.value);
+              }}
+            >
+              {locked ? LOCK_ICON : null}
+              {option.label}
+            </button>
+          );
+        })}
         <button
           type="button"
-          className={`${styles.chip} ${showCustom ? styles.chipSelected : ''}`}
-          onClick={() => setShowCustom((v) => !v)}
+          className={`${styles.chip} ${showCustom && isPremium ? styles.chipSelected : ''} ${!isPremium ? styles.chipLocked : ''}`}
+          aria-disabled={!isPremium}
+          title={!isPremium ? 'Custom-length plans need FoodPadi Premium' : undefined}
+          onClick={() => {
+            if (!isPremium) {
+              setShowPremiumNudge(true);
+              return;
+            }
+            setShowPremiumNudge(false);
+            setShowCustom((v) => !v);
+          }}
         >
+          {!isPremium ? LOCK_ICON : null}
           More options
         </button>
       </div>
+
+      {showPremiumNudge ? <PremiumUpsellCard heading="Plan further ahead" blurb="A full week and custom-length plans are part of FoodPadi Premium:" /> : null}
 
       {showCustom ? (
         <div className={styles.fieldRow}>

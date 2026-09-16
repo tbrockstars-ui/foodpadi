@@ -12,17 +12,24 @@ function formatTime(totalSeconds: number): string {
 }
 
 interface Props {
-  /** A duration guessed from the step text (regex hint) — pre-selects that preset if it matches, else the first. */
+  /** A duration guessed from the step text (regex hint), or the AI's own
+   * structured per-step duration (Cook Today only) — pre-selects/auto-starts
+   * that duration if present, else the timer waits on the first preset. */
   suggestedSeconds?: number;
+  /** Called once, the moment the countdown reaches zero — lets the caller
+   * auto-advance to the next step. Web counterpart: CookingTimer.tsx's same
+   * prop, apps/web/app/cook-today/CookingTimer.tsx. */
+  onComplete?: () => void;
 }
 
 /**
- * A per-step countdown for guided cooking. No backend/AI timing data exists
- * (RecipeView.steps is plain text — see Phase 1 plan), so the duration is
- * always user-picked, just pre-filled from a regex guess when the step text
- * names one. `Vibration` is core react-native — no new dependency.
+ * A per-step countdown for guided cooking. Timestamp-based (an `endAt`
+ * wall-clock target, not a decrementing counter) so the remaining time stays
+ * accurate even if this 1s ticker gets throttled while the app is
+ * backgrounded — the same fix already applied on web (see that file's own
+ * comment). `Vibration` is core react-native — no new dependency.
  */
-export function CookingTimer({ suggestedSeconds }: Props) {
+export function CookingTimer({ suggestedSeconds, onComplete }: Props) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const initial = suggestedSeconds && suggestedSeconds > 0 ? suggestedSeconds : PRESETS_SECONDS[0];
@@ -31,6 +38,13 @@ export function CookingTimer({ suggestedSeconds }: Props) {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // The wall-clock timestamp the countdown should hit zero at — recomputed
+  // fresh on every start()/resume so drift never accumulates.
+  const endAtRef = useRef<number | null>(null);
+  // The exact remaining duration, in ms, as of the last pause (or the full
+  // duration if never started) — what a bare start() with no argument
+  // resumes from.
+  const remainingMsRef = useRef<number>(initial * 1000);
 
   useEffect(() => {
     return () => {
@@ -45,36 +59,65 @@ export function CookingTimer({ suggestedSeconds }: Props) {
     }
   };
 
-  const start = () => {
+  const tick = () => {
+    if (endAtRef.current === null) return;
+    const remainingMs = endAtRef.current - Date.now();
+    if (remainingMs <= 0) {
+      clearTicker();
+      endAtRef.current = null;
+      remainingMsRef.current = 0;
+      setRunning(false);
+      setDone(true);
+      setRemainingSeconds(0);
+      Vibration.vibrate([0, 300, 150, 300]);
+      onComplete?.();
+      return;
+    }
+    remainingMsRef.current = remainingMs;
+    setRemainingSeconds(Math.ceil(remainingMs / 1000));
+  };
+
+  // No argument resumes from the exact ms left at the last pause (or the
+  // full duration, right after a reset) — an explicit seconds value is used
+  // by the preset chips, which reset-then-start in one motion.
+  const start = (overrideSeconds?: number) => {
     clearTicker();
+    const startFromMs = overrideSeconds !== undefined ? overrideSeconds * 1000 : remainingMsRef.current;
+    endAtRef.current = Date.now() + startFromMs;
+    remainingMsRef.current = startFromMs;
     setDone(false);
     setRunning(true);
-    intervalRef.current = setInterval(() => {
-      setRemainingSeconds((current) => {
-        if (current <= 1) {
-          clearTicker();
-          setRunning(false);
-          setDone(true);
-          Vibration.vibrate([0, 300, 150, 300]);
-          return 0;
-        }
-        return current - 1;
-      });
-    }, 1000);
+    setRemainingSeconds(Math.ceil(startFromMs / 1000));
+    intervalRef.current = setInterval(tick, 1000);
   };
 
   const pause = () => {
+    if (endAtRef.current !== null) {
+      remainingMsRef.current = Math.max(0, endAtRef.current - Date.now());
+    }
     clearTicker();
+    endAtRef.current = null;
     setRunning(false);
   };
 
   const reset = (nextDuration = durationSeconds) => {
     clearTicker();
+    endAtRef.current = null;
+    remainingMsRef.current = nextDuration * 1000;
     setRunning(false);
     setDone(false);
     setDurationSeconds(nextDuration);
     setRemainingSeconds(nextDuration);
   };
+
+  // Auto-starts the moment a real duration is known (structured AI timing or
+  // a text-guess) — mirrors web's CookingTimer, which starts itself for the
+  // same reason: the cook's hands are busy, they shouldn't have to tap
+  // "Start Timer" for every single step.
+  useEffect(() => {
+    if (suggestedSeconds && suggestedSeconds > 0) start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <View style={styles.card}>
@@ -107,7 +150,7 @@ export function CookingTimer({ suggestedSeconds }: Props) {
             <Text style={styles.controlText}>Pause</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={[styles.controlButton, styles.controlButtonPrimary]} onPress={start} accessibilityRole="button">
+          <TouchableOpacity style={[styles.controlButton, styles.controlButtonPrimary]} onPress={() => start()} accessibilityRole="button">
             <Text style={styles.controlTextPrimary}>
               {remainingSeconds === durationSeconds ? 'Start Timer' : 'Resume'}
             </Text>

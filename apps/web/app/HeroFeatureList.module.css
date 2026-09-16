@@ -1,0 +1,38 @@
+/* Absolutely positioned against the hero's own right edge (desktop only),
+   docked to the true viewport edge via the same break-out trick — see
+   HeroPhoneShowcase.module.css's comment for the full reasoning; mirrored. */
+.wrap {
+  position: absolute;
+  right: calc(50% - 50vw - 64px);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.bannerImg {
+  display: block;
+  width: clamp(320px, 33.3vw - 80px, 560px); /* matches the left banner — see its comment for the anchor points */
+  height: auto;
+}
+
+/* Kept in sync with HeroPhoneShowcase's breakpoint (raised to 1280px when
+   the left banner grew 20%, 2026-09-16) — the two must switch to stacked
+   layout at the same width .heroGrid does (see page.module.css), or one
+   banner ends up absolutely-positioned while the other is already stacked. */
+@media (max-width: 1280px) {
+  .wrap {
+    position: relative;
+    right: auto;
+    top: auto;
+    transform: none;
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+  }
+
+  .bannerImg {
+    width: 680px; /* 2x the previous 340px */
+    max-width: 92vw;
+  }
+}

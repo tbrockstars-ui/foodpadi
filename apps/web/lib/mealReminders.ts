@@ -1,19 +1,19 @@
-import type { MealPlanItemView } from '@foodpadi/shared';
+import { effectivePlannedTime, effectiveReminderOffsetMinutes, type MealPlanItemView, type MealPlanView } from '@foodpadi/shared';
 
 /**
- * Web counterpart to apps/mobile/src/lib/mealReminders.ts — same feature
- * (a "30 minutes to go" nudge before a planned meal's plannedTime), but a
- * meaningfully weaker mechanism: the web app has no service worker / push
- * subscription, so there's no OS-level scheduling to hand this to. A
- * reminder here is a plain `setTimeout` that fires a browser Notification —
- * it only survives as long as this tab stays open. PlanView re-arms every
- * item's reminder on mount for exactly that reason (a closed-then-reopened
- * tab has lost whatever was pending), same precedent as mobile re-arming on
- * app start. Callers should tell the user their tab needs to stay open,
- * since that's a real, honest limitation this can't hide.
+ * Web counterpart to apps/mobile/src/lib/mealReminders.ts — same feature (a
+ * "N minutes to go" nudge before a planned meal's effective time, see
+ * packages/shared/src/planTiming.ts), but a meaningfully weaker mechanism:
+ * the web app has no service worker / push subscription, so there's no
+ * OS-level scheduling to hand this to. A reminder here is a plain
+ * `setTimeout` that fires a browser Notification — it only survives as long
+ * as this tab stays open. PlanView re-arms every item's reminder on mount
+ * for exactly that reason (a closed-then-reopened tab has lost whatever was
+ * pending), same precedent as mobile re-arming on app start. Callers should
+ * tell the user their tab needs to stay open, since that's a real, honest
+ * limitation this can't hide.
  */
 
-const REMINDER_LEAD_MS = 30 * 60 * 1000;
 // setTimeout's delay is a 32-bit signed int internally — anything past this
 // fires almost immediately instead of at the intended time. A meal plan is
 // never scheduled this far ahead in practice, but chaining rather than
@@ -53,21 +53,30 @@ function fireAt(identifier: string, delayMs: number, fire: () => void) {
 export type MealReminderResult = 'scheduled' | 'no-time' | 'past' | 'permission-denied' | 'unsupported';
 
 /**
- * Schedules (or reschedules) the "30 minutes to go" reminder for one
- * meal-plan item.
+ * Schedules (or reschedules) the "N minutes to go" reminder for one
+ * meal-plan item. Both the eating time and the reminder lead time can come
+ * from the item's own override or the plan's default (packages/shared/src/
+ * planTiming.ts) — callers pass the whole plan, not just the item, so this
+ * always resolves the same effective values the UI shows. An effective
+ * offset of 0 means "no reminder", by plan default or explicit per-day
+ * choice.
  */
-export async function scheduleMealReminder(item: MealPlanItemView): Promise<MealReminderResult> {
+export async function scheduleMealReminder(item: MealPlanItemView, plan: MealPlanView): Promise<MealReminderResult> {
   const identifier = item.id;
   const existing = scheduled.get(identifier);
   if (existing) clearTimeout(existing);
   scheduled.delete(identifier);
 
-  if (!item.plannedTime) return 'no-time';
+  const plannedTime = effectivePlannedTime(item, plan);
+  if (!plannedTime) return 'no-time';
 
-  const [hours, minutes] = item.plannedTime.split(':').map(Number);
+  const offsetMinutes = effectiveReminderOffsetMinutes(item, plan);
+  if (offsetMinutes <= 0) return 'no-time'; // this day/plan explicitly wants no reminder
+
+  const [hours, minutes] = plannedTime.split(':').map(Number);
   const mealAt = new Date(item.plannedDate);
   mealAt.setHours(hours, minutes, 0, 0);
-  const reminderAt = mealAt.getTime() - REMINDER_LEAD_MS;
+  const reminderAt = mealAt.getTime() - offsetMinutes * 60 * 1000;
   const delayMs = reminderAt - Date.now();
 
   if (delayMs <= 0) return 'past'; // already in the past — nothing useful to schedule
@@ -82,10 +91,10 @@ export async function scheduleMealReminder(item: MealPlanItemView): Promise<Meal
 
   fireAt(identifier, delayMs, () => {
     scheduled.delete(identifier);
-    new Notification(`30 minutes to ${action} 🍽️`, {
+    new Notification(`${offsetMinutes} minute${offsetMinutes === 1 ? '' : 's'} to ${action} 🍽️`, {
       body: mealName
-        ? `${mealName} is booked for ${item.plannedTime} — ${action} now so you're ready in time.`
-        : `Your ${item.plannedTime} meal is coming up — time to ${action}.`,
+        ? `${mealName} is booked for ${plannedTime} — ${action} now so you're ready in time.`
+        : `Your ${plannedTime} meal is coming up — time to ${action}.`,
     });
   });
 

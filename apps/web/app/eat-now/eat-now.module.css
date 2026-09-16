@@ -268,7 +268,7 @@
   padding: 6px 14px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-ink);
   text-decoration: none;
   background: var(--primary-soft);
 }

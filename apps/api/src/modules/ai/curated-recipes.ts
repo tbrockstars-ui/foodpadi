@@ -38,6 +38,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Slide onto the hot tray and bake 10-12 minutes until the crust is golden and cheese is bubbling.',
       'Drizzle with olive oil and scatter over fresh basil before serving.',
     ],
+    stepDurationsSeconds: [900, null, null, 660, null],
   },
   {
     title: 'One-Pot Chicken & Rice',
@@ -58,6 +59,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Stir in the rice, pour over the stock, and nestle the chicken back in.',
       'Cover and simmer for 20 minutes until the rice is tender and chicken is cooked through.',
     ],
+    stepDurationsSeconds: [420, 300, null, 1200],
   },
   {
     title: 'Tomato & Basil Pasta',
@@ -77,6 +79,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Fry the garlic gently in olive oil, then add the tinned tomatoes and simmer for 10 minutes.',
       'Toss the drained pasta through the sauce, top with torn basil and grated parmesan.',
     ],
+    stepDurationsSeconds: [600, 660, null],
   },
   {
     // "Vegan" prefix added deliberately (was "Chickpea & Spinach Curry") —
@@ -100,6 +103,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Add the chickpeas and coconut milk, simmer for 15 minutes.',
       'Stir through the spinach until wilted, then serve with rice or flatbread.',
     ],
+    stepDurationsSeconds: [360, 900, null],
   },
   {
     title: 'Sheet-Pan Salmon & Veg',
@@ -118,6 +122,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Roast for 10 minutes, then add the salmon fillets and lemon slices on top.',
       'Roast for a further 12-15 minutes until the salmon is cooked through.',
     ],
+    stepDurationsSeconds: [null, 600, 810],
   },
   {
     title: 'Beef & Black Bean Tacos',
@@ -137,6 +142,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Stir in the taco seasoning and black beans, simmer for 5 minutes.',
       'Warm the tortillas and fill with the beef mixture, lettuce and cheese.',
     ],
+    stepDurationsSeconds: [420, 300, null],
   },
   {
     title: 'Miso Noodle Soup',
@@ -157,6 +163,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Add the mushrooms and cook for 5 minutes, then cook the noodles in the broth.',
       'Serve topped with the halved soft-boiled eggs and sliced spring onion.',
     ],
+    stepDurationsSeconds: [510, 240, 540, null],
   },
   {
     title: 'Chicken & Avocado Salad',
@@ -176,6 +183,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Toss the salad leaves, tomatoes and cucumber with olive oil.',
       'Top with the sliced chicken and avocado.',
     ],
+    stepDurationsSeconds: [660, null, null],
   },
   {
     title: 'Greek Salad',
@@ -195,6 +203,9 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Toss with the olives and olive oil.',
       'Top with crumbled feta and serve.',
     ],
+    // No genuine cook step at all — assembly only, so every entry is null
+    // rather than fabricating a wait time for a no-cook salad.
+    stepDurationsSeconds: [null, null, null],
   },
   {
     title: 'Loaded Jacket Potato',
@@ -212,6 +223,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Warm the baked beans.',
       'Split the potatoes open, top with butter, beans and grated cheese.',
     ],
+    stepDurationsSeconds: [3300, 300, null],
   },
   {
     title: 'Chicken & Vegetable Stir Fry',
@@ -232,6 +244,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Add the garlic, ginger and vegetables, stir-fry for 3-4 minutes.',
       'Stir in the soy sauce and serve over the cooked rice.',
     ],
+    stepDurationsSeconds: [720, 360, 210, null],
   },
   {
     // Was "Veggie Bean Chilli" — same reasoning as the curry above, every
@@ -255,6 +268,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Add the kidney beans and tinned tomatoes, simmer for 20 minutes.',
       'Serve with the cooked rice.',
     ],
+    stepDurationsSeconds: [720, 360, 1200, null],
   },
   {
     title: 'Egg Fried Rice',
@@ -273,6 +287,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Fry the rice and peas for a few minutes until hot through.',
       'Stir the egg back in with the soy sauce and spring onion.',
     ],
+    stepDurationsSeconds: [120, 240, null],
   },
   {
     title: 'Spaghetti Bolognese',
@@ -294,6 +309,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Stir in the tomato purée, tinned tomatoes and a splash of water, then simmer for 20 minutes.',
       'Meanwhile cook the spaghetti until al dente, drain, and toss through the sauce.',
     ],
+    stepDurationsSeconds: [420, 420, 1200, 600],
   },
   {
     title: 'Full English Breakfast',
@@ -315,6 +331,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Warm the beans in a small pan.',
       'Plate everything up with hot buttered toast.',
     ],
+    stepDurationsSeconds: [780, 420, 240, null],
   },
   {
     title: 'Vegan Lentil Dahl',
@@ -336,6 +353,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Cook for 20-25 minutes, stirring often, until the lentils collapse into a thick dahl.',
       'Stir through the spinach until wilted and season to taste.',
     ],
+    stepDurationsSeconds: [360, 300, 1350, null],
   },
   {
     title: 'Halloumi & Vegetable Traybake',
@@ -356,6 +374,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Roast at 200°C for 20 minutes.',
       'Add thick slices of halloumi and roast for a further 8-10 minutes until golden.',
     ],
+    stepDurationsSeconds: [null, 1200, 540],
   },
   {
     title: 'Tuna Pasta Bake',
@@ -375,6 +394,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Mix the pasta with the drained tuna, sweetcorn, softened onion and crème fraîche.',
       'Tip into an oven dish, scatter over the cheese, and bake at 200°C for 15-20 minutes until bubbling.',
     ],
+    stepDurationsSeconds: [540, null, 1050],
   },
   {
     title: 'Sausage & Mash',
@@ -395,6 +415,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Slowly fry the sliced onions until soft and golden, add the stock and simmer into a gravy.',
       'Serve the sausages over the mash with the onion gravy.',
     ],
+    stepDurationsSeconds: [900, 960, 720, null],
   },
   {
     title: 'Thai Green Chicken Curry',
@@ -415,6 +436,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Pour in the coconut milk, bring to a simmer, and cook for 12-15 minutes with the green beans.',
       'Finish with a squeeze of lime and serve with the cooked jasmine rice.',
     ],
+    stepDurationsSeconds: [60, 240, 810, null],
   },
   {
     title: 'Shakshuka',
@@ -436,6 +458,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Make wells in the sauce, crack in the eggs, cover, and cook until the whites are just set.',
       'Serve straight from the pan with bread to mop up.',
     ],
+    stepDurationsSeconds: [360, 540, 420, null],
   },
   {
     title: 'Beef Burgers & Chips',
@@ -456,6 +479,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Fry or grill the patties for 3-4 minutes a side, adding a cheese slice near the end.',
       'Build the burgers in the buns with lettuce and sliced tomato, and serve with the chips.',
     ],
+    stepDurationsSeconds: [1650, null, 450, null],
   },
   {
     title: 'Peanut Butter Noodles',
@@ -475,6 +499,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Whisk the peanut butter, soy sauce, lime juice and crushed garlic with enough noodle water to make a pourable sauce.',
       'Toss the noodles through the sauce and top with sliced spring onion.',
     ],
+    stepDurationsSeconds: [300, null, null],
   },
   {
     title: 'Jollof Rice with Chicken',
@@ -496,6 +521,10 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Stir in the rinsed rice, add stock to just cover, and return the chicken.',
       'Cover tightly and cook on a low heat for about 25 minutes until the rice is tender.',
     ],
+    // The screenshot-reported gap (Step 1 had no timer, so it never
+    // auto-advanced) traces to this whole file having no stepDurationsSeconds
+    // at all — see the file-level comment above.
+    stepDurationsSeconds: [480, 720, null, 1500],
   },
   {
     // Was "Butternut Squash Soup" — squash/onion/garlic/vegetable stock/oil
@@ -516,6 +545,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Pour over the stock and simmer for 20 minutes until the squash is very tender.',
       'Blend until smooth and season to taste.',
     ],
+    stepDurationsSeconds: [780, 1200, null],
   },
   {
     title: 'Chicken Fajitas',
@@ -536,6 +566,7 @@ export const CURATED_RECIPES: RawRecipeCandidate[] = [
       'Cook for 5 minutes more until the chicken is done and the vegetables are charred at the edges.',
       'Serve in warm tortillas with soured cream.',
     ],
+    stepDurationsSeconds: [null, 420, 300, null],
   },
 ];
 
@@ -582,17 +613,26 @@ const minutesOf = (r: RawRecipeCandidate): number => {
 export function pickCuratedRecipes(
   hint: string,
   count: number,
-  opts: { maxMinutes?: number } = {},
+  opts: { maxMinutes?: number; excludeTitles?: string[] } = {},
 ): RawRecipeCandidate[] {
   const matched = hint.trim() ? scoreCuratedByHint(hint).map((s) => s.recipe) : [];
   // Hint matches first, then the rest of the pool as top-up.
   const ordered = [...matched, ...CURATED_RECIPES];
 
+  // "Try another set" support — never a dead end: if excluding everything
+  // already shown would leave nothing left to pick from (the curated pool is
+  // finite), ignore the exclusion rather than returning empty. A repeat beats
+  // nothing, same philosophy as the maxMinutes fallback just below.
+  const excluded = new Set((opts.excludeTitles ?? []).map((t) => t.trim().toLowerCase()));
+  const notExcluded =
+    excluded.size > 0 ? ordered.filter((r) => !excluded.has(String(r.title).trim().toLowerCase())) : ordered;
+  const candidates = notExcluded.length > 0 ? notExcluded : ordered;
+
   const withinTime = opts.maxMinutes
-    ? ordered.filter((r) => minutesOf(r) <= opts.maxMinutes!)
-    : ordered;
+    ? candidates.filter((r) => minutesOf(r) <= opts.maxMinutes!)
+    : candidates;
   // If the time filter emptied the list, ignore it — see the doc comment.
-  const source = withinTime.length > 0 ? withinTime : ordered;
+  const source = withinTime.length > 0 ? withinTime : candidates;
 
   const result: RawRecipeCandidate[] = [];
   const seen = new Set<unknown>();

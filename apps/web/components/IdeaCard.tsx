@@ -30,8 +30,17 @@ export interface IdeaCardData {
  * gets the full recipe in a modal (already fetched with the card, no extra
  * round trip); a guest (no `recipe`, see HomeHub.tsx's loadIdeaCards) gets a
  * lightweight "create an account to see this" prompt instead.
+ *
+ * `onStartCooking` is optional and additive — Home doesn't pass it, so
+ * Home's cards are unchanged. Cook Today (docs Cook-page-redesign brief §9)
+ * passes its existing `openRecipe` handler, which puts a real
+ * "Start Cooking →" button directly on the card face (only when a full
+ * `recipe` is present — a signed-in member) instead of requiring the modal
+ * detour first. It drives the exact same detail/journey/cooking flow the
+ * modal's "create account" path already assumes exists — no second cooking
+ * implementation.
  */
-export function IdeaCard({ idea }: { idea: IdeaCardData }) {
+export function IdeaCard({ idea, onStartCooking }: { idea: IdeaCardData; onStartCooking?: (recipe: RecipeView) => void }) {
   const [open, setOpen] = useState(false);
   // "Find Near Me" inside the modal — same real, geolocation-based
   // LocalFoodSearch used on Home's Decide results and Plan's "Get it" days,
@@ -76,6 +85,15 @@ export function IdeaCard({ idea }: { idea: IdeaCardData }) {
           {idea.timeMinutes} min · {idea.difficulty}
           {idea.priceEstimate ? <span className={styles.ideaPrice}> · {idea.priceEstimate}</span> : null}
         </p>
+        {onStartCooking && idea.recipe ? (
+          <button
+            type="button"
+            className={styles.ideaStartCookingButton}
+            onClick={() => onStartCooking(idea.recipe!)}
+          >
+            Start Cooking <span aria-hidden="true">→</span>
+          </button>
+        ) : null}
       </div>
 
       {open ? (

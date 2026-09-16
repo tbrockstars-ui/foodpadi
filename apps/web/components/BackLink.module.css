@@ -17,7 +17,7 @@
 .backLink:hover {
   background: var(--primary-soft);
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-ink);
   transform: translateX(-2px);
 }
 

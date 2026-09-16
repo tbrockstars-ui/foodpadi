@@ -4,6 +4,12 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import type { FoodIdeaView, MealChoice, MealPlanItemView, MealPlanView } from '@foodpadi/shared';
+import {
+  effectivePlannedTime,
+  effectiveReminderOffsetMinutes,
+  reminderShortfallMinutes,
+  suggestedStartTime,
+} from '@foodpadi/shared';
 import { getCuisineImage } from '../../lib/imageAssets';
 import { FoodImage } from '../../components/FoodImage';
 import { cancelMealReminder, scheduleMealReminder, type MealReminderResult } from '../../lib/mealReminders';
@@ -37,14 +43,26 @@ const REMINDER_RESULT_MESSAGE: Record<MealReminderResult, string | null> = {
   unsupported: "Reminder saved, but this browser doesn't support notifications — you won't get a nudge here.",
 };
 
-/** The reminder fires 30 minutes before plannedTime — shown so "30 min before X" isn't left for the user to do the maths on. Matches mobile's PlanAheadScreen. */
-function formatReminderTime(plannedTime: string): string {
+/** The reminder fires `offsetMinutes` before plannedTime — shown so "N min before X" isn't left for the user to do the maths on. Matches mobile's PlanAheadScreen. */
+function formatReminderTime(plannedTime: string, offsetMinutes: number): string {
   const [hours, minutes] = plannedTime.split(':').map(Number);
-  const total = (hours * 60 + minutes - 30 + 24 * 60) % (24 * 60);
+  const total = (hours * 60 + minutes - offsetMinutes + 24 * 60) % (24 * 60);
   const h = Math.floor(total / 60);
   const m = total % 60;
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 }
+
+// The reminder-lead-time options offered wherever the user picks one — plan
+// default and per-day override alike. 0 = "no reminder".
+const REMINDER_OFFSET_OPTIONS: { label: string; value: number }[] = [
+  { label: 'No reminder', value: 0 },
+  { label: '10 min before', value: 10 },
+  { label: '15 min before', value: 15 },
+  { label: '20 min before', value: 20 },
+  { label: '30 min before', value: 30 },
+  { label: '45 min before', value: 45 },
+  { label: '60 min before', value: 60 },
+];
 
 /** Web counterpart to apps/mobile/src/screens/PlanAheadScreen.tsx's plan step. */
 export function PlanView({ plan }: { plan: MealPlanView }) {
@@ -78,15 +96,24 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
   // Matches mobile's PlanAheadScreen.
   const [timeDrafts, setTimeDrafts] = useState<Record<string, string>>({});
   const [timeError, setTimeError] = useState<string | null>(null);
+  // The plan-wide default editor — closed by default, one shared control
+  // rather than per-day, since "set once, applies to every day" is the
+  // point.
+  const [defaultsOpen, setDefaultsOpen] = useState(false);
+  const [defaultTimeDraft, setDefaultTimeDraft] = useState(plan.defaultMealTime ?? '');
+  const [defaultsBusy, setDefaultsBusy] = useState(false);
+  const [defaultsError, setDefaultsError] = useState<string | null>(null);
 
   // Re-arm every item's reminder whenever the plan's data changes (initial
   // load, or a fresh server-rendered `plan` after any router.refresh() below)
   // — a reminder here is just a setTimeout (see lib/mealReminders.ts), so a
   // closed-then-reopened tab has lost whatever was pending and needs it
   // rescheduled, same precedent as mobile re-arming on app start.
+  // Unconditional: scheduleMealReminder itself no-ops safely when a day has
+  // no effective time/reminder, no need to pre-filter here.
   useEffect(() => {
     for (const item of plan.items) {
-      if (item.plannedTime) void scheduleMealReminder(item);
+      void scheduleMealReminder(item, plan);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan]);
@@ -184,13 +211,17 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
   // (or ""), so unlike a free-text field there's no format to validate here
   // — the browser's own time picker is what guarantees the hour/minute are
   // right in the first place.
-  const applyPlannedTime = async (item: MealPlanItemView) => {
+  // `overrideDraft` lets a caller apply a specific value (e.g. "clear back to
+  // the plan default") directly, bypassing timeDrafts state — useful right
+  // after a setTimeDrafts call in the same handler, since that state update
+  // isn't visible synchronously.
+  const applyPlannedTime = async (item: MealPlanItemView, overrideDraft?: string) => {
     // Falls back to the already-committed plannedTime, exactly like the
     // input's own displayed value below — without this, clicking "Update"
     // before ever touching the field (timeDrafts has nothing for this item
     // yet) would read as an empty draft and silently clear the time instead
     // of just resubmitting it unchanged.
-    const draft = (timeDrafts[item.id] ?? item.plannedTime ?? '').trim();
+    const draft = (overrideDraft ?? timeDrafts[item.id] ?? item.plannedTime ?? '').trim();
     setTimeError(null);
     setBusyItemId(item.id);
     try {
@@ -205,15 +236,79 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
       }
       const updated = (await res.json()) as MealPlanView;
       const updatedItem = updated.items.find((i) => i.id === item.id);
-      if (updatedItem?.plannedTime) {
-        const result = await scheduleMealReminder(updatedItem);
+      if (updatedItem) {
+        const result = await scheduleMealReminder(updatedItem, updated);
         setTimeError(REMINDER_RESULT_MESSAGE[result]);
-      } else {
-        cancelMealReminder(item.id);
       }
       router.refresh();
     } finally {
       setBusyItemId(null);
+    }
+  };
+
+  // Per-day reminder-lead-time override. `null` clears it back to inheriting
+  // the plan default.
+  const applyReminderOffset = async (item: MealPlanItemView, offsetMinutes: number | null) => {
+    setBusyItemId(item.id);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${plan.id}/items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reminderOffsetMinutes: offsetMinutes }),
+      });
+      if (!res.ok) {
+        setTimeError(await readError(res, 'Could not update that reminder. Please try again.'));
+        return;
+      }
+      const updated = (await res.json()) as MealPlanView;
+      const updatedItem = updated.items.find((i) => i.id === item.id);
+      if (updatedItem) await scheduleMealReminder(updatedItem, updated);
+      router.refresh();
+    } finally {
+      setBusyItemId(null);
+    }
+  };
+
+  // Plan-wide default eating time — "set once, applies to every day that
+  // hasn't been individually overridden" (packages/shared/src/planTiming.ts).
+  // Never touches item rows; every non-overridden day's reminder is re-armed
+  // by the top-level effect purely because its *effective* time just
+  // changed (router.refresh() brings back a new `plan` prop).
+  const applyDefaultMealTime = async () => {
+    const draft = defaultTimeDraft.trim();
+    setDefaultsError(null);
+    setDefaultsBusy(true);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${plan.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultMealTime: draft || null }),
+      });
+      if (!res.ok) {
+        setDefaultsError(await readError(res, 'Could not update the default time. Please try again.'));
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDefaultsBusy(false);
+    }
+  };
+
+  const applyDefaultReminderOffset = async (offsetMinutes: number) => {
+    setDefaultsBusy(true);
+    try {
+      const res = await fetch(`/api/proxy/plan-ahead/${plan.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultReminderOffsetMinutes: offsetMinutes }),
+      });
+      if (!res.ok) {
+        setDefaultsError(await readError(res, 'Could not update the default reminder. Please try again.'));
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDefaultsBusy(false);
     }
   };
 
@@ -300,7 +395,8 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
     }
   };
 
-  const planLevelLabel = plan.scope === 'tomorrow' ? 'Replace this day-plan' : 'Replace whole plan';
+  const planLevelLabel =
+    plan.scope === 'today' || plan.scope === 'tomorrow' ? 'Replace this day-plan' : 'Replace whole plan';
 
   return (
     <div>
@@ -312,8 +408,77 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
       {error ? <p className={styles.errorText}>{error}</p> : null}
       {timeError ? <p className={styles.errorText}>{timeError}</p> : null}
 
+      <div className={styles.mealCard}>
+        <button type="button" className={styles.itemActionText} onClick={() => setDefaultsOpen((v) => !v)}>
+          {plan.defaultMealTime
+            ? `Default: eat at ${plan.defaultMealTime}, reminder ${
+                plan.defaultReminderOffsetMinutes > 0 ? `${plan.defaultReminderOffsetMinutes} min before` : 'off'
+              }`
+            : 'Set a default eating time for every day →'}
+        </button>
+        {defaultsOpen ? (
+          <div className={styles.defaultsBlock}>
+            <p className={styles.fieldLabel}>When do you usually want to eat?</p>
+            <div className={styles.timeRow}>
+              <input
+                className={styles.timeInput}
+                type="time"
+                aria-label="Default meal time"
+                value={defaultTimeDraft}
+                onChange={(e) => setDefaultTimeDraft(e.target.value)}
+              />
+              <button
+                type="button"
+                className={styles.itemActionText}
+                onClick={applyDefaultMealTime}
+                disabled={defaultsBusy}
+              >
+                {plan.defaultMealTime ? 'Update' : 'Set default'}
+              </button>
+            </div>
+            {defaultsError ? <p className={styles.errorText}>{defaultsError}</p> : null}
+
+            <p className={styles.fieldLabel} style={{ marginTop: 'var(--space-md)' }}>
+              Remind me
+            </p>
+            <div className={styles.chipWrap}>
+              {REMINDER_OFFSET_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={plan.defaultReminderOffsetMinutes === option.value}
+                  className={`${styles.chip} ${
+                    plan.defaultReminderOffsetMinutes === option.value ? styles.chipSelected : ''
+                  }`}
+                  onClick={() => applyDefaultReminderOffset(option.value)}
+                  disabled={defaultsBusy}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <p className={styles.reminderHint}>
+              Applies to every day below that hasn&apos;t been set individually — you can still override any single
+              day.
+            </p>
+          </div>
+        ) : null}
+      </div>
+
       {plan.items.map((item) => {
         const image = item.recipe ? getCuisineImage(item.recipe.cuisine) : null;
+        const effectiveTime = effectivePlannedTime(item, plan);
+        const effectiveOffset = effectiveReminderOffsetMinutes(item, plan);
+        const isTimeOverride = item.plannedTime !== null;
+        // Smart start time — a distinct, purely informational companion to
+        // the reminder above: recipe-aware ("start at 18:25 to eat by
+        // 19:00") rather than a flat lead time. "Cook it" days with a recipe
+        // only — "Get it" has no cook duration to count back from.
+        const recipeCookTimeMinutes =
+          item.mealChoice === 'cook' && item.recipe && effectiveTime ? item.recipe.cookTimeMinutes : null;
+        const shortfall =
+          recipeCookTimeMinutes !== null ? reminderShortfallMinutes(effectiveOffset, recipeCookTimeMinutes) : 0;
         return (
           <div key={item.id} className={styles.mealCard}>
             {image ? <img className={styles.mealImage} src={image.url} alt={image.alt} /> : null}
@@ -332,10 +497,27 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                 <p className={styles.mealTitle}>Nothing planned for this day</p>
               )}
 
-              {item.plannedTime ? (
+              {effectiveTime ? (
                 <p className={styles.reminderNote}>
-                  🔔 Reminder at {formatReminderTime(item.plannedTime)} — 30 min before it&apos;s time to{' '}
-                  {item.mealChoice === 'eat_out' ? 'order' : 'start cooking'}.
+                  {effectiveOffset > 0
+                    ? `🔔 Reminder at ${formatReminderTime(effectiveTime, effectiveOffset)} — ${effectiveOffset} min before it's time to ${
+                        item.mealChoice === 'eat_out' ? 'order' : 'start cooking'
+                      }.`
+                    : `Eating at ${effectiveTime} — no reminder set.`}
+                  {!isTimeOverride ? ' (plan default)' : ''}
+                </p>
+              ) : null}
+
+              {recipeCookTimeMinutes !== null ? (
+                <p className={styles.startTimeNote}>
+                  Start around {suggestedStartTime(effectiveTime!, recipeCookTimeMinutes)} to be ready by{' '}
+                  {effectiveTime}.
+                </p>
+              ) : null}
+              {shortfall > 0 ? (
+                <p className={styles.startTimeWarning}>
+                  This recipe takes about {recipeCookTimeMinutes} min — your {effectiveOffset}-min reminder may
+                  leave you about {shortfall} min short.
                 </p>
               ) : null}
 
@@ -364,11 +546,12 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                     </button>
                   </div>
 
-                  {/* 30-min-before reminder. The time input is a native
-                      <input type="time"> — the browser's own hour/minute
-                      picker, not a free-text field someone could mistype —
-                      so this is guaranteed a valid "HH:mm" (or empty) before
-                      it ever reaches applyPlannedTime. */}
+                  {/* The time input is a native <input type="time"> — the
+                      browser's own hour/minute picker, not a free-text field
+                      someone could mistype — so this is guaranteed a valid
+                      "HH:mm" (or empty) before it ever reaches
+                      applyPlannedTime. */}
+                  <p className={styles.fieldLabel}>{plan.defaultMealTime ? "Override this day's time" : 'Eating time'}</p>
                   <div className={styles.timeRow}>
                     <input
                       className={styles.timeInput}
@@ -383,13 +566,59 @@ export function PlanView({ plan }: { plan: MealPlanView }) {
                       onClick={() => applyPlannedTime(item)}
                       disabled={busyItemId === item.id}
                     >
-                      {item.plannedTime ? 'Update' : 'Set time'}
+                      {isTimeOverride ? 'Update' : 'Set time'}
                     </button>
                   </div>
-                  {item.plannedTime ? (
-                    <p className={styles.reminderHint}>
-                      Keep this tab open around then to get the notification.
-                    </p>
+                  {isTimeOverride && plan.defaultMealTime ? (
+                    <button
+                      type="button"
+                      className={styles.itemActionText}
+                      onClick={() => {
+                        setTimeDrafts((current) => ({ ...current, [item.id]: '' }));
+                        applyPlannedTime(item, '');
+                      }}
+                      disabled={busyItemId === item.id}
+                    >
+                      Use plan default ({plan.defaultMealTime}) instead
+                    </button>
+                  ) : null}
+
+                  {effectiveTime ? (
+                    <>
+                      <p className={styles.fieldLabel} style={{ marginTop: 'var(--space-md)' }}>
+                        Remind me
+                      </p>
+                      <div className={styles.chipWrap}>
+                        {REMINDER_OFFSET_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            type="button"
+                            role="radio"
+                            aria-checked={effectiveOffset === option.value}
+                            className={`${styles.chip} ${effectiveOffset === option.value ? styles.chipSelected : ''}`}
+                            onClick={() => applyReminderOffset(item, option.value)}
+                            disabled={busyItemId === item.id}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                      {item.reminderOffsetMinutes !== null && plan.defaultMealTime ? (
+                        <button
+                          type="button"
+                          className={styles.itemActionText}
+                          onClick={() => applyReminderOffset(item, null)}
+                          disabled={busyItemId === item.id}
+                        >
+                          Use plan default (
+                          {plan.defaultReminderOffsetMinutes > 0 ? `${plan.defaultReminderOffsetMinutes} min before` : 'off'}
+                          ) instead
+                        </button>
+                      ) : null}
+                      {effectiveOffset > 0 ? (
+                        <p className={styles.reminderHint}>Keep this tab open around then to get the notification.</p>
+                      ) : null}
+                    </>
                   ) : null}
 
                   {item.mealChoice === 'eat_out' ? (

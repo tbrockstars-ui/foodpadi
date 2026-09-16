@@ -14,6 +14,11 @@ import type {
   CompanionSuggestionResponse,
   ConfirmPasswordResetRequest,
   CreateFeedbackRequest,
+  CreateStandaloneShoppingListRequest,
+  DealerProfileView,
+  DealerRatingsResponse,
+  DealerSearchRequest,
+  DealerSearchResponse,
   DecideRequest,
   DecideResponse,
   FeedbackView,
@@ -23,13 +28,16 @@ import type {
   GenerateRecipesRequest,
   GeneratePlanRequest,
   GuestSessionResponse,
+  HomeIdeasResponse,
   ImportRecipeRequest,
   LocalFoodSearchInteractionType,
   LocalFoodSearchRequest,
   LocalFoodSearchResponse,
   LoginRequest,
   MealPlanView,
+  PantryItemsResponse,
   PlanPreviewResponse,
+  RecentlyCookedResponse,
   RecipeView,
   ReferralReceivedStatus,
   ReferralShareChannel,
@@ -45,18 +53,43 @@ import type {
   SearchEatNowRequest,
   SetFoodGoalsRequest,
   ShoppingListView,
+  SubmitDealerRatingRequest,
+  TrackClientEventRequest,
   TrackGoalEventRequest,
   UpdateCompanionPreferencesRequest,
   UpdateFeedbackRequest,
   UpdateMealPlanItemRequest,
+  UpdatePlanDefaultsRequest,
+  UpdateProfileRequest,
   UpdateShoppingListItemRequest,
   UpsertFoodPreferenceRequest,
   UserSummary,
 } from '@foodpadi/shared';
 import { tokenStore } from './tokenStore';
 
+// A local Metro/Expo Go dev session always ran against the *deployed*
+// production API (app.json's extra.apiBaseUrl is one static URL for every
+// build) — any API-side field a local branch hasn't shipped yet then gets
+// rejected server-side ("property X should not exist" from class-validator's
+// whitelist), even though the exact same field is perfectly valid against the
+// API code sitting right next to it. In dev, derive the API host from the
+// Metro packager's own LAN address instead (Constants exposes it as
+// "hostUri", e.g. "192.168.1.5:8081" — the same host the JS bundle itself
+// was just fetched from) and hit the locally running API (apps/api's default
+// port, see .env's API_URL) on that machine. Falls back to the configured
+// production URL when hostUri isn't a LAN address (tunnel/production builds).
+function resolveDevApiBaseUrl(): string | null {
+  const hostUri = Constants.expoConfig?.hostUri;
+  if (!hostUri) return null;
+  const host = hostUri.split(':')[0];
+  if (!host || host.endsWith('.exp.direct') || host.endsWith('.exp.host')) return null;
+  return `http://${host}:4310`;
+}
+
 const API_BASE_URL: string =
-  (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ?? 'http://localhost:4310';
+  (__DEV__ && resolveDevApiBaseUrl()) ||
+  (Constants.expoConfig?.extra?.apiBaseUrl as string | undefined) ||
+  'http://localhost:4310';
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -203,6 +236,10 @@ export const api = {
   googleAuth: (idToken: string) =>
     request<AuthResponse>('/auth/google', { method: 'POST', body: { idToken } }),
   me: () => request<UserSummary>('/users/me', { auth: true }),
+  // Country of residence, display name, and the birth-month avatar picker
+  // (user instruction 2026-09-11) — see packages/shared/src/avatars.ts.
+  updateProfile: (patch: UpdateProfileRequest) =>
+    request<UserSummary>('/users/me', { method: 'PATCH', body: patch, auth: true }),
   acknowledgeDisclaimer: () =>
     request<UserSummary>('/users/me/disclaimer-acknowledge', { method: 'POST', auth: true }),
   completeOnboarding: () =>
@@ -251,6 +288,13 @@ export const api = {
     }),
   generateCookTodayRecipes: (payload: GenerateRecipesRequest, token: string) =>
     request<RecipeView[]>('/cook-today/generate', { method: 'POST', body: payload, token }),
+  // Fire-and-forget client-only analytics for the handful of Cook Today
+  // funnel steps with no backend request of their own — same explicit-token
+  // pattern as generateCookTodayRecipes above so a guest session works too
+  // (auth:true only resolves a signed-in tokenStore token). Web counterpart:
+  // apps/web/lib/trackClientEvent.ts.
+  trackEvent: (payload: TrackClientEventRequest, token: string) =>
+    request<void>('/analytics/track', { method: 'POST', body: payload, token }),
   saveRecipe: (payload: SaveRecipeRequest) =>
     request<SavedRecipeView>('/cook-today/recipes', { method: 'POST', body: payload, auth: true }),
   listSavedRecipes: () => request<SavedRecipeView[]>('/cook-today/recipes', { auth: true }),
@@ -286,6 +330,20 @@ export const api = {
   // "FoodPadi decides" entry point (web counterpart: apps/web/app/DecideFlow.tsx).
   decide: (payload: DecideRequest, token: string) =>
     request<DecideResponse>('/decide', { method: 'POST', body: payload, token }),
+  // Cook Today's "Good ideas for you" / "FoodPadi's Pick" / "Quick cook"
+  // (web counterpart: apps/web/lib/homeIdeas.ts's loadIdeaCards) — same
+  // guest-or-auth GET /home/ideas the web Home page and Cook Today page use.
+  // No mood/maxTime/maxBudget query here — mobile Cook Today, like web's own
+  // cook-today/page.tsx, just wants the plain unfiltered list.
+  getHomeIdeas: (token: string) => request<HomeIdeasResponse>('/home/ideas', { token }),
+  // "Recently cooked" strip — same GET /home/recently-cooked, guest-or-auth
+  // (always empty for a guest server-side, nothing persists for them).
+  getRecentlyCooked: (token: string) =>
+    request<RecentlyCookedResponse>('/home/recently-cooked', { token }),
+  // "Use These First" — the member's own pantry, oldest-added first (web
+  // counterpart: apps/web/lib/homeIdeas.ts's loadPantrySummary). Account-only,
+  // same ScanController guard as addPantryItems below.
+  listPantryItems: () => request<PantryItemsResponse>('/pantry/items', { auth: true }),
   localFoodSearch: (payload: LocalFoodSearchRequest, token: string) =>
     request<LocalFoodSearchResponse>('/local-food-search', { method: 'POST', body: payload, token }),
   // "Find Near Me" brief §16 — client-only interactions the server can't
@@ -302,6 +360,46 @@ export const api = {
       body: { interactionType, metadata },
       token,
     }).catch(() => undefined),
+  // FoodPadi Food Dealer Network — the SAME endpoints the web customer app
+  // uses (dealer brief §21/§64). Deterministic, guest-accessible, no AI.
+  dealerSearch: (params: DealerSearchRequest, token: string) => {
+    const qs = new URLSearchParams();
+    if (params.q) qs.set('q', params.q);
+    if (params.locality) qs.set('locality', params.locality);
+    if (typeof params.latitude === 'number') qs.set('latitude', String(params.latitude));
+    if (typeof params.longitude === 'number') qs.set('longitude', String(params.longitude));
+    if (params.category) qs.set('category', params.category);
+    if (params.dealerType) qs.set('dealerType', params.dealerType);
+    if (params.page) qs.set('page', String(params.page));
+    return request<DealerSearchResponse>(`/dealers/search?${qs.toString()}`, { token });
+  },
+  getDealer: (slug: string) => request<DealerProfileView>(`/dealers/${encodeURIComponent(slug)}`),
+  trackDealerEvent: (slug: string, type: string) =>
+    request<void>(`/dealers/${encodeURIComponent(slug)}/events`, {
+      method: 'POST',
+      body: { type },
+    }).catch(() => undefined),
+  // Post-visit customer ratings (user instruction 2026-09-11). Read is public;
+  // write requires a real account — an unauthenticated getMine/submit throws
+  // ApiError(401), which the screen treats as "sign in to rate this business".
+  getDealerRatings: (slug: string, page = 1) =>
+    request<DealerRatingsResponse>(`/dealers/${encodeURIComponent(slug)}/ratings?page=${page}`),
+  getMyDealerRating: (slug: string) =>
+    request<{ rating: number; comment: string | null } | null>(
+      `/dealers/${encodeURIComponent(slug)}/ratings/me`,
+      { auth: true },
+    ),
+  submitDealerRating: (slug: string, payload: SubmitDealerRatingRequest) =>
+    request<DealerRatingsResponse>(`/dealers/${encodeURIComponent(slug)}/ratings`, {
+      method: 'POST',
+      body: payload,
+      auth: true,
+    }),
+  removeMyDealerRating: (slug: string) =>
+    request<DealerRatingsResponse>(`/dealers/${encodeURIComponent(slug)}/ratings/me`, {
+      method: 'DELETE',
+      auth: true,
+    }),
   generatePlan: (payload: GeneratePlanRequest) =>
     request<MealPlanView>('/plan-ahead/generate', { method: 'POST', body: payload, auth: true }),
   // Guest-or-auth, AI-free preview of Plan Ahead — a few curated dinner ideas
@@ -335,6 +433,12 @@ export const api = {
     request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'DELETE', auth: true }),
   updatePlanItem: (planId: string, itemId: string, payload: UpdateMealPlanItemRequest) =>
     request<MealPlanView>(`/plan-ahead/${planId}/items/${itemId}`, { method: 'PATCH', body: payload, auth: true }),
+  // Plan-wide default eating time + reminder lead time ("set once, applies
+  // to every day that hasn't been individually overridden"). Web
+  // counterpart: same PATCH /plan-ahead/:planId route, called from
+  // PlanView.tsx via the Next.js proxy.
+  updatePlanDefaults: (planId: string, payload: UpdatePlanDefaultsRequest) =>
+    request<MealPlanView>(`/plan-ahead/${planId}`, { method: 'PATCH', body: payload, auth: true }),
   // `regenerate: true` rebuilds an existing list from the plan (keeps manual items).
   generateShoppingList: (planId: string, regenerate = false) =>
     request<ShoppingListView>(`/plan-ahead/${planId}/shopping-list`, {
@@ -342,6 +446,12 @@ export const api = {
       body: { regenerate },
       auth: true,
     }),
+  // A list built directly from an ingredient set (Cook Today's fridge-check
+  // "you need to buy" items), not from an accepted plan — mealPlanId is null
+  // on the result. Web counterpart: the same POST /plan-ahead/shopping-lists
+  // route, called from FridgeCheck.tsx.
+  createStandaloneShoppingList: (payload: CreateStandaloneShoppingListRequest) =>
+    request<ShoppingListView>('/plan-ahead/shopping-lists', { method: 'POST', body: payload, auth: true }),
   getShoppingList: (listId: string) =>
     request<ShoppingListView>(`/plan-ahead/shopping-lists/${listId}`, { auth: true }),
   addShoppingListItem: (listId: string, payload: AddShoppingListItemRequest) =>

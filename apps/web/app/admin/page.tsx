@@ -83,6 +83,14 @@ export default async function AdminHomePage() {
           <p className={styles.subtext}>Manage Eat Now&apos;s catalog — add, edit, deactivate, or remove dishes.</p>
         </Link>
 
+        <Link href="/admin/billing" className={`${styles.placeholderCard} ${styles.cardLink}`}>
+          <h2>Subscription</h2>
+          <p className={styles.subtext}>
+            Set the Premium price, free-trial length, Nigeria (₦) price and per-currency local
+            amounts. Pushes to Stripe &amp; Flutterwave on save.
+          </p>
+        </Link>
+
         <section className={styles.placeholderCard}>
           <h2>Coming next</h2>
           <p className={styles.subtext}>

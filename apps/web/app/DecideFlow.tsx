@@ -344,36 +344,48 @@ export function DecideFlow({ isGuest = false }: { isGuest?: boolean }) {
                 </div>
               </div>
 
-              {/* "Find Near Me" — the one CTA a Decide result has. Clicking
-                  it immediately searches for this already-selected food near
-                  the user (LocalFoodSearch's autoStart below); it never
-                  re-asks what food to look for. */}
-              {expandedId === option.id ? (
-                getSearchBusy ? null : (
-                  <button
-                    type="button"
-                    className={styles.optionAction}
-                    onClick={() => {
-                      setGetSearchStage('idle');
-                      setExpandedId(null);
-                    }}
-                  >
-                    Hide
-                  </button>
-                )
-              ) : (
+              {/* Every result gets two independent actions: "Cook It" sends
+                  the exact title to Cook Today's free-text box (the customer
+                  still has to hit its own Cook button — nothing here
+                  auto-generates a recipe), and "Find Nearby" is the existing
+                  CTA, untouched — clicking it immediately searches for this
+                  already-selected food near the user (LocalFoodSearch's
+                  autoStart below); it never re-asks what food to look for. */}
+              <div className={styles.optionActionsRow}>
                 <button
                   type="button"
-                  className={styles.findNearMeButton}
-                  onClick={() => {
-                    trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title });
-                    setGetSearchStage('idle');
-                    setExpandedId(option.id);
-                  }}
+                  className={styles.optionAction}
+                  onClick={() => router.push(`/cook-today?prompt=${encodeURIComponent(option.title)}`)}
                 >
-                  Find Near Me
+                  Cook It
                 </button>
-              )}
+                {expandedId === option.id ? (
+                  getSearchBusy ? null : (
+                    <button
+                      type="button"
+                      className={styles.optionAction}
+                      onClick={() => {
+                        setGetSearchStage('idle');
+                        setExpandedId(null);
+                      }}
+                    >
+                      Hide
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.findNearMeButton}
+                    onClick={() => {
+                      trackLocalFoodSearchInteraction('find_near_me_clicked', { query: option.title });
+                      setGetSearchStage('idle');
+                      setExpandedId(option.id);
+                    }}
+                  >
+                    Find Nearby
+                  </button>
+                )}
+              </div>
 
               {expandedId === option.id ? (
                 <div className={styles.optionDetail}>

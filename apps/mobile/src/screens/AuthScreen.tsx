@@ -21,6 +21,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   const ins = useScreenInsets();
   const { login, register } = useAuth();
   const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [firstName, setFirstName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -43,12 +44,13 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
   };
 
   const emailLooksValid = /^\S+@\S+\.\S+$/.test(email.trim());
+  const firstNameValid = mode === 'login' || firstName.trim().length > 0;
   const passwordLongEnough = password.length >= 8;
   const passwordsMatch = mode === 'login' || (confirmPassword.length > 0 && confirmPassword === password);
-  const canSubmit = emailLooksValid && passwordLongEnough && passwordsMatch;
+  const canSubmit = emailLooksValid && firstNameValid && passwordLongEnough && passwordsMatch;
 
   const submit = async () => {
-    if (!emailLooksValid || !passwordLongEnough) return;
+    if (!emailLooksValid || !firstNameValid || !passwordLongEnough) return;
     if (mode === 'register' && password !== confirmPassword) {
       setError('Passwords do not match.');
       return;
@@ -59,7 +61,7 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
       if (mode === 'login') {
         await login(email.trim(), password);
       } else {
-        await register(email.trim(), password);
+        await register(email.trim(), password, firstName.trim());
       }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Something went wrong. Please try again.');
@@ -112,6 +114,15 @@ export function AuthScreen({ onForgotPassword, onContinueAsGuest, successMessage
 
       {mode === 'register' ? (
         <>
+          <TextInput
+            style={styles.input}
+            placeholder="First name"
+            placeholderTextColor={colors.textMuted}
+            autoCapitalize="words"
+            value={firstName}
+            onChangeText={setFirstName}
+            accessibilityLabel="First name"
+          />
           <View style={styles.inputWrap}>
             <TextInput
               style={[styles.input, styles.inputWithToggle]}

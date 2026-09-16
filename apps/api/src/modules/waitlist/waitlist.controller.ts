@@ -9,7 +9,12 @@ export class WaitlistController {
   @Post()
   @HttpCode(HttpStatus.OK)
   async join(@Body() dto: JoinWaitlistDto) {
-    await this.waitlistService.join(dto.email);
+    await this.waitlistService.join(dto.email, {
+      marketingConsent: dto.marketingConsent ?? false,
+      purpose: dto.purpose,
+      source: dto.source,
+      campaign: dto.campaign,
+    });
     return { ok: true };
   }
 }

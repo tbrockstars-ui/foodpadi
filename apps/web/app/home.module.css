@@ -19,6 +19,13 @@
   margin-bottom: 16px;
 }
 
+.greeting {
+  color: var(--primary-ink);
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 6px;
+}
+
 .heading {
   display: flex;
   align-items: center;
@@ -89,7 +96,7 @@
 .actionLabel {
   font-size: 16px;
   font-weight: 700;
-  color: var(--primary);
+  color: var(--primary-ink);
   margin: 0;
 }
 
@@ -191,24 +198,34 @@
   margin-top: 4px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 /* Decide flow — "FoodPadi decides" (Understand Context -> 3 explained options) */
 
 .decideSection {
   background: var(--surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-lg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-xl);
   margin-bottom: var(--space-xl);
   box-shadow: var(--shadow-sm);
 }
 
+@media (max-width: 640px) {
+  .decideSection {
+    padding: var(--space-lg);
+    border-radius: var(--radius-lg);
+  }
+}
+
+/* The intent chips read as calm, intelligent suggestions — not a wall of
+   buttons. Muted by default; lime only when one is actually chosen. */
 .chipRow {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: var(--space-md);
+  margin-bottom: var(--space-lg);
 }
 
 /* Resets the whole flow (text, budget, results) back to blank. Pushed to
@@ -237,71 +254,90 @@
 }
 
 .promptChip {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  border: 1px solid transparent;
+  background: var(--surface-sunken);
+  color: var(--text-muted);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   padding: 8px 14px;
   border-radius: var(--radius-pill);
   cursor: pointer;
   font-family: inherit;
-  /* Selecting a chip swaps background/text colour — this makes that swap a
-     smooth crossfade instead of an instant snap (brief §19). Colour-only,
-     so it stays on even under prefers-reduced-motion (no movement to
-     reduce). */
+  /* Selecting a chip swaps background/text colour — a smooth crossfade,
+     not an instant snap. Colour-only, so it stays on even under
+     prefers-reduced-motion. */
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.promptChipSelected {
+.promptChip:hover {
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.promptChipSelected,
+.promptChipSelected:hover {
   background: var(--primary);
   color: var(--primary-text);
   border-color: var(--primary);
+  font-weight: 600;
 }
 
+/* The free-text field is the primary interaction — big, editorial, calm. */
 .searchBar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
+  display: block;
+  margin-bottom: var(--space-lg);
 }
 
 .decideInput {
   display: block;
-  flex: 1;
-  min-width: 0;
+  width: 100%;
   box-sizing: border-box;
   border: 1px solid var(--border);
   background: var(--surface-sunken);
-  border-radius: var(--radius-pill);
-  padding: 16px 24px;
-  font-size: 16px;
+  border-radius: var(--radius-lg);
+  padding: 20px 22px;
+  font-size: 17px;
+  line-height: 1.4;
   color: var(--text);
   font-family: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.decideInput::placeholder {
+  color: var(--text-faint);
 }
 
 .decideInput:focus {
   outline: none;
   border-color: var(--primary);
   background: var(--surface);
+  box-shadow: var(--focus-ring);
 }
 
+/* Primary CTA — lime with dark text; confident, not glaring. Restrained
+   shadow, its own full-width row on mobile. */
 .searchButton {
-  flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  height: 52px;
-  padding: 0 22px;
+  min-height: 54px;
+  padding: 0 28px;
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: var(--primary);
   color: var(--primary-text);
-  font-size: 15px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   white-space: nowrap;
   cursor: pointer;
   font-family: inherit;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.searchButton:hover:not(:disabled) {
+  background: var(--primary-dark);
 }
 
 .searchButton span {
@@ -310,8 +346,14 @@
 }
 
 .searchButton:disabled {
-  opacity: 0.4;
+  opacity: 0.45;
   cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .searchButton {
+    width: 100%;
+  }
 }
 
 .constraintsRow {
@@ -339,12 +381,24 @@
 .constraintInput {
   width: 100%;
   border: 1px solid var(--border);
-  background: var(--background);
+  background: var(--surface-sunken);
   border-radius: var(--radius-md);
-  padding: 10px 14px;
-  font-size: 13px;
+  padding: 12px 14px;
+  font-size: 14px;
   color: var(--text);
   font-family: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.constraintInput::placeholder {
+  color: var(--text-faint);
+}
+
+.constraintInput:focus {
+  outline: none;
+  border-color: var(--primary);
+  background: var(--surface);
+  box-shadow: var(--focus-ring);
 }
 
 .constraintInputHasPrefix {
@@ -450,6 +504,20 @@
   cursor: pointer;
   font-family: inherit;
   margin-top: var(--space-md);
+}
+
+/* Wraps "Cook It" + "Find Nearby"/"Hide" side by side on a Decide result.
+   Each child (.optionAction / .findNearMeButton) already carries its own
+   margin-top, which a flex item still honours, so the row needs no spacing
+   of its own. */
+.optionActionsRow {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.optionActionsRow > * {
+  flex: 1;
+  text-align: center;
 }
 
 .optionDetail {
@@ -628,6 +696,36 @@
   color: var(--text-faint);
 }
 
+/* Cook Today only (IdeaCard's optional onStartCooking prop) — Home never
+   passes that prop, so this class is simply unused there; adding it here
+   changes nothing about Home's own cards. */
+.ideaStartCookingButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--primary);
+  color: var(--primary-text);
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  padding: 9px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.12s ease;
+}
+
+.ideaStartCookingButton:hover {
+  background: var(--primary-dark);
+}
+
+.ideaStartCookingButton:active {
+  transform: scale(0.98);
+}
+
 .ideaMatch {
   display: inline-block;
   background: var(--success-soft);
@@ -731,7 +829,7 @@
   height: 22px;
   border-radius: var(--radius-pill);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 11px;
   font-weight: 700;
   text-align: center;
@@ -741,7 +839,7 @@
 .ideaModalCta {
   display: inline-block;
   margin-top: var(--space-sm);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
   font-size: 14px;
   text-decoration: none;
@@ -831,7 +929,7 @@
 .recentViewAll {
   font-size: 12.5px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .recentRow {
@@ -904,5 +1002,225 @@
   color: var(--text-faint);
   margin: 4px 0 2px;
   line-height: 1.5;
+}
+
+/* --- Cook Today only, additive below this line ---------------------------
+   Every class from here down is new and used only by app/cook-today's own
+   redesigned layout (docs Cook-page-redesign brief) — none of the existing
+   rules above are modified, and Home never references these classes, so
+   Home's own rendering is completely unaffected. Cook Today's action cards
+   want distinct accent colours the shared design system doesn't define yet
+   (only green/amber exist as --primary/--secondary); purple and blue are
+   defined locally here, rgba-based so they read reasonably in both themes
+   without needing separate light/dark overrides, rather than widening
+   globals.css's palette for one page's four cards. */
+
+/* Forces the 4 action cards into a 2x2 square (Cook Today only) instead of
+   Home's own auto-fit row — Home's quick actions have a different item
+   count and keep their existing shape untouched. */
+.quickActionsGridSquare {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+@media (max-width: 480px) {
+  .quickActionsGridSquare {
+    grid-template-columns: 1fr;
+  }
+}
+
+.quickActionCardAccent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: relative;
+  border-width: 1px;
+  border-style: solid;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.quickActionCardAccent:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.quickActionIconChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.quickActionArrow {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  color: var(--text-faint);
+  font-size: 14px;
+}
+
+.quickActionGreen {
+  border-color: var(--primary-soft);
+  background: linear-gradient(180deg, var(--primary-soft) 0%, var(--surface) 65%);
+}
+.quickActionGreen .quickActionIconChip {
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+}
+
+.quickActionPurple {
+  border-color: rgba(139, 124, 246, 0.28);
+  background: linear-gradient(180deg, rgba(139, 124, 246, 0.14) 0%, var(--surface) 65%);
+}
+.quickActionPurple .quickActionIconChip {
+  background: rgba(139, 124, 246, 0.2);
+  color: #8b7cf6;
+}
+
+.quickActionAmber {
+  border-color: var(--secondary-soft);
+  background: linear-gradient(180deg, var(--secondary-soft) 0%, var(--surface) 65%);
+}
+.quickActionAmber .quickActionIconChip {
+  background: var(--secondary-soft);
+  color: var(--secondary-dark);
+}
+
+.quickActionBlue {
+  border-color: rgba(91, 155, 213, 0.28);
+  background: linear-gradient(180deg, rgba(91, 155, 213, 0.14) 0%, var(--surface) 65%);
+}
+.quickActionBlue .quickActionIconChip {
+  background: rgba(91, 155, 213, 0.2);
+  color: #5b9bd5;
+}
+
+/* Recently cooked — compact horizontal strip (Cook Today puts this at the
+   bottom of the main column; Home keeps its existing vertical .recentCard
+   list in its aside, untouched, using the classes above this section). */
+.recentStrip {
+  display: flex;
+  gap: var(--space-md);
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-top: var(--space-sm);
+}
+
+.recentStripItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  width: 84px;
+  text-decoration: none;
+}
+
+.recentStripThumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--border);
+}
+
+.recentStripTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  text-align: center;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.recentStripWhen {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 0;
+}
+
+/* FoodPadi's Pick — the featured card in the right column gets a touch more
+   presence than a plain .ideaCard (brief §13: "larger image, stronger card
+   treatment, subtle glow"), without a second card component. */
+.pickCard {
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--primary-soft);
+  box-shadow: 0 0 0 1px var(--primary-soft), var(--shadow-sm);
+}
+
+.pickHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
+.pickBadge {
+  display: inline-block;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  margin: 6px 0 0;
+}
+
+.pickTryAnother {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 6px auto 0;
+  border: none;
+  background: none;
+  color: var(--text-muted);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 4px;
+}
+
+.pickTryAnother:hover {
+  color: var(--text);
+}
+
+/* "Use These First" (brief §15) — compact pantry-item rows, Cook Today only. */
+.pantryList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pantryRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 7px 0;
+}
+
+.pantryRow + .pantryRow {
+  border-top: 1px solid var(--border);
+}
+
+.pantryName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0;
+}
+
+.pantryQuantity {
+  font-size: 12px;
+  color: var(--text-faint);
+  margin: 0;
+  white-space: nowrap;
 }
 

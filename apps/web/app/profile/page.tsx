@@ -10,6 +10,8 @@ import { AppShell } from '../../components/AppShell';
 import shellStyles from '../app-shell.module.css';
 import styles from './profile.module.css';
 import { GoalsSection } from './GoalsSection';
+import { AvatarSection } from './AvatarSection';
+import { CountrySection } from './CountrySection';
 import { CuisinesSection } from './CuisinesSection';
 import { AvoidedIngredientsSection } from './AvoidedIngredientsSection';
 import { PrivacySection } from './PrivacySection';
@@ -63,6 +65,21 @@ export default async function ProfilePage() {
         ) : (
           <>
             <p className={styles.email}>{data.me.email}</p>
+
+            <h2 className={styles.sectionHeading}>Avatar</h2>
+            <div className={styles.section}>
+              <AvatarSection initialBirthMonth={data.me.birthMonth} initialAvatarId={data.me.avatarId} />
+            </div>
+
+            <h2 id="country" className={`${styles.sectionHeading} ${styles.anchorTarget}`}>
+              Country of residence
+            </h2>
+            <div className={styles.section}>
+              <p className={styles.emptyText}>
+                Sets your currency and price for FoodPadi Premium.
+              </p>
+              <CountrySection initialCode={data.me.countryCode} />
+            </div>
 
             <h2 className={styles.sectionHeading}>Recipes &amp; plans</h2>
             <div className={styles.section} style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-sm)' }}>

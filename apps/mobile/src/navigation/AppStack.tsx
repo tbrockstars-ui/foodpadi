@@ -9,6 +9,7 @@ import { ShoppingListScreen } from '../screens/ShoppingListScreen';
 import { InviteScreen } from '../screens/InviteScreen';
 import { EditGoalsScreen } from '../screens/EditGoalsScreen';
 import { CuisinesScreen } from '../screens/CuisinesScreen';
+import { EditAvatarScreen } from '../screens/EditAvatarScreen';
 import { ImportRecipeScreen } from '../screens/ImportRecipeScreen';
 import { ScanScreen } from '../screens/ScanScreen';
 import { SavedRecipesScreen } from '../screens/SavedRecipesScreen';
@@ -17,6 +18,7 @@ import { CookingSessionScreen } from '../screens/CookingSessionScreen';
 import { SavedPlansScreen } from '../screens/SavedPlansScreen';
 import { SettingsScreen } from '../screens/SettingsScreen';
 import { SubscriptionScreen } from '../screens/SubscriptionScreen';
+import { DealerProfileScreen } from '../screens/DealerProfileScreen';
 import type { AppStackParamList } from './types';
 
 // Re-exported so the many `import type { AppStackParamList } from
@@ -66,6 +68,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
         <Stack.Screen name="Cuisines" component={CuisinesScreen} />
         <Stack.Screen name="Invite" component={InviteScreen} />
         <Stack.Screen name="EditGoals" component={EditGoalsScreen} />
+        <Stack.Screen name="EditAvatar" component={EditAvatarScreen} />
         <Stack.Screen name="ImportRecipe" component={ImportRecipeScreen} />
         <Stack.Screen name="Scan" component={ScanScreen} />
         <Stack.Screen name="SavedRecipes" component={SavedRecipesScreen} />
@@ -76,6 +79,7 @@ export function AppStack({ onRequestLogin }: { onRequestLogin: () => void }) {
           {(props) => <SettingsScreen {...props} onRequestLogin={onRequestLogin} />}
         </Stack.Screen>
         <Stack.Screen name="Subscription" component={SubscriptionScreen} />
+        <Stack.Screen name="DealerProfile" component={DealerProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

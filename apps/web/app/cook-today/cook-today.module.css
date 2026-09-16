@@ -1,3 +1,33 @@
+/* The hero free-text row (input + "Decide for me") — same visual language
+   as home.module.css's .searchBar/.searchButton, but that pair is normally
+   stacked (input row, then a separate button row) so .searchButton's own
+   mobile `width: 100%` rule works. This page wants them side by side on a
+   wide screen instead (closer to the reference layout), so this is its own
+   small wrapper: a row on desktop, stacked on narrow viewports — at which
+   point .searchButton's own width:100% naturally fills the column. */
+.heroSearchRow {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+
+@media (max-width: 640px) {
+  .heroSearchRow {
+    flex-direction: column;
+  }
+}
+
+/* The results/detail/cooking/continue-journey steps are single-column,
+   text-heavy reading views — kept at the page's old ~880px width even
+   though the blank entry screen (page.tsx now wraps everything in Home's
+   1280px .container, for the hubGrid layout) is wider. Long ingredient/step
+   lines stretching the full 1280px would be harder to read, not better. */
+.narrowColumn {
+  max-width: 880px;
+  margin: 0 auto;
+  width: 100%;
+}
+
 .title {
   font-size: 28px;
   font-weight: 700;
@@ -40,7 +70,7 @@
 .chipSelected {
   border-color: var(--primary);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-weight: 600;
 }
 
@@ -62,6 +92,24 @@
   font-size: 15px;
   color: var(--text);
   font-family: inherit;
+}
+
+.commentInput {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  font-size: 15px;
+  color: var(--text);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.commentInput:focus {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .addButton {
@@ -88,6 +136,32 @@
   margin: 0 0 var(--space-md);
 }
 
+.prepBreakdown {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 var(--space-lg);
+}
+
+.timeWarning {
+  background: var(--warning-soft);
+  border-radius: var(--radius-lg);
+  padding: var(--space-md) var(--space-lg);
+  margin-bottom: var(--space-lg);
+}
+
+.timeWarningText {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0 0 var(--space-md);
+}
+
+.timeWarningRow {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
 .primaryButton {
   border: none;
   border-radius: var(--radius-md);
@@ -105,6 +179,18 @@
   cursor: not-allowed;
 }
 
+.linkButton {
+  border: none;
+  background: none;
+  color: var(--primary-ink);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+
 .secondaryButton {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
@@ -115,6 +201,65 @@
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
+}
+
+/* --- Saved recipes: bulk select/delete --- */
+
+.bulkBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.checkRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+}
+
+.checkboxInput {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.bulkBarLabel {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.bulkDeleteButton {
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--danger);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bulkDeleteButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Top-left checkbox on each saved-recipe card (LikeHeart already owns
+   top-right) — sits above the card's own expand click-area, not inside it,
+   so selecting a card never also toggles it open. */
+.cardCheckbox {
+  position: absolute;
+  top: var(--space-md);
+  left: var(--space-md);
+  z-index: 1;
+  display: flex;
+  cursor: pointer;
 }
 
 .resultCard {
@@ -129,6 +274,45 @@
   box-shadow: var(--shadow-sm);
   cursor: pointer;
   font-family: inherit;
+}
+
+.resultCardInner {
+  display: flex;
+  gap: var(--space-md);
+  align-items: flex-start;
+}
+
+.resultImage {
+  width: 72px;
+  height: 72px;
+  border-radius: var(--radius-md);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: var(--surface-sunken);
+}
+
+.resultBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.matchBadge {
+  display: inline-block;
+  background: var(--primary-soft);
+  color: var(--primary-ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  margin: 0 0 var(--space-xs);
+}
+
+.resultReason {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: var(--space-xs) 0 0;
+  line-height: 1.4;
 }
 
 .resultTitle {
@@ -185,7 +369,7 @@
   height: 24px;
   border-radius: var(--radius-pill);
   background: var(--primary-soft);
-  color: var(--primary);
+  color: var(--primary-ink);
   font-size: 12px;
   font-weight: 600;
   text-align: center;
@@ -203,6 +387,23 @@
   color: var(--text-faint);
   line-height: 1.5;
   margin: var(--space-lg) 0;
+}
+
+.progressRow {
+  display: flex;
+  gap: 6px;
+  margin: var(--space-sm) 0 0;
+}
+
+.progressDot {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-sunken);
+}
+
+.progressDotDone {
+  background: var(--primary);
 }
 
 .stepGuideText {
@@ -240,7 +441,7 @@
 }
 
 .timerTimeDone {
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .timerPresetRow {
@@ -259,8 +460,39 @@
 .timerDoneText {
   font-size: 13px;
   font-weight: 600;
-  color: var(--primary);
+  color: var(--primary-ink);
   margin: var(--space-sm) 0 0;
+}
+
+.transitionCard {
+  background: var(--surface-sunken);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  margin-top: var(--space-lg);
+  text-align: center;
+}
+
+.transitionEyebrow {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-ink);
+  margin: 0 0 var(--space-sm);
+}
+
+.transitionCountdown {
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-md);
+  font-variant-numeric: tabular-nums;
+}
+
+.transitionNextStepText {
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.4;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-lg);
 }
 
 .ratingRow {

@@ -3,8 +3,10 @@ import { CompanionController } from './companion.controller';
 import { CompanionService } from './companion.service';
 import { ContextService } from './context.service';
 import { PatternService } from './pattern.service';
+import { BillingModule } from '../billing/billing.module';
 
 @Module({
+  imports: [BillingModule],
   controllers: [CompanionController],
   providers: [PatternService, ContextService, CompanionService],
   // PatternService is also consumed directly by FeedbackModule (feedback

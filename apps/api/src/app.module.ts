@@ -19,7 +19,11 @@ import { ReferralsModule } from './modules/referrals/referrals.module';
 import { CompanionModule } from './modules/companion/companion.module';
 import { FeedbackModule } from './modules/feedback/feedback.module';
 import { CookingAssistantModule } from './modules/cooking-assistant/cooking-assistant.module';
+import { CookingJourneyModule } from './modules/cooking-journey/cooking-journey.module';
 import { HomeModule } from './modules/home/home.module';
+import { BillingModule } from './modules/billing/billing.module';
+import { DailyRemindersModule } from './modules/daily-reminders/daily-reminders.module';
+import { DealersModule } from './modules/dealers/dealers.module';
 import { AppController } from './app.controller';
 
 @Module({
@@ -44,7 +48,11 @@ import { AppController } from './app.controller';
     CompanionModule,
     FeedbackModule,
     CookingAssistantModule,
+    CookingJourneyModule,
     HomeModule,
+    BillingModule,
+    DailyRemindersModule,
+    DealersModule,
   ],
   controllers: [AppController],
 })

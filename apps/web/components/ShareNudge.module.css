@@ -48,7 +48,7 @@
 
 .copy.copied {
   border-color: var(--primary);
-  color: var(--primary);
+  color: var(--primary-ink);
 }
 
 .dismiss {

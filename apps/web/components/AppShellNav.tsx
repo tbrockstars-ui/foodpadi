@@ -20,7 +20,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/', label: 'Home', icon: HomeIcon, alsoMatch: ['/guest'] },
   { href: '/cook-today', label: 'Cook', icon: CookIcon },
   { href: '/plan', label: 'Plan', icon: PlanIcon },
-  { href: '/pantry', label: 'Pantry', icon: PantryIcon },
   { href: '/eat-now', label: 'Discover', icon: DiscoverIcon },
   { href: '/favorites', label: 'Favorites', icon: SavedIcon, membersOnly: true },
   { href: '/profile', label: 'Profile', icon: ProfileIcon, membersOnly: true },
@@ -102,15 +101,6 @@ function PlanIcon({ width, height }: { width: number; height: number }) {
     <svg {...iconProps(width, height)}>
       <rect x="3.5" y="5" width="17" height="15" rx="2" />
       <path d="M3.5 9.5h17M8 3v3.5M16 3v3.5" />
-    </svg>
-  );
-}
-
-function PantryIcon({ width, height }: { width: number; height: number }) {
-  return (
-    <svg {...iconProps(width, height)}>
-      <rect x="4.5" y="3.5" width="15" height="17" rx="1.5" />
-      <path d="M4.5 9.5h15M8 3.5v6M8 17v3.5" />
     </svg>
   );
 }

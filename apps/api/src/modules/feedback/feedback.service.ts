@@ -41,6 +41,7 @@ export class FeedbackService {
       context: dto.context,
       rating: dto.rating,
       tagCount: dto.tags?.length ?? 0,
+      hasComment: Boolean(dto.comment?.trim()),
     });
 
     this.recomputePatterns(userId);

@@ -26,7 +26,15 @@ export class AdminWaitlistService {
     ]);
 
     return {
-      signups: signups.map((s) => ({ id: s.id, email: s.email, createdAt: s.createdAt.toISOString() })),
+      signups: signups.map((s) => ({
+        id: s.id,
+        email: s.email,
+        createdAt: s.createdAt.toISOString(),
+        marketingConsent: s.marketingConsent,
+        purpose: s.purpose,
+        source: s.source,
+        campaign: s.campaign,
+      })),
       page,
       pageSize,
       total,
